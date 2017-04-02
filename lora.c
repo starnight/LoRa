@@ -176,6 +176,13 @@ static const struct of_device_id lora_dt_ids[] = {
 	{}, /* Should be terminated with a NULL entry. */
 };
 MODULE_DEVICE_TABLE(of, lora_dt_ids);
+
+static const struct spi_device_id spi_ids[] = {
+	{ .name = "rpi-lora-spi" },
+	{}
+};
+MODULE_DEVICE_TABLE(spi, spi_ids);
+
 //#endif
 
 #ifdef CONFIG_ACPI
@@ -295,6 +302,7 @@ static struct spi_driver lora_spi_driver = {
 	},
 	.probe = lora_spi_probe,
 	.remove = lora_spi_remove,
+	.id_table = spi_ids,
 };
 
 
