@@ -1,0 +1,30 @@
+/dts-v1/;
+/plugin/;
+
+/ {
+	compatible = "brcm,bcm2835";
+
+	fragment@0 {
+		target = <&spi>;
+		__overlay__ {
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			spidev@0 {
+				status = "disabled";
+			};
+
+			spidev@1 {
+				status = "disabled";
+			};
+			
+			rpi-lora-spi@0 {
+				compatible = "semtech,sx1278";
+				reg = <0>;
+				status = "okay";
+				spi-max-frequency = <0x7a120>;
+			};
+
+		};
+	};
+};
