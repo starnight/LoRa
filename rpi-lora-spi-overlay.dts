@@ -2,8 +2,6 @@
 /plugin/;
 
 / {
-	compatible = "brcm,bcm2835";
-
 	fragment@0 {
 		target = <&spi>;
 		__overlay__ {
@@ -18,13 +16,19 @@
 				status = "disabled";
 			};
 			
-			rpi-lora-spi@0 {
-				compatible = "semtech,sx1278";
+			lora-spi@0 {
+				compatible = "lora-spi";
 				reg = <0>;
 				status = "okay";
 				spi-max-frequency = <0x7a120>;
 			};
 
+			lora-spi@1 {
+				compatible = "lora-spi";
+				reg = <1>;
+				status = "okay";
+				spi-max-frequency = <0x7a120>;
+			};
 		};
 	};
 };

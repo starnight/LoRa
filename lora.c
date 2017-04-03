@@ -35,8 +35,12 @@ struct device_data {
 	rwlock_t lock;
 };
 
+#ifndef __N_SPI_MINORS
+#define __N_SPI_MINORS	2
+#endif
+
 static unsigned int lora_major = 0;
-static unsigned int lora_devs = 2;
+static unsigned int lora_devs = __N_SPI_MINORS;
 static struct cdev lora_cdev;
 static struct class *lora_sys_class = NULL;
 
@@ -168,27 +172,19 @@ static struct file_operations lora_fops = {
 	//.unlocked_ioctl = lora_ioctl,
 };
 
-//#ifdef CONFIG_OF
+#ifdef CONFIG_OF
 static const struct of_device_id lora_dt_ids[] = {
 	{ .compatible = "semtech,sx1278" },
-	{ .compatible = "rpi-lora-spi" },
-	{ .compatible = "brcm,bcm2835-spi" },
+	{ .compatible = "lora-spi" },
 	{}, /* Should be terminated with a NULL entry. */
 };
 MODULE_DEVICE_TABLE(of, lora_dt_ids);
-
-static const struct spi_device_id spi_ids[] = {
-	{ .name = "rpi-lora-spi" },
-	{}
-};
-MODULE_DEVICE_TABLE(spi, spi_ids);
-
-//#endif
+#endif
 
 #ifdef CONFIG_ACPI
 #define LORA_ACPI_DUMMY	1
 static const struct acpi_device_id lora_acpi_ids[] = {
-	{"SPT0001", LORA_ACPI_DUMMY},
+	{ .id = "lora-spi" },
 	{}, /* Should be terminated with a NULL entry. */
 };
 MODULE_DEVICE_TABLE(acpi, lora_acpi_ids);
@@ -210,9 +206,13 @@ static void lora_probe_acpi(struct spi_device *spi) {
 static void lora_probe_acpi(struct spi_device *spi) {};
 #endif
 
-#define N_SPI_MINORS	2
+static const struct spi_device_id spi_ids[] = {
+	{ .name = "lora-spi" },
+	{}, /* Should be terminated with a NULL entry. */
+};
+MODULE_DEVICE_TABLE(spi, spi_ids);
 
-static DECLARE_BITMAP(minors, N_SPI_MINORS);
+static DECLARE_BITMAP(minors, __N_SPI_MINORS);
 static LIST_HEAD(device_list);
 
 static int lora_spi_probe(struct spi_device *spi) {
@@ -238,11 +238,13 @@ static int lora_spi_probe(struct spi_device *spi) {
 	/* Inital the driver data. */
 	lora_data->spi = spi;
 
-
+	/* Device list. */
 	INIT_LIST_HEAD(&(lora_data->device_entry));
 	
-	minor = find_first_zero_bit(minors, N_SPI_MINORS);
-	if(minor < N_SPI_MINORS) {
+	/* Have device minor number. */
+	minor = find_first_zero_bit(minors, lora_devs);
+	/* Create device node. */
+	if(minor < lora_devs) {
 		lora_data->devt = MKDEV(lora_major, minor);
 		dev = device_create(lora_sys_class, &(spi->dev), lora_data->devt,
 							lora_data, "loraSPI%d.%d",
@@ -253,17 +255,15 @@ static int lora_spi_probe(struct spi_device *spi) {
 		dev_dbg(&spi->dev, "no minor number available.\n");
 		status = -ENODEV;
 	}
+
 	if(status == 0) {
 		set_bit(minor, minors);
 		list_add(&lora_data->device_entry, &device_list);
-	}
 
-	lora_data->speed_hz = spi->max_speed_hz;
-
-	if(status == 0) {
+		lora_data->speed_hz = spi->max_speed_hz;
 		spi_set_drvdata(spi, lora_data);
-		printk(KERN_DEBUG "lora: loraSPI%d.%d device node created.\n",
-						  spi->master->bus_num, spi->chip_select);
+		printk(KERN_DEBUG "lora: loraSPI%d.%d device node created.  Speed is %d\n",
+						  spi->master->bus_num, spi->chip_select, spi->max_speed_hz);
 	}
 	else
 		kfree(lora_data);
@@ -291,11 +291,11 @@ static int lora_spi_remove(struct spi_device *spi) {
 
 static struct spi_driver lora_spi_driver = {
 	.driver = {
-		.name = "rpi-lora-spi",
+		.name = "lora-spi",
 		.owner = THIS_MODULE,
-//#ifdef CONFIG_OF
+#ifdef CONFIG_OF
 		.of_match_table = lora_dt_ids,
-//#endif
+#endif
 #ifdef CONFIG_ACPI
 		.acpi_match_table = ACPI_PTR(lora_acpi_ids),
 #endif
@@ -304,9 +304,6 @@ static struct spi_driver lora_spi_driver = {
 	.remove = lora_spi_remove,
 	.id_table = spi_ids,
 };
-
-
-
 
 static int lora_init(void) {
 	dev_t dev = MKDEV(lora_major, 0);
@@ -325,7 +322,7 @@ static int lora_init(void) {
 	cdev_init(&lora_cdev, &lora_fops);
 	lora_cdev.owner = THIS_MODULE;
 	/* Add the character device driver into system. */
-	cdev_err = cdev_add(&lora_cdev, MKDEV(lora_major, 0), lora_devs);
+	cdev_err = cdev_add(&lora_cdev, dev, lora_devs);
 	if(cdev_err) {
 		printk(KERN_DEBUG "lora: Failed to register a character device\n");
 		/* Release the allocated character device. */
@@ -365,10 +362,6 @@ static int lora_init(void) {
 		printk(KERN_DEBUG "lora: %s driver registered.\n", LORA_NAME);
 	}
 
-	/* Create device node. */
-	//device_create(lora_sys_class, NULL, dev, NULL, LORA_NAME);
-	//printk(KERN_DEBUG "lora: %s device node created.\n", LORA_NAME);
-
 	return status;
 }
 
@@ -376,8 +369,6 @@ static void lora_exit(void) {
 	dev_t dev = MKDEV(lora_major, 0);
 
 	printk(KERN_DEBUG "lora: exit\n");
-	/* Destory device nodes. */
-	//device_destroy(lora_sys_class, dev);
 	/* Delete device class. */
 	class_destroy(lora_sys_class);
 	/* Delete the character device driver from system. */

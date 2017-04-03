@@ -1,22 +1,21 @@
 PROJ=lora
 obj-m := $(PROJ).o
 
-ifeq ($(KERNELDIR),)
-KERNELDIR=/lib/modules/$(shell uname -r)/build
-endif
+KERNEL_LOCATION=/lib/modules/$(shell uname -r)
+BUILDDIR=$(KERNEL_LOCATION)/build
 
 OVERLAY_SRC=rpi-lora-spi-overlay.dts
 OVERLAY_DST=/boot/overlays/rpi-lora-spi.dtbo
 
 all:
-	make -C $(KERNELDIR) M=$(shell pwd) modules
+	make -C $(BUILDDIR) M=$(shell pwd) modules
 
 dts:
 	sudo dtc -I dts -O dtb -@ -o $(OVERLAY_DST) $(OVERLAY_SRC)
 
 install:
-	gzip lora.ko
-	sudo mv lora.ko.gz /lib/modules/$(shell uname -r)/kernel/drivers/spi/rpi-lora-spi.ko.gz
+	gzip $(PROJ).ko
+	sudo mv $(PROJ).ko.gz $(KERNEL_LOCATION)/kernel/drivers/spi/lora-spi.ko.gz
 	# Rebuild the kernel module dependencies for modprobe
 	sudo depmod -a
 
@@ -52,5 +51,5 @@ test-post:
 test: test-pre test-action test-post
 
 clean:
-	make -C $(KERNELDIR) M=$(shell pwd) clean
+	make -C $(BUILDDIR) M=$(shell pwd) clean
 	rm -f ioctl
