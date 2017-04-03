@@ -12,7 +12,10 @@
 #include <linux/of_device.h>
 #include "test_ioctl.h"
 
+MODULE_AUTHOR("JianHong Pan, <starnight@g.ncu.edu.tw>");
+MODULE_DESCRIPTION("User mode LoRa SPI device interface");
 MODULE_LICENSE("Dual BSD/GPL");
+MODULE_ALIAS("spi:lora-spi");
 
 #define LORA_NAME	"lora"
 
