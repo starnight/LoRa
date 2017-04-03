@@ -17,6 +17,8 @@ dts:
 install:
 	gzip lora.ko
 	sudo mv lora.ko.gz /lib/modules/$(shell uname -r)/kernel/drivers/spi/rpi-lora-spi.ko.gz
+	# Rebuild the kernel module dependencies for modprobe
+	sudo depmod -a
 
 test-pre:
 	sudo insmod ./$(PROJ).ko
