@@ -12,12 +12,7 @@
 #include <linux/of_device.h>
 #include "test_ioctl.h"
 
-MODULE_AUTHOR("JianHong Pan, <starnight@g.ncu.edu.tw>");
-MODULE_DESCRIPTION("User mode LoRa SPI device interface");
-MODULE_LICENSE("Dual BSD/GPL");
-MODULE_ALIAS("spi:lora-spi");
-
-#define LORA_NAME	"lora"
+#define LORA_NAME	"LoRa SPI"
 
 /* The device packaged data and registers structure. */
 struct device_data {
@@ -39,15 +34,13 @@ struct device_data {
 };
 
 #ifndef __N_SPI_MINORS
-#define __N_SPI_MINORS	2
+#define __N_SPI_MINORS	32
 #endif
 
 static unsigned int lora_major = 0;
 static unsigned int lora_devs = __N_SPI_MINORS;
 static struct cdev lora_cdev;
 static struct class *lora_sys_class = NULL;
-
-
 
 /* The device initial data and registers' value. */
 static char _buffer[] = "0123456789\r\n";
@@ -167,6 +160,7 @@ static long lora_ioctl(struct file *filp, unsigned int cmd, unsigned long arg) {
 	return ret;
 }
 
+/* The file operations implement the user space's character device interface. */
 static struct file_operations lora_fops = {
 	.open = lora_open,
 	.release = lora_close,
@@ -175,6 +169,7 @@ static struct file_operations lora_fops = {
 	//.unlocked_ioctl = lora_ioctl,
 };
 
+/* The compatible device array. */
 #ifdef CONFIG_OF
 static const struct of_device_id lora_dt_ids[] = {
 	{ .compatible = "semtech,sx1278" },
@@ -185,6 +180,8 @@ MODULE_DEVICE_TABLE(of, lora_dt_ids);
 #endif
 
 #ifdef CONFIG_ACPI
+
+/* The compatible device array for ACPI. */
 #define LORA_ACPI_DUMMY	1
 static const struct acpi_device_id lora_acpi_ids[] = {
 	{ .id = "lora-spi" },
@@ -192,6 +189,7 @@ static const struct acpi_device_id lora_acpi_ids[] = {
 };
 MODULE_DEVICE_TABLE(acpi, lora_acpi_ids);
 
+/* The callback function of ACPI probes LoRa SPI. */
 static void lora_probe_acpi(struct spi_device *spi) {
 	const struct acpi_device_id *id;
 
@@ -209,6 +207,7 @@ static void lora_probe_acpi(struct spi_device *spi) {
 static void lora_probe_acpi(struct spi_device *spi) {};
 #endif
 
+/* The compatible SPI device id array. */
 static const struct spi_device_id spi_ids[] = {
 	{ .name = "lora-spi" },
 	{}, /* Should be terminated with a NULL entry. */
@@ -218,6 +217,7 @@ MODULE_DEVICE_TABLE(spi, spi_ids);
 static DECLARE_BITMAP(minors, __N_SPI_MINORS);
 static LIST_HEAD(device_list);
 
+/* The callback function of module probes LoRa SPI. */
 static int lora_spi_probe(struct spi_device *spi) {
 	struct device_data *lora_data;
 	struct device *dev;
@@ -274,6 +274,7 @@ static int lora_spi_probe(struct spi_device *spi) {
 	return status;
 }
 
+/* The callback function of LoRa SPI device removing. */
 static int lora_spi_remove(struct spi_device *spi) {
 	struct device_data *lora_data = spi_get_drvdata(spi);
 
@@ -291,7 +292,7 @@ static int lora_spi_remove(struct spi_device *spi) {
 	return 0;
 }
 
-
+/* The SPI driver which acts as a protocol driver in this kernel module. */
 static struct spi_driver lora_spi_driver = {
 	.driver = {
 		.name = "lora-spi",
@@ -383,3 +384,8 @@ static void lora_exit(void) {
 
 module_init(lora_init);
 module_exit(lora_exit);
+
+MODULE_AUTHOR("JianHong Pan, <starnight@g.ncu.edu.tw>");
+MODULE_DESCRIPTION("User mode LoRa SPI device interface");
+MODULE_LICENSE("Dual BSD/GPL");
+MODULE_ALIAS("spi:lora-spi");
