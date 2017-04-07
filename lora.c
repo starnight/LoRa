@@ -169,7 +169,7 @@ static struct file_operations lora_fops = {
 	//.unlocked_ioctl = lora_ioctl,
 };
 
-/* The compatible device array. */
+/* The compatible SoC array. */
 #ifdef CONFIG_OF
 static const struct of_device_id lora_dt_ids[] = {
 	{ .compatible = "semtech,sx1278" },
@@ -181,7 +181,7 @@ MODULE_DEVICE_TABLE(of, lora_dt_ids);
 
 #ifdef CONFIG_ACPI
 
-/* The compatible device array for ACPI. */
+/* The compatible ACPI device array. */
 #define LORA_ACPI_DUMMY	1
 static const struct acpi_device_id lora_acpi_ids[] = {
 	{ .id = "lora-spi" },
@@ -373,6 +373,8 @@ static void lora_exit(void) {
 	dev_t dev = MKDEV(lora_major, 0);
 
 	printk(KERN_DEBUG "lora: exit\n");
+	/* Unregister the LoRa SPI driver. */
+	spi_unregister_driver(&lora_spi_driver);
 	/* Delete device class. */
 	class_destroy(lora_sys_class);
 	/* Delete the character device driver from system. */
