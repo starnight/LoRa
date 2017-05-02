@@ -1,6 +1,7 @@
 PPROJ=lora
 PROJ=lora-spi
 obj-m := $(PROJ).o
+$(PROJ)-objs := lora_spi.o sx1278.o
 
 KERNEL_LOCATION=/lib/modules/$(shell uname -r)
 BUILDDIR=$(KERNEL_LOCATION)/build

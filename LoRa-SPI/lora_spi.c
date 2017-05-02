@@ -11,7 +11,8 @@
 #include <linux/of_device.h>
 #include <linux/errno.h>
 
-#include "lora-spi.h"
+#include "lora_spi.h"
+#include "sx1278.h"
 
 #define __DRIVER_NAME		"lora-spi"
 #define N_LORASPI_MINORS	4
@@ -26,11 +27,11 @@ static ssize_t loraspi_read(struct lora_data *lrdata, const char __user *buf, si
 	struct spi_device *spi;
 
 	spi = lrdata->lora_device;
-	printk(KERN_DEBUG "lora-spi: some device #%d.%d read\n",
+	printk(KERN_DEBUG "lora-spi: SPI device #%d.%d read\n",
 		   spi->master->bus_num, spi->chip_select);
 
 //	mutex_lock(&(lrdata->buf_lock));
-//	/* Read from the some device into the lora data's RX buffer. */
+//	/* Read from the SPI device into the lora data's RX buffer. */
 //	res = lrdata->bufmaxlen - lrdata->rx_buflen;
 //	len = (res <= size) ? res : size;
 //	len = somedevice_read(spi, lrdata->rx_buf + lrdata->rx_buflen, len);
@@ -53,7 +54,7 @@ static ssize_t loraspi_write(struct lora_data *lrdata, const char __user *buf, s
 	struct spi_device *spi;
 
 	spi = lrdata->lora_device;
-	printk(KERN_DEBUG "lora-spi: some device #%d.%d write\n",
+	printk(KERN_DEBUG "lora-spi: SPI device #%d.%d write\n",
 		   spi->master->bus_num, spi->chip_select);
 
 //	mutex_lock(&(lrdata->buf_lock));
@@ -67,7 +68,7 @@ static ssize_t loraspi_write(struct lora_data *lrdata, const char __user *buf, s
 //		oblen = lrdata->tx_buflen;
 //		lrdata->tx_buflen += len;
 //
-//		/* Write from lora data into some device. */
+//		/* Write from lora data into SPI device. */
 //		res = somedevice_write(spi, lrdata->tx_buf + oblen, lrdata->tx_buflen);
 //		lrdata->tx_buflen -= len;
 //		if(res <= 0) {
@@ -148,7 +149,7 @@ static int loraspi_probe(struct spi_device *spi) {
 	unsigned long minor;
 	int status;
 
-	printk(KERN_DEBUG "lora-spi: probe a some device with address %d.%d\n",
+	printk(KERN_DEBUG "lora-spi: probe a SPI device with address %d.%d\n",
 		   spi->master->bus_num, spi->chip_select);
 
 #ifdef CONFIG_OF 
@@ -179,7 +180,7 @@ static int loraspi_probe(struct spi_device *spi) {
 							lrdata->devt,
 							lrdata,
 							"loraSPI%d.%d", spi->master->bus_num, spi->chip_select);
-		/* Set the some device's driver data for later use.  */
+		/* Set the SPI device's driver data for later use.  */
 		spi_set_drvdata(spi, lrdata);
 		lora_device_add(lrdata);
 		status = PTR_ERR_OR_ZERO(dev);
@@ -189,6 +190,10 @@ static int loraspi_probe(struct spi_device *spi) {
 		kfree(lrdata);
 		status = -ENODEV;
 	}
+	
+	/* Initial the SX1278 chip. */
+	init_sx1278(spi);
+	
 	mutex_unlock(&minors_lock);
 
 	return status;
@@ -198,7 +203,7 @@ static int loraspi_probe(struct spi_device *spi) {
 static int loraspi_remove(struct spi_device *spi) {
 	struct lora_data *lrdata;
 	
-	printk(KERN_DEBUG "lora-spi: remove a some device with address %d.%d",
+	printk(KERN_DEBUG "lora-spi: remove a SPI device with address %d.%d",
 		   spi->master->bus_num, spi->chip_select);
 
 	lrdata = spi_get_drvdata(spi);
@@ -210,6 +215,8 @@ static int loraspi_remove(struct spi_device *spi) {
 	mutex_lock(&minors_lock);
 	device_destroy(lr_driver.lora_class, lrdata->devt);
 	clear_bit(MINOR(lrdata->devt), minors);
+	/* Set the SX1278 chip to sleep. */
+	sx127X_setState(spi, SX127X_SLEEP_MODE);
 	mutex_unlock(&minors_lock);
 
 	/* Free the memory of the lora device.  */
