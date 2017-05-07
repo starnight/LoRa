@@ -62,6 +62,7 @@ static int file_open(struct inode *inode, struct file *filp) {
 
 	/* Map the data location to the file data pointer. */
 	filp->private_data = lrdata;
+	/* This a character device, so it is not seekable. */
 	nonseekable_open(inode, filp);
 
 	return 0;
@@ -149,10 +150,11 @@ static int lora_device_remove(struct lora_data *lrdata) {
 EXPORT_SYMBOL(lora_device_remove);
 
 static struct file_operations lora_fops = {
-	.open = file_open,
-	.release = file_close,
-	.read = file_read,
-	.write = file_write,
+	.open 		= file_open,
+	.release	= file_close,
+	.read		= file_read,
+	.write		= file_write,
+	.llseek		= no_llseek,
 };
 
 /* Register there is a kind of lora driver. */
