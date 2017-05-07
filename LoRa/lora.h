@@ -41,11 +41,13 @@ struct lora_data {
 	struct lora_operations *ops;
 	uint8_t *tx_buf;
 	uint8_t *rx_buf;
-	uint16_t tx_buflen;
-	uint16_t rx_buflen;
-	uint16_t bufmaxlen;
-	uint16_t users;
+	uint8_t tx_buflen;
+	uint8_t rx_buflen;
+	uint8_t bufmaxlen;
+	uint8_t users;
 	struct mutex buf_lock;
+	uint8_t node_adr;
+	uint8_t packet_num;
 };
 
 struct lora_driver {
@@ -56,6 +58,18 @@ struct lora_driver {
 	struct cdev lora_cdev;
 	struct class *lora_class;
 	struct module *owner;
+};
+
+#define MAX_PACKETLENGTH			123
+#define LORA_OFFSET_PAYLOADLENGTH	5
+
+struct lora_packet {
+	uint8_t dst;
+	uint8_t src;
+	uint8_t packet_num;
+	uint8_t len;
+	uint8_t data[MAX_PACKETLENGTH];
+	uint8_t retry;
 };
 
 #endif
