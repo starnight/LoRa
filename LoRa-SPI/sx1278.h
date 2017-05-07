@@ -56,28 +56,48 @@
 #define SX127X_REG_PLL						0x70
 
 #define SX127X_SLEEP_MODE					0x00
-#define SX127x_STANDBY_MODE					0x01
-#define SX127x_FSTX_MODE					0x02
-#define SX127x_TX_MODE						0x03
-#define SX127x_FSRX_MODE					0x04
-#define SX127X_RX_MODE						0x05
+#define SX127X_STANDBY_MODE					0x01
+#define SX127X_FSTX_MODE					0x02
+#define SX127X_TX_MODE						0x03
+#define SX127X_FSRX_MODE					0x04
+#define SX127X_RXCONTINUOUS_MODE			0x05
+#define SX127X_RXSINGLE_MODE				0x06
+#define SX127X_CAD_MODE						0x07
 
-int init_sx1278(struct spi_device *spi);
+#define SX127X_FLAG_RXTIMEOUT				0x80
+#define	SX127X_FLAG_RXDONE					0x40
+#define SX127X_FLAG_PAYLOADCRCERROR			0x20
+#define SX127X_FLAG_VALIDHEADER				0x10
+#define SX127X_FLAG_TXDONE					0x08
+#define SX127X_FLAG_CADDONE					0x04
+#define SX127X_FLAG_FHSSCHANGECHANNEL		0x02
+#define SX127X_FLAG_CADDETECTED				0x01
+
+#define SX127X_FLAGMASK_RXTIMEOUT			0x80
+#define	SX127X_FLAGMASK_RXDONE				0x40
+#define SX127X_FLAGMASK_PAYLOADCRCERROR		0x20
+#define SX127X_FLAGMASK_VALIDHEADER			0x10
+#define SX127X_FLAGMASK_TXDONE				0x08
+#define SX127X_FLAGMASK_CADDONE				0x04
+#define SX127X_FLAGMASK_FHSSCHANGECHANNEL	0x02
+#define SX127X_FLAGMASK_CADDETECTED			0x01
+
+int init_sx127X(struct spi_device *spi);
 
 ssize_t
-sx1278_sync(struct spi_device *spi, struct spi_message *);
+sx127X_sync(struct spi_device *spi, struct spi_message *);
 
 ssize_t
-sx1278_sync_write(struct spi_device *spi, uint8_t *buf, size_t len);
+sx127X_sync_write(struct spi_device *spi, uint8_t *buf, size_t len);
 
 ssize_t
-sx1278_sync_read(struct spi_device *spi, uint8_t *buf, size_t len);
+sx127X_sync_read(struct spi_device *spi, uint8_t *buf, size_t len);
 
 int
-sx1278_read_reg(struct spi_device *spi, uint8_t start_adr, uint8_t *buf, size_t len);
+sx127X_read_reg(struct spi_device *spi, uint8_t start_adr, uint8_t *buf, size_t len);
 
 int
-sx1278_write_reg(struct spi_device *spi, uint8_t start_adr, uint8_t *buf, size_t len);
+sx127X_write_reg(struct spi_device *spi, uint8_t start_adr, uint8_t *buf, size_t len);
 
 void
 sx127X_restart(struct spi_device *spi);
@@ -98,5 +118,27 @@ sx127X_readState(struct spi_device *spi);
 
 int
 sx127X_readVersion(struct spi_device *spi, char *vstr, size_t len);
+
+uint8_t
+sx127X_getLoRaFlag(struct spi_device *spi, uint8_t f);
+
+#define sx127X_getAllLoRaFlag(spi)	sx127X_getLoRaFlag(spi, 0xFF)
+
+void
+sx127X_clearLoRaFlag(struct spi_device *spi, uint8_t f);
+
+#define sx127X_clearAllLoRaFlag(spi)	sx127X_clearLoRaFlag(spi, 0xFF)
+
+uint32_t
+sx127X_getLoRaSPRFactor(struct spi_device *spi);
+
+uint32_t
+sx127X_getLoRaBW(struct spi_device *spi);
+
+void
+sx127X_setLoRaPreambleLen(struct spi_device *spi, uint32_t len);
+
+uint32_t
+sx127X_getLoRaPreambleLen(struct spi_device *spi);
 
 #endif

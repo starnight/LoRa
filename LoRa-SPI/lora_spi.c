@@ -10,6 +10,7 @@
 #include <linux/of.h>
 #include <linux/of_device.h>
 #include <linux/errno.h>
+#include <linux/delay.h>
 
 #include "lora_spi.h"
 #include "sx1278.h"
@@ -22,66 +23,166 @@ static DECLARE_BITMAP(minors, N_LORASPI_MINORS);
 static DEFINE_MUTEX(minors_lock);
 
 static ssize_t loraspi_read(struct lora_data *lrdata, const char __user *buf, size_t size) {
-	size_t len = 0, oblen;
+	size_t len = 0;
 	int res;
+	int status;
 	struct spi_device *spi;
+	uint8_t c;
+	uint8_t base_adr;
 
 	spi = lrdata->lora_device;
 	printk(KERN_DEBUG "lora-spi: SPI device #%d.%d read\n",
 		   spi->master->bus_num, spi->chip_select);
 
-//	mutex_lock(&(lrdata->buf_lock));
-//	/* Read from the SPI device into the lora data's RX buffer. */
-//	res = lrdata->bufmaxlen - lrdata->rx_buflen;
-//	len = (res <= size) ? res : size;
-//	len = somedevice_read(spi, lrdata->rx_buf + lrdata->rx_buflen, len);
+	mutex_lock(&(lrdata->buf_lock));
+	/* Set chip to standby state. */
+	printk(KERN_DEBUG "lora-spi: Going to set standby state\n");
+	sx127X_setState(spi, SX127X_STANDBY_MODE);
+
+	/* Set chip FIFO pointer to FIFO TX base. */
+	printk(KERN_DEBUG "lora-spi: Going to read TX base address\n");
+	sx127X_read_reg(spi, SX127X_REG_FIFO_RX_BASE_ADDR, &base_adr, 1);
+	printk(KERN_DEBUG "lora-spi: Going to set FIFO pointer to TX base address %x\n", base_adr);
+	sx127X_write_reg(spi, SX127X_REG_FIFO_ADDR_PTR, &base_adr, 1);
+
+	/* Read from the SPI device into the lora data's RX buffer. */
+	res = lrdata->bufmaxlen - lrdata->rx_buflen;
+	size = (res <= size) ? res : size;
+	//len = somedevice_read(spi, lrdata->rx_buf + lrdata->rx_buflen, len);
+	for(c = 0; c < size; c++) {
+		status = sx127X_read_reg(spi, SX127X_REG_FIFO, lrdata->rx_buf + c, 1);
+		if(status != 0)
+			break;
+	}
+
+	if(c > 0) {
+		lrdata->rx_buflen = c;
+
+		/* Read from the lora data into user space. */
+		res = copy_to_user((void *)buf, lrdata->rx_buf, lrdata->rx_buflen);
+		len = lrdata->rx_buflen - res;
+
+		lrdata->rx_buflen = 0;
+	}
 //	oblen = lrdata->rx_buflen;
 //	lrdata->rx_buflen += len;
 //
 //	/* Read from the lora data into user space. */
 //	copy_to_user((void *)buf, lrdata->rx_buf + oblen, len);
 //	lrdata->rx_buflen -= len;
-//
-//	mutex_unlock(&(lrdata->buf_lock));
+
+	mutex_unlock(&(lrdata->buf_lock));
 
 	return len;
 }
 
 static ssize_t loraspi_write(struct lora_data *lrdata, const char __user *buf, size_t size) {
-	ssize_t c = 0;
-	size_t len, oblen;
-	int res;
+	uint8_t c;
+	ssize_t status;
 	struct spi_device *spi;
+	uint8_t data;
+	uint8_t base_adr;
+	uint8_t flag;
+	uint32_t timeout;
+
+	struct lora_packet lrpack;
 
 	spi = lrdata->lora_device;
-	printk(KERN_DEBUG "lora-spi: SPI device #%d.%d write\n",
-		   spi->master->bus_num, spi->chip_select);
+	printk(KERN_DEBUG "lora-spi: SPI device #%d.%d write %u bytes from user space\n",
+		   spi->master->bus_num, spi->chip_select, size);
+	status = copy_from_user(lrdata->tx_buf, buf, size);
 
-//	mutex_lock(&(lrdata->buf_lock));
-//	while(size > 0) {
-//		/* Write from user space into the lora data. */
-//		res = lrdata->bufmaxlen - lrdata->tx_buflen;
-//		len = (res <= size) ? res : size;
-//		if(len == 0)
-//			break;
-//		copy_from_user(lrdata->tx_buf + lrdata->tx_buflen, buf + c, len);
-//		oblen = lrdata->tx_buflen;
-//		lrdata->tx_buflen += len;
-//
-//		/* Write from lora data into SPI device. */
-//		res = somedevice_write(spi, lrdata->tx_buf + oblen, lrdata->tx_buflen);
-//		lrdata->tx_buflen -= len;
-//		if(res <= 0) {
-//			break;
-//		}
-//		else if(res < len) {
-//			c += res;
-//			break;
-//		}
-//		c += len;
-//		size -= len;
-//	}
-//	mutex_unlock(&(lrdata->buf_lock));
+	if(status >= size)
+		return 0;
+
+	lrdata->tx_buflen = size - status;
+
+	/* Initial LoRa packet. */
+	lrpack.dst = 2;
+	lrpack.src = lrdata->node_adr;
+	lrpack.packet_num = lrdata->packet_num;
+	lrdata->packet_num += 1;
+	memcpy(lrpack.data, lrdata->tx_buf, lrdata->tx_buflen);
+	lrpack.len = lrdata->tx_buflen;
+
+	mutex_lock(&(lrdata->buf_lock));
+
+	/* Set chip to standby state. */
+	printk(KERN_DEBUG "lora-spi: Going to set standby state\n");
+	sx127X_setState(spi, SX127X_STANDBY_MODE);
+	data = sx127X_readMode(spi);
+	printk(KERN_DEBUG "lora-spi: Current OP mode is 0x%X\n", data);
+
+	/* Set chip FIFO pointer to FIFO TX base. */
+	base_adr = 0x80;
+	printk(KERN_DEBUG "lora-spi: Going to set TX base address\n");
+	sx127X_write_reg(spi, SX127X_REG_FIFO_TX_BASE_ADDR, &base_adr, 1);
+	printk(KERN_DEBUG "lora-spi: Going to set FIFO pointer to TX base address 0x%X\n", base_adr);
+	sx127X_write_reg(spi, SX127X_REG_FIFO_ADDR_PTR, &base_adr, 1);
+
+	/* Write to SPI chip synchronously to fill the FIFO of the chip. */
+//	/* Write LoRa packet destination. */
+//	sx127X_write_reg(spi, SX127X_REG_FIFO, &lrpack.dst, 1);
+//	/* Write LoRa packet source. */
+//	sx127X_write_reg(spi, SX127X_REG_FIFO, &lrpack.src, 1);
+//	/* Write LoRa packet number. */
+//	sx127X_write_reg(spi, SX127X_REG_FIFO, &lrpack.packet_num, 1);
+//	/* Write LoRa packet payload length. */
+//	sx127X_write_reg(spi, SX127X_REG_FIFO, &lrpack.len, 1);
+//	/* Write LoRa packet payload. */
+	printk(KERN_DEBUG "lora-spi: write %d bytes to chip\n", lrpack.len);
+	c = sx127X_write_reg(spi, SX127X_REG_FIFO, lrpack.data, lrpack.len);
+//	/* Write LoRa packet retry. */
+//	sx127X_write_reg(spi, SX127X_REG_FIFO, &lrpack.retry, 1);
+
+	/* Set the FIFO payload length. */
+	data = c;
+	printk(KERN_DEBUG "lora-spi: set payload length %d\n", data);
+	sx127X_write_reg(spi, SX127X_REG_PAYLOAD_LENGTH, &data, 1);
+	sx127X_read_reg(spi, SX127X_REG_PAYLOAD_LENGTH, &data, 1);
+	printk(KERN_DEBUG "lora-spi: read payload length %d btyes\n", data);
+
+	sx127X_read_reg(spi, SX127X_REG_FIFO_ADDR_PTR, &data, 1);
+	printk(KERN_DEBUG "lora-spi: FIFO address is 0x%X now\n", data);
+
+	/* Clear LoRa IRQ TX flag. */
+	sx127X_clearLoRaFlag(spi, SX127X_FLAG_TXDONE);
+	printk(KERN_DEBUG "lora-spi: IRQ flags' state: 0x%X\n", sx127X_getAllLoRaFlag(spi));
+
+	if(c > 0) {
+		/* Set chip to transmit(TX) state to send the data in FIFO to RF. */
+		printk(KERN_DEBUG "lora-spi: set TX state\n");
+		sx127X_setState(spi, SX127X_TX_MODE);
+
+		timeout = (c + sx127X_getLoRaPreambleLen(spi) + 1) + 2;
+		printk(KERN_DEBUG "lora-spi: the time out is %d us", timeout * 1000);
+
+		/* Wait until TX is finished by checking the TX flag. */
+		for(flag = 0; timeout > 0; timeout--) {
+			flag = sx127X_getLoRaFlag(spi, SX127X_FLAG_TXDONE);
+			if(flag != 0) {
+				printk(KERN_DEBUG "lora-spi: wait TX is finished\n");
+				break;
+			}
+			else {
+				if(timeout == 1) {
+					c = 0;
+					printk(KERN_DEBUG "lora-spi: wait TX is time out\n");
+				}
+				else {
+					udelay(1000);
+				}
+			}
+		}
+	}
+
+	/* Set chip to standby state. */
+	printk(KERN_DEBUG "lora-spi: set back to standby state\n");
+	sx127X_setState(spi, SX127X_STANDBY_MODE);
+
+	lrdata->tx_buflen = 0;
+
+	mutex_unlock(&(lrdata->buf_lock));
 
 	return c;
 }
@@ -152,7 +253,7 @@ static int loraspi_probe(struct spi_device *spi) {
 	printk(KERN_DEBUG "lora-spi: probe a SPI device with address %d.%d\n",
 		   spi->master->bus_num, spi->chip_select);
 
-#ifdef CONFIG_OF 
+#ifdef CONFIG_OF
 	if(spi->dev.of_node && !of_match_device(lora_dt_ids, &(spi->dev))) {
 		dev_err(&(spi->dev), "buggy DT: lora listed directly in DT\n");
 		WARN_ON(spi->dev.of_node &&
@@ -170,6 +271,9 @@ static int loraspi_probe(struct spi_device *spi) {
 	/* Initial the lora device's data. */
 	lrdata->lora_device = spi;
 	lrdata->ops = &lrops;
+	lrdata->node_adr = 1 + spi->chip_select;
+	lrdata->packet_num = 0;
+	mutex_init(&(lrdata->buf_lock));
 	mutex_lock(&minors_lock);
 	minor = find_first_zero_bit(minors, N_LORASPI_MINORS);
 	if(minor < N_LORASPI_MINORS) {
@@ -191,8 +295,8 @@ static int loraspi_probe(struct spi_device *spi) {
 		status = -ENODEV;
 	}
 	
-	/* Initial the SX1278 chip. */
-	init_sx1278(spi);
+	/* Initial the SX127X chip. */
+	init_sx127X(spi);
 	
 	mutex_unlock(&minors_lock);
 
@@ -215,7 +319,7 @@ static int loraspi_remove(struct spi_device *spi) {
 	mutex_lock(&minors_lock);
 	device_destroy(lr_driver.lora_class, lrdata->devt);
 	clear_bit(MINOR(lrdata->devt), minors);
-	/* Set the SX1278 chip to sleep. */
+	/* Set the SX127X chip to sleep. */
 	sx127X_setState(spi, SX127X_SLEEP_MODE);
 	mutex_unlock(&minors_lock);
 
