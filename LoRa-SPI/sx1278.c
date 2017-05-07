@@ -67,13 +67,31 @@ sx127X_sync_read(struct spi_device *spi, uint8_t *buf, size_t len) {
 
 int
 sx127X_read_reg(struct spi_device *spi, uint8_t start_adr, uint8_t *buf, size_t len) {
-	size_t i;
+	int status = 0;
+	struct spi_transfer at, bt;
+	struct spi_message m;
 
-	for(i = 0; i < len; i++, start_adr++) {
-		spi_write_then_read(spi, &start_adr, 1, buf + i, 1);
-	}
+	spi_message_init(&m);
 
-	return 0;
+	/* Read address.  The MSB must be cleared because of reading an address. */
+	memset(&at, 0, sizeof(at));
+	at.tx_buf = &start_adr;
+	at.len = 1;
+	spi_message_add_tail(&at, &m);
+
+	/* Write value. */
+	memset(&bt, 0, sizeof(bt));
+	bt.rx_buf = buf;
+	bt.len = len;
+	spi_message_add_tail(&bt, &m);
+
+	status = sx127X_sync(spi, &m);
+	/* Minus the start address's length. */
+	if(status > 0)
+		status -= 1;
+	//printk(KERN_DEBUG "sx127X: just read %d bytes from chip\n", status);
+
+	return status;
 }
 
 int
@@ -183,7 +201,7 @@ sx127X_getFreq(struct spi_device *spi) {
 	uint32_t fr;
 
 	status = sx127X_read_reg(spi, SX127X_REG_FRF_MSB, buf, 3);
-	if(status != 0)
+	if(status <= 0)
 		return 0.0;
 
 	for(i = 2; i >= 0; i--)
@@ -208,7 +226,7 @@ sx127X_readVersion(struct spi_device *spi, char *vstr, size_t len) {
 
 	status = sx127X_read_reg(spi, SX127X_REG_VERSION, &v, 1);
 
-	if(status == 0) {
+	if(status == 1) {
 		fv = v >> 4;
 		mmv = v & 0x0F;
 		snprintf(vstr, len, "%d.%d", fv, mmv);
