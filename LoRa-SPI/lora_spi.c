@@ -16,7 +16,9 @@
 #include "sx1278.h"
 
 #define __DRIVER_NAME		"lora-spi"
-#define N_LORASPI_MINORS	4
+#ifndef N_LORASPI_MINORS
+#define N_LORASPI_MINORS	8
+#endif
 
 static DECLARE_BITMAP(minors, N_LORASPI_MINORS);
 
