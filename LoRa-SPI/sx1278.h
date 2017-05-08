@@ -87,12 +87,6 @@ int init_sx127X(struct spi_device *spi);
 ssize_t
 sx127X_sync(struct spi_device *spi, struct spi_message *);
 
-ssize_t
-sx127X_sync_write(struct spi_device *spi, uint8_t *buf, size_t len);
-
-ssize_t
-sx127X_sync_read(struct spi_device *spi, uint8_t *buf, size_t len);
-
 int
 sx127X_read_reg(struct spi_device *spi, uint8_t start_adr, uint8_t *buf, size_t len);
 

@@ -38,33 +38,6 @@ sx127X_sync(struct spi_device *spi, struct spi_message *m) {
 	return status;
 }
 
-ssize_t
-sx127X_sync_write(struct spi_device *spi, uint8_t *buf, size_t len) {
-	struct spi_transfer t;
-	struct spi_message m;
-
-	spi_message_init(&m);
-	memset(&t, 0, sizeof(t));
-	t.tx_buf = buf;
-	t.len = len;
-
-	spi_message_add_tail(&t, &m);
-	return spi_sync(spi, &m);
-}
-
-ssize_t
-sx127X_sync_read(struct spi_device *spi, uint8_t *buf, size_t len) {
-	struct spi_transfer t = {
-		.rx_buf = buf,
-		.len = len,
-	};
-	struct spi_message m;
-
-	spi_message_init(&m);
-	spi_message_add_tail(&t, &m);
-	return sx127X_sync(spi, &m);
-}
-
 int
 sx127X_read_reg(struct spi_device *spi, uint8_t start_adr, uint8_t *buf, size_t len) {
 	int status = 0;
