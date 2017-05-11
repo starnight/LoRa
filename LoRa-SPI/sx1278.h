@@ -114,14 +114,14 @@ int
 sx127X_readVersion(struct spi_device *spi, char *vstr, size_t len);
 
 uint8_t
-sx127X_getLoRaFlag(struct spi_device *spi, uint8_t f);
+sx127X_getLoRaAllFlag(struct spi_device *spi);
 
-#define sx127X_getAllLoRaFlag(spi)	sx127X_getLoRaFlag(spi, 0xFF)
+#define sx127X_getLoRaFlag(spi, f)	(sx127X_getLoRaAllFlag(spi) & (f))
 
 void
 sx127X_clearLoRaFlag(struct spi_device *spi, uint8_t f);
 
-#define sx127X_clearAllLoRaFlag(spi)	sx127X_clearLoRaFlag(spi, 0xFF)
+#define sx127X_clearLoRaAllFlag(spi)	sx127X_clearLoRaFlag(spi, 0xFF)
 
 uint32_t
 sx127X_getLoRaSPRFactor(struct spi_device *spi);
@@ -130,9 +130,36 @@ uint32_t
 sx127X_getLoRaBW(struct spi_device *spi);
 
 void
+sx127X_setLoRaRXTimeout(struct spi_device *spi, uint32_t ms);
+
+uint32_t
+sx127X_getLoRaRXTimeout(struct spi_device *spi);
+
+void
+sx127X_setLoRaMaxRXBuff(struct spi_device *spi, uint8_t len);
+
+ssize_t
+sx127X_readLoRaData(struct spi_device *spi, uint8_t *buf, size_t len);
+
+int32_t
+sx127X_getLastLoRaPacketRSSI(struct spi_device *spi);
+
+uint32_t
+sx127X_getLastLoRaPacketSNR(struct spi_device *spi);
+
+int32_t
+sx127X_getLoRaRSSI(struct spi_device *spi);
+
+void
 sx127X_setLoRaPreambleLen(struct spi_device *spi, uint32_t len);
 
 uint32_t
 sx127X_getLoRaPreambleLen(struct spi_device *spi);
+
+void
+sx127X_setLoRaCRC(struct spi_device *spi, uint8_t yesno);
+
+void
+sx127X_setBoost(struct spi_device *spi, uint8_t yesno);
 
 #endif

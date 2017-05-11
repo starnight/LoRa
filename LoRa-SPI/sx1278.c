@@ -185,10 +185,7 @@ sx127X_getFreq(struct spi_device *spi) {
 	return fr;
 }
 
-void
-sx127X_setPower(struct spi_device *spi, uint32_t mW) {
-
-}
+//void sx127X_setPower(struct spi_device *spi, uint32_t mW) {}
 //uint32_t sx127X_getPower(struct spi_device *spi) {}
 
 int
@@ -210,12 +207,12 @@ sx127X_readVersion(struct spi_device *spi, char *vstr, size_t len) {
 
 /* LoRa Mode */
 uint8_t
-sx127X_getLoRaFlag(struct spi_device *spi, uint8_t f) {
+sx127X_getLoRaAllFlag(struct spi_device *spi) {
 	uint8_t flags;
 
 	sx127X_read_reg(spi, SX127X_REG_IRQ_FLAGS, &flags, 1);
 
-	return (flags & f);
+	return flags;
 }
 
 void
@@ -223,14 +220,14 @@ sx127X_clearLoRaFlag(struct spi_device *spi, uint8_t f) {
 	uint8_t flag;
 
 	/* Get oiginal flag. */
-	flag = sx127X_getAllLoRaFlag(spi);
+	flag = sx127X_getLoRaAllFlag(spi);
 	/* Set the designated bits of the flag. */
 	flag |= f;
 	sx127X_write_reg(spi, SX127X_REG_IRQ_FLAGS, &flag, 1);
 }
-//uint8_t sx127X_getLoRaRXEndFlag(void) {}
-//ssize_t sz127X_setLoRaDataToSend(uint8_t *buf, size_t len) {}
-//void sx127X_setLoRaSPRFactor(uint8_t spf) {}
+//uint8_t sx127X_getLoRaRXEndFlag(struct spi_device *spi) {}
+//ssize_t sz127X_setLoRaDataToSend(struct spi_device *spi, uint8_t *buf, size_t len) {}
+//void sx127X_setLoRaSPRFactor(struct spi_device *spi, uint8_t spf) {}
 uint32_t
 sx127X_getLoRaSPRFactor(struct spi_device *spi) {
 	uint8_t sf;
@@ -266,19 +263,142 @@ sx127X_getLoRaBW(struct spi_device *spi) {
 
 	return hz[bw];
 }
-//void sx127X_setLoRaCR(uint8_t cr) {}
-//uint8_t sx127X_getLoRaCR(void) {}
-//float sx127X_getSRate(void) {}
-//void sx127X_setLoRaRXByteTimeout(uint32_t n) {}
-//void sx127X_setLoRaRXTimeout(float sec) {}
-//uint32_t sx127X_getLoRaRXByteTimeout(void) {}
-//float sx127X_getLoRaRXTimeout(void) {}
-//void sx127X_setLoRaMaxRXBuff(uint8_t len) {}
-//size_t sx127X_readLoRaData(uint8_t *buf, size_t len) {}
-//void sx127X_DiscardLoRaRX(void) {}
-//int32_t sx127X_LastLoRaPacketRSSI(void) {}
-//uint32_t sx127X_LastLoRaPacketSNR(void) {}
-//int32_t sx127X_getLoRaRSSI(void) {}
+
+void
+sx127X_setLoRaCR(struct spi_device *spi, uint8_t cr) {
+	uint8_t mcf1;
+
+	sx127X_read_reg(spi, SX127X_REG_MODEM_CONFIG1, &mcf1, 1);
+	mcf1 = (mcf1 & 0x0E) | (((cr & 0xF) - 4) << 1);
+	sx127X_write_reg(spi, SX127X_REG_MODEM_CONFIG1, &mcf1, 1);
+}
+
+uint8_t
+sx127X_getLoRaCR(struct spi_device *spi) {
+	uint8_t mcf1;
+	uint8_t cr; // ex: 0x45 represents cr=4/5
+
+	sx127X_read_reg(spi, SX127X_REG_MODEM_CONFIG1, &mcf1, 1);
+	cr = 0x40 + ((mcf1 & 0x0E) >> 1) + 4;
+	
+	return cr;
+}
+//float sx127X_getSRate(struct spi_device *spi) {}
+void
+sx127X_setLoRaRXByteTimeout(struct spi_device *spi, uint32_t n) {
+	uint8_t buf[2];
+	uint8_t mcf2;
+
+	if(n < 1) n = 1;
+	if(n > 1023) n = 1023;
+
+	/* Read original Modem config 2. */
+	sx127X_read_reg(spi, SX127X_REG_MODEM_CONFIG2, &mcf2, 1);
+
+	/* LSB */
+	buf[1] = n % 256;
+	/* MSB */
+	buf[0] = (mcf2 & 0xFC) | (n >> 8);
+
+	sx127X_write_reg(spi, SX127X_REG_MODEM_CONFIG2, buf, 2);
+}
+
+void
+sx127X_setLoRaRXTimeout(struct spi_device *spi, uint32_t ms) {
+	uint32_t n;
+
+	n = ms * sx127X_getLoRaBW(spi) / sx127X_getLoRaSPRFactor(spi);
+
+	sx127X_setLoRaRXByteTimeout(spi, n);
+}
+
+uint32_t
+sx127X_getLoRaRXByteTimeout(struct spi_device *spi) {
+	uint32_t n;
+	uint8_t buf[2];
+
+	sx127X_read_reg(spi, SX127X_REG_MODEM_CONFIG2, buf, 2);
+
+	n = (buf[0] & 0x03) * 256 + buf[1];
+
+	return n;
+}
+
+uint32_t
+sx127X_getLoRaRXTimeout(struct spi_device *spi) {
+	uint32_t ms;
+
+	ms = sx127X_getLoRaRXByteTimeout(spi) * sx127X_getLoRaSPRFactor(spi) / sx127X_getLoRaBW(spi);
+
+	return ms;
+}
+
+void
+sx127X_setLoRaMaxRXBuff(struct spi_device *spi, uint8_t len) {
+	sx127X_write_reg(spi, SX127X_REG_MAX_PAYLOAD_LENGTH, &len, 1);
+}
+
+ssize_t
+sx127X_readLoRaData(struct spi_device *spi, uint8_t *buf, size_t len) {
+	uint8_t start_adr;
+	uint8_t blen;
+	ssize_t c;
+
+	/* Get the chip RX FIFO last packet address. */
+	sx127X_read_reg(spi, SX127X_REG_FIFO_RX_CURRENT_ADDR, &start_adr, 1);
+	/* Set chip FIFO pointer to FIFO last packet address. */
+	sx127X_write_reg(spi, SX127X_REG_FIFO_ADDR_PTR, &start_adr, 1);
+	/* Get the RX last packet payload length. */
+	sx127X_read_reg(spi, SX127X_REG_RX_NB_BYTES, &blen, 1);
+
+	len = (blen < len) ? blen : len;
+	/* Read LoRa packet payload. */
+	c = sx127X_read_reg(spi, SX127X_REG_FIFO, buf, len);
+
+	return c;
+}
+
+//void sx127X_discardLoRaRX(struct spi_device *spi) {}
+int32_t
+sx127X_getLastLoRaPacketRSSI(struct spi_device *spi) {
+	uint32_t dbm;
+	uint8_t lhf;
+	uint8_t rssi;
+
+	/* Get LoRa is in high or low frequency mode. */
+	lhf = sx127X_readMode(spi) & 0x08;
+	/* Get RSSI value. */
+	sx127X_read_reg(spi, SX127X_REG_PKT_RSSI_VALUE, &rssi, 1);
+	dbm = (lhf) ? -164 + rssi : -157 + rssi;
+
+	return dbm;
+}
+
+uint32_t
+sx127X_getLastLoRaPacketSNR(struct spi_device *spi) {
+	uint32_t db;
+	uint8_t snr;
+
+	sx127X_read_reg(spi, SX127X_REG_PKT_SNR_VALUE, &snr, 1);
+	db = snr / 4;
+
+	return db;
+}
+
+int32_t
+sx127X_getLoRaRSSI(struct spi_device *spi) {
+	uint32_t dbm;
+	uint8_t lhf;
+	uint8_t rssi;
+
+	/* Get LoRa is in high or low frequency mode. */
+	lhf = sx127X_readMode(spi) & 0x08;
+	/* Get RSSI value. */
+	sx127X_read_reg(spi, SX127X_REG_RSSI_VALUE, &rssi, 1);
+	dbm = (lhf) ? -164 + rssi : -157 + rssi;
+
+	return dbm;
+}
 void
 sx127X_setLoRaPreambleLen(struct spi_device *spi, uint32_t len) {
 	uint8_t pl[2];
@@ -299,5 +419,21 @@ sx127X_getLoRaPreambleLen(struct spi_device *spi) {
 
 	return len;
 }
-//void sx127X_setLoRaCRC(uint8_t yesno) {}
-//void sx127X_setBoost(uint8_t yesno) {}
+
+void
+sx127X_setLoRaCRC(struct spi_device *spi, uint8_t yesno) {
+	uint8_t mcf2;
+
+	sx127X_read_reg(spi, SX127X_REG_MODEM_CONFIG2, &mcf2, 1);
+	mcf2 = (yesno) ? mcf2 | (1 << 2) : mcf2 & (~(1 << 2));
+	sx127X_write_reg(spi, SX127X_REG_MODEM_CONFIG2, &mcf2, 1);
+}
+
+void
+sx127X_setBoost(struct spi_device *spi, uint8_t yesno) {
+	uint8_t pacf;
+
+	sx127X_read_reg(spi, SX127X_REG_PA_CONFIG, &pacf, 1);
+	pacf = (yesno) ? pacf | (1 << 7) : pacf & (~(1 << 7));
+	sx127X_write_reg(spi, SX127X_REG_PA_CONFIG, &pacf, 1);
+}
