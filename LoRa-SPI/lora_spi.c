@@ -25,12 +25,12 @@ static DECLARE_BITMAP(minors, N_LORASPI_MINORS);
 static DEFINE_MUTEX(minors_lock);
 
 static ssize_t loraspi_read(struct lora_data *lrdata, const char __user *buf, size_t size) {
-	size_t len = 0;
-	int res;
 	int status;
 	struct spi_device *spi;
-	uint8_t c;
+	int c = 0;
 	uint8_t base_adr;
+	uint8_t flag;
+	uint32_t timeout;
 
 	spi = lrdata->lora_device;
 	printk(KERN_DEBUG "lora-spi: SPI device #%d.%d read\n",
@@ -42,40 +42,47 @@ static ssize_t loraspi_read(struct lora_data *lrdata, const char __user *buf, si
 	sx127X_setState(spi, SX127X_STANDBY_MODE);
 
 	/* Set chip FIFO pointer to FIFO TX base. */
-	printk(KERN_DEBUG "lora-spi: Going to read TX base address\n");
-	sx127X_read_reg(spi, SX127X_REG_FIFO_RX_BASE_ADDR, &base_adr, 1);
-	printk(KERN_DEBUG "lora-spi: Going to set FIFO pointer to TX base address %x\n", base_adr);
-	sx127X_write_reg(spi, SX127X_REG_FIFO_ADDR_PTR, &base_adr, 1);
+	base_adr = 0x00;
+	printk(KERN_DEBUG "lora-spi: Going to set RX base address\n");
+	sx127X_write_reg(spi, SX127X_REG_FIFO_RX_BASE_ADDR, &base_adr, 1);
 
-	/* Read from the SPI device into the lora data's RX buffer. */
-	res = lrdata->bufmaxlen - lrdata->rx_buflen;
-	size = (res <= size) ? res : size;
-	//len = somedevice_read(spi, lrdata->rx_buf + lrdata->rx_buflen, len);
-	for(c = 0; c < size; c++) {
-		status = sx127X_read_reg(spi, SX127X_REG_FIFO, lrdata->rx_buf + c, 1);
-		if(status != 0)
-			break;
+	/* Set chip wait for LoRa timeout time. */
+	sx127X_setLoRaRXTimeout(spi, 300);
+	/* Clear all of the IRQ flags. */
+	sx127X_clearLoRaAllFlag(spi);
+	/* Set chip to RX single packet state.  The chip start to wait for receiving. */
+	sx127X_setState(spi, SX127X_RXSINGLE_MODE);
+	/* Wait and check there is any packet received ready. */
+	for(timeout = 0; timeout < 100; timeout++) {
+		flag = sx127X_getLoRaFlag(spi, SX127X_FLAG_RXTIMEOUT | SX127X_FLAG_RXDONE);
+		if(flag == 0) udelay(10000);
+		else break;
+	}
+	/* Set chip to standby state. */
+	sx127X_setState(spi, SX127X_STANDBY_MODE);
+
+	/* If there is nothing or received timeout. */
+	if((flag == 0) || (flag & SX127X_FLAG_RXTIMEOUT)) {
+		c = -1;
+	}
+	/* If there is a packet, but the payload is CRC error. */
+	if(sx127X_getLoRaFlag(spi, SX127X_FLAG_PAYLOADCRCERROR)) {
+		c = -2;
 	}
 
-	if(c > 0) {
-		lrdata->rx_buflen = c;
-
-		/* Read from the lora data into user space. */
-		res = copy_to_user((void *)buf, lrdata->rx_buf, lrdata->rx_buflen);
-		len = lrdata->rx_buflen - res;
-
-		lrdata->rx_buflen = 0;
+	/* There is a ready packet in the chip's FIFO. */
+	if(c == 0) {
+		size = (lrdata->rx_buflen < size) ? lrdata->rx_buflen : size;
+		/* Read from chip to LoRa data RX buffer. */
+		c = sx127X_readLoRaData(spi, lrdata->rx_buf, size);
+		/* Copy from LoRa data RX buffer to user space. */
+		if(c > 0)
+			copy_to_user((void *)buf, lrdata->rx_buf, c);
 	}
-//	oblen = lrdata->rx_buflen;
-//	lrdata->rx_buflen += len;
-//
-//	/* Read from the lora data into user space. */
-//	copy_to_user((void *)buf, lrdata->rx_buf + oblen, len);
-//	lrdata->rx_buflen -= len;
 
 	mutex_unlock(&(lrdata->buf_lock));
 
-	return len;
+	return c;
 }
 
 static ssize_t loraspi_write(struct lora_data *lrdata, const char __user *buf, size_t size) {
@@ -92,6 +99,9 @@ static ssize_t loraspi_write(struct lora_data *lrdata, const char __user *buf, s
 	spi = lrdata->lora_device;
 	printk(KERN_DEBUG "lora-spi: SPI device #%d.%d write %u bytes from user space\n",
 		   spi->master->bus_num, spi->chip_select, size);
+
+	mutex_lock(&(lrdata->buf_lock));
+
 	status = copy_from_user(lrdata->tx_buf, buf, size);
 
 	if(status >= size)
@@ -106,8 +116,6 @@ static ssize_t loraspi_write(struct lora_data *lrdata, const char __user *buf, s
 	lrdata->packet_num += 1;
 	memcpy(lrpack.data, lrdata->tx_buf, lrdata->tx_buflen);
 	lrpack.len = lrdata->tx_buflen;
-
-	mutex_lock(&(lrdata->buf_lock));
 
 	/* Set chip to standby state. */
 	printk(KERN_DEBUG "lora-spi: Going to set standby state\n");
@@ -149,7 +157,7 @@ static ssize_t loraspi_write(struct lora_data *lrdata, const char __user *buf, s
 
 	/* Clear LoRa IRQ TX flag. */
 	sx127X_clearLoRaFlag(spi, SX127X_FLAG_TXDONE);
-	printk(KERN_DEBUG "lora-spi: IRQ flags' state: 0x%X\n", sx127X_getAllLoRaFlag(spi));
+	printk(KERN_DEBUG "lora-spi: IRQ flags' state: 0x%X\n", sx127X_getLoRaAllFlag(spi));
 
 	if(c > 0) {
 		/* Set chip to transmit(TX) state to send the data in FIFO to RF. */
@@ -353,7 +361,7 @@ static struct spi_driver lora_spi_driver = {
 static int loraspi_init(void) {
 	int status;
 	
-	printk(KERN_DEBUG "lora-spi: init\n");
+	printk(KERN_DEBUG "lora-spi: init SX1278 compatible kernel module\n");
 	
 	/* Register a kind of LoRa driver. */
 	lora_register_driver(&lr_driver);
