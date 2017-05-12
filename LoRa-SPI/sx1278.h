@@ -108,7 +108,8 @@ sx127X_setState(struct spi_device *spi, uint8_t st);
 uint8_t
 sx127X_readState(struct spi_device *spi);
 
-
+uint8_t
+sx127X_getPower(struct spi_device *spi);
 
 int
 sx127X_readVersion(struct spi_device *spi, char *vstr, size_t len);
@@ -123,8 +124,14 @@ sx127X_clearLoRaFlag(struct spi_device *spi, uint8_t f);
 
 #define sx127X_clearLoRaAllFlag(spi)	sx127X_clearLoRaFlag(spi, 0xFF)
 
+void
+sx127X_setLoRaSPRFactor(struct spi_device *spi, uint32_t chips);
+
 uint32_t
 sx127X_getLoRaSPRFactor(struct spi_device *spi);
+
+void
+sx127X_setLoRaBW(struct spi_device *spi, uint32_t bw);
 
 uint32_t
 sx127X_getLoRaBW(struct spi_device *spi);

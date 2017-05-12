@@ -186,7 +186,29 @@ sx127X_getFreq(struct spi_device *spi) {
 }
 
 //void sx127X_setPower(struct spi_device *spi, uint32_t mW) {}
-//uint32_t sx127X_getPower(struct spi_device *spi) {}
+
+uint8_t
+sx127X_getPower(struct spi_device *spi) {
+	uint8_t pac;
+	uint8_t boost;
+	uint8_t pmax;
+	uint8_t pout;
+	uint8_t dbm;
+
+	sx127X_read_reg(spi, SX127X_REG_PA_CONFIG, &pac, 1);
+	boost = (pac & 0x80) >> 7;
+	pout = pac & 0x0F;
+	if(boost) {
+		dbm = pout - 2;
+	}
+	else {
+		/* Power max should be pmax/10.  Itis 10 times for now. */
+		pmax = (108 + 6 * ((pac & 0x70) >> 4));
+		dbm = (150 - pmax + pout * 10) / 10;
+	}
+
+	return dbm;
+}
 
 int
 sx127X_readVersion(struct spi_device *spi, char *vstr, size_t len) {
@@ -227,7 +249,22 @@ sx127X_clearLoRaFlag(struct spi_device *spi, uint8_t f) {
 }
 //uint8_t sx127X_getLoRaRXEndFlag(struct spi_device *spi) {}
 //ssize_t sz127X_setLoRaDataToSend(struct spi_device *spi, uint8_t *buf, size_t len) {}
-//void sx127X_setLoRaSPRFactor(struct spi_device *spi, uint8_t spf) {}
+
+void
+sx127X_setLoRaSPRFactor(struct spi_device *spi, uint32_t chips) {
+	uint8_t sf;
+	uint8_t mcf2;
+
+	for(sf = 6; sf < 12; sf++) {
+		if(chips == ((uint32_t)1 << sf))
+			break;
+	}
+
+	sx127X_read_reg(spi, SX127X_REG_MODEM_CONFIG2, &mcf2, 1);
+	mcf2 = (mcf2 & 0x0F) | (sf << 4);
+	sx127X_write_reg(spi, SX127X_REG_MODEM_CONFIG2, &mcf2, 1);
+}
+
 uint32_t
 sx127X_getLoRaSPRFactor(struct spi_device *spi) {
 	uint8_t sf;
@@ -240,26 +277,41 @@ sx127X_getLoRaSPRFactor(struct spi_device *spi) {
 	return chips;
 }
 
-//void sx127X_setLoRaBW(struct spi_device *spi, uint32_t bw) {}
+const uint32_t hz[] = {
+	  7800,
+	 10400,
+	 15600,
+	 20800,
+	 31250,
+	 41700,
+	 62500,
+	125000,
+	250000,
+	500000
+};
+
+void
+sx127X_setLoRaBW(struct spi_device *spi, uint32_t bw) {
+	uint8_t i;
+	uint8_t mcf1;
+
+	for(i = 0; i < 9; i++) {
+		if(hz[i] <= bw)
+			break;
+	}
+
+	sx127X_read_reg(spi, SX127X_REG_MODEM_CONFIG1, &mcf1, 1);
+	mcf1 = (mcf1 & 0x0F) | i;
+	sx127X_write_reg(spi, SX127X_REG_MODEM_CONFIG1, &mcf1, 1);
+}
 
 uint32_t
 sx127X_getLoRaBW(struct spi_device *spi) {
-	const uint32_t hz[] = {
-		7800,
-		10400,
-		15600,
-		20800,
-		31250,
-		41700,
-		62500,
-		125000,
-		250000,
-		500000
-	};
+	uint8_t mcf1;
 	uint8_t bw;
 
-	sx127X_read_reg(spi, SX127X_REG_MODEM_CONFIG1, &bw, 1);
-	bw = bw >> 4;
+	sx127X_read_reg(spi, SX127X_REG_MODEM_CONFIG1, &mcf1, 1);
+	bw = mcf1 >> 4;
 
 	return hz[bw];
 }
