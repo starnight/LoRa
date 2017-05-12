@@ -49,11 +49,6 @@ int main(int argc, char **argv) {
 		return -1;
 	}
 
-	/* Write to the file descriptor if it is ready to be written. */
-	printf("Going to write %s\n", path);
-	do_write(fd);
-	printf("Written %s\n", path);
-
 	/* Read from the file descriptor if it is ready to be read. */
 	printf("Going to read %s\n", path);
 	do_read(fd);
