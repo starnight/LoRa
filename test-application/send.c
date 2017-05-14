@@ -17,8 +17,8 @@ void do_read(int fd) {
 }
 
 /* Write data into the device. */
-void do_write(int fd) {
-	char buf[] = "Ker Ker!!!!!!";
+void do_write(int fd, char *buf) {
+	//char buf[] = "Ker Ker!!!!!!";
 	ssize_t sz;
 
 	sz = write(fd, buf, strlen(buf));
@@ -27,12 +27,14 @@ void do_write(int fd) {
 
 int main(int argc, char **argv) {
 	char *path;
+	char *data;
 	int fd;
 	char pstr[40];
 
 	/* Parse command. */
-	if(argc >= 2) {
+	if(argc >= 3) {
 		path = argv[1];
+		data = argv[2];
 	}
 	else {
 		printf("Need more arguments.\r\n");
@@ -51,7 +53,7 @@ int main(int argc, char **argv) {
 
 	/* Write to the file descriptor if it is ready to be written. */
 	printf("Going to write %s\n", path);
-	do_write(fd);
+	do_write(fd, data);
 	printf("Written %s\n", path);
 
 	/* Close device node. */
