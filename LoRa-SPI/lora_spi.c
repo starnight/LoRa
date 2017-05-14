@@ -41,25 +41,26 @@ static ssize_t loraspi_read(struct lora_data *lrdata, const char __user *buf, si
 	printk(KERN_DEBUG "lora-spi: Going to set standby state\n");
 	sx127X_setState(spi, SX127X_STANDBY_MODE);
 
-	/* Set chip FIFO pointer to FIFO TX base. */
-	base_adr = 0x00;
-	printk(KERN_DEBUG "lora-spi: Going to set RX base address\n");
-	sx127X_write_reg(spi, SX127X_REG_FIFO_RX_BASE_ADDR, &base_adr, 1);
+	/* Set chip FIFO RX base. */
+	//base_adr = 0x00;
+	//printk(KERN_DEBUG "lora-spi: Going to set RX base address\n");
+	//sx127X_write_reg(spi, SX127X_REG_FIFO_RX_BASE_ADDR, &base_adr, 1);
+	//sx127X_write_reg(spi, SX127X_REG_FIFO_ADDR_PTR, &base_adr, 1);
 
 	/* Set chip wait for LoRa timeout time. */
 	sx127X_setLoRaRXTimeout(spi, 300);
+	//sx127X_setState(spi, SX127X_FSRX_MODE);
 	/* Clear all of the IRQ flags. */
 	sx127X_clearLoRaAllFlag(spi);
-	/* Set chip to RX single packet state.  The chip start to wait for receiving. */
-	sx127X_setState(spi, SX127X_RXSINGLE_MODE);
+	/* Set chip to RX continuous state.  The chip start to wait for receiving. */
+	sx127X_setState(spi, SX127X_RXCONTINUOUS_MODE);
 	/* Wait and check there is any packet received ready. */
-	for(timeout = 0; timeout < 100; timeout++) {
-		flag = sx127X_getLoRaFlag(spi, SX127X_FLAG_RXTIMEOUT | SX127X_FLAG_RXDONE);
-		if(flag == 0) udelay(10000);
+	for(timeout = 0; timeout < 500; timeout++) {
+		flag = sx127X_getLoRaFlag(spi, SX127X_FLAG_RXTIMEOUT | SX127X_FLAG_RXDONE | SX127X_FLAG_PAYLOADCRCERROR);
+		//printk(KERN_DEBUG "lora-spi: LoRa flag in receiving is %X\n", flag);
+		if(flag == 0) mdelay(10);
 		else break;
 	}
-	/* Set chip to standby state. */
-	sx127X_setState(spi, SX127X_STANDBY_MODE);
 
 	/* If there is nothing or received timeout. */
 	if((flag == 0) || (flag & SX127X_FLAG_RXTIMEOUT)) {
@@ -72,13 +73,20 @@ static ssize_t loraspi_read(struct lora_data *lrdata, const char __user *buf, si
 
 	/* There is a ready packet in the chip's FIFO. */
 	if(c == 0) {
-		size = (lrdata->rx_buflen < size) ? lrdata->rx_buflen : size;
+		mdelay(500);
+		size = (lrdata->bufmaxlen < size) ? lrdata->bufmaxlen : size;
 		/* Read from chip to LoRa data RX buffer. */
 		c = sx127X_readLoRaData(spi, lrdata->rx_buf, size);
 		/* Copy from LoRa data RX buffer to user space. */
 		if(c > 0)
 			copy_to_user((void *)buf, lrdata->rx_buf, c);
 	}
+
+	/* Clear all of the IRQ flags. */
+	sx127X_clearLoRaAllFlag(spi);
+
+	/* Set chip to standby state. */
+	sx127X_setState(spi, SX127X_SLEEP_MODE);
 
 	mutex_unlock(&(lrdata->buf_lock));
 
@@ -169,8 +177,9 @@ static ssize_t loraspi_write(struct lora_data *lrdata, const char __user *buf, s
 
 		/* Wait until TX is finished by checking the TX flag. */
 		for(flag = 0; timeout > 0; timeout--) {
-			flag = sx127X_getLoRaFlag(spi, SX127X_FLAG_TXDONE);
-			if(flag != 0) {
+			flag = sx127X_getLoRaAllFlag(spi);//, SX127X_FLAG_TXDONE);
+			//printk(KERN_DEBUG "lora-spi: wait TX flag is %X\n", flag);
+			if((flag & SX127X_FLAG_TXDONE) != 0) {
 				printk(KERN_DEBUG "lora-spi: wait TX is finished\n");
 				break;
 			}

@@ -50,19 +50,21 @@ sx127X_read_reg(struct spi_device *spi, uint8_t start_adr, uint8_t *buf, size_t 
 	memset(&at, 0, sizeof(at));
 	at.tx_buf = &start_adr;
 	at.len = 1;
+	at.speed_hz = 15200;
 	spi_message_add_tail(&at, &m);
 
-	/* Write value. */
+	/* Read value. */
 	memset(&bt, 0, sizeof(bt));
 	bt.rx_buf = buf;
 	bt.len = len;
+	bt.speed_hz = 15200;
 	spi_message_add_tail(&bt, &m);
 
 	status = sx127X_sync(spi, &m);
+	//printk(KERN_DEBUG "sx127X: just read %d bytes from chip\n", status);
 	/* Minus the start address's length. */
 	if(status > 0)
 		status -= 1;
-	//printk(KERN_DEBUG "sx127X: just read %d bytes from chip\n", status);
 
 	return status;
 }
@@ -80,19 +82,22 @@ sx127X_write_reg(struct spi_device *spi, uint8_t start_adr, uint8_t *buf, size_t
 	memset(&at, 0, sizeof(at));
 	at.tx_buf = &start_adr;
 	at.len = 1;
+	at.speed_hz = 15200;
 	spi_message_add_tail(&at, &m);
 
 	/* Write value. */
 	memset(&bt, 0, sizeof(bt));
 	bt.tx_buf = buf;
 	bt.len = len;
+	bt.speed_hz = 15200;
 	spi_message_add_tail(&bt, &m);
 
 	status = sx127X_sync(spi, &m);
 	/* Minus the start address's length. */
 	if(status > 0)
 		status -= 1;
-	//printk(KERN_DEBUG "sx127X: just written %d bytes to chip\n", status);
+	//printk(KERN_DEBUG "sx127X: loraSPI%d.%d just written %d bytes to chip\n", 
+	//		spi->master->bus_num, spi->chip_select, status);
 
 	return status;
 }
@@ -398,14 +403,19 @@ sx127X_readLoRaData(struct spi_device *spi, uint8_t *buf, size_t len) {
 
 	/* Get the chip RX FIFO last packet address. */
 	sx127X_read_reg(spi, SX127X_REG_FIFO_RX_CURRENT_ADDR, &start_adr, 1);
+	printk(KERN_DEBUG "sx127X: the RX buffer start address is 0x%X\n", start_adr);
 	/* Set chip FIFO pointer to FIFO last packet address. */
 	sx127X_write_reg(spi, SX127X_REG_FIFO_ADDR_PTR, &start_adr, 1);
+
 	/* Get the RX last packet payload length. */
 	sx127X_read_reg(spi, SX127X_REG_RX_NB_BYTES, &blen, 1);
+	printk(KERN_DEBUG "sx127X: the RX last packet payload length is %d bytes\n", blen);
 
 	len = (blen < len) ? blen : len;
+	printk(KERN_DEBUG "sx127X: going to read %d bytes from RX FIFO\n", len);
 	/* Read LoRa packet payload. */
 	c = sx127X_read_reg(spi, SX127X_REG_FIFO, buf, len);
+	printk(KERN_DEBUG "sx127X: c in read LoRa data is %d\n", c);
 
 	return c;
 }
