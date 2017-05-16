@@ -6,19 +6,19 @@
 #include <sys/select.h>
 
 /* Read the device data. */
-void do_read(int fd) {
-	char buf[16];
+ssize_t do_read(int fd, char *buf, size_t len) {
 	ssize_t sz;
 
 	memset(buf, '\0', 16);
 
 	sz = read(fd, buf, 15);
 	printf("Read %d bytes: %s\r\n", sz, buf);
+
+	return sz;
 }
 
 /* Write data into the device. */
-void do_write(int fd, char *buf) {
-	//char buf[] = "Ker Ker!!!!!!";
+void do_write(int fd, char *buf, size_t len) {
 	ssize_t sz;
 
 	sz = write(fd, buf, strlen(buf));
@@ -30,6 +30,8 @@ int main(int argc, char **argv) {
 	char *data;
 	int fd;
 	char pstr[40];
+#define MAX_BUFFER_LEN	16
+	char buf[MAX_BUFFER_LEN];
 
 	/* Parse command. */
 	if(argc >= 3) {
@@ -53,7 +55,7 @@ int main(int argc, char **argv) {
 
 	/* Write to the file descriptor if it is ready to be written. */
 	printf("Going to write %s\n", path);
-	do_write(fd, data);
+	do_write(fd, data, strlen(data));
 	printf("Written %s\n", path);
 
 	/* Close device node. */
