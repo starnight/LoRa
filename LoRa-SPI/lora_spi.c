@@ -42,14 +42,13 @@ static ssize_t loraspi_read(struct lora_data *lrdata, const char __user *buf, si
 	sx127X_setState(spi, SX127X_STANDBY_MODE);
 
 	/* Set chip FIFO RX base. */
-	//base_adr = 0x00;
-	//printk(KERN_DEBUG "lora-spi: Going to set RX base address\n");
-	//sx127X_write_reg(spi, SX127X_REG_FIFO_RX_BASE_ADDR, &base_adr, 1);
-	//sx127X_write_reg(spi, SX127X_REG_FIFO_ADDR_PTR, &base_adr, 1);
+	base_adr = 0x00;
+	printk(KERN_DEBUG "lora-spi: Going to set RX base address\n");
+	sx127X_write_reg(spi, SX127X_REG_FIFO_RX_BASE_ADDR, &base_adr, 1);
+	sx127X_write_reg(spi, SX127X_REG_FIFO_ADDR_PTR, &base_adr, 1);
 
 	/* Set chip wait for LoRa timeout time. */
 	sx127X_setLoRaRXTimeout(spi, 300);
-	//sx127X_setState(spi, SX127X_FSRX_MODE);
 	/* Clear all of the IRQ flags. */
 	sx127X_clearLoRaAllFlag(spi);
 	/* Set chip to RX continuous state.  The chip start to wait for receiving. */
@@ -73,7 +72,7 @@ static ssize_t loraspi_read(struct lora_data *lrdata, const char __user *buf, si
 
 	/* There is a ready packet in the chip's FIFO. */
 	if(c == 0) {
-		mdelay(500);
+		memset(lrdata->rx_buf, 0, lrdata->bufmaxlen);
 		size = (lrdata->bufmaxlen < size) ? lrdata->bufmaxlen : size;
 		/* Read from chip to LoRa data RX buffer. */
 		c = sx127X_readLoRaData(spi, lrdata->rx_buf, size);
@@ -109,7 +108,7 @@ static ssize_t loraspi_write(struct lora_data *lrdata, const char __user *buf, s
 		   spi->master->bus_num, spi->chip_select, size);
 
 	mutex_lock(&(lrdata->buf_lock));
-
+	memset(lrdata->tx_buf, 0, lrdata->bufmaxlen);
 	status = copy_from_user(lrdata->tx_buf, buf, size);
 
 	if(status >= size)
@@ -117,13 +116,13 @@ static ssize_t loraspi_write(struct lora_data *lrdata, const char __user *buf, s
 
 	lrdata->tx_buflen = size - status;
 
-	/* Initial LoRa packet. */
-	lrpack.dst = 2;
-	lrpack.src = lrdata->node_adr;
-	lrpack.packet_num = lrdata->packet_num;
-	lrdata->packet_num += 1;
-	memcpy(lrpack.data, lrdata->tx_buf, lrdata->tx_buflen);
-	lrpack.len = lrdata->tx_buflen;
+//	/* Initial LoRa packet. */
+//	lrpack.dst = 2;
+//	lrpack.src = lrdata->node_adr;
+//	lrpack.packet_num = lrdata->packet_num;
+//	lrdata->packet_num += 1;
+//	memcpy(lrpack.data, lrdata->tx_buf, lrdata->tx_buflen);
+//	lrpack.len = lrdata->tx_buflen;
 
 	/* Set chip to standby state. */
 	printk(KERN_DEBUG "lora-spi: Going to set standby state\n");
@@ -148,8 +147,9 @@ static ssize_t loraspi_write(struct lora_data *lrdata, const char __user *buf, s
 //	/* Write LoRa packet payload length. */
 //	sx127X_write_reg(spi, SX127X_REG_FIFO, &lrpack.len, 1);
 //	/* Write LoRa packet payload. */
-	printk(KERN_DEBUG "lora-spi: write %d bytes to chip\n", lrpack.len);
-	c = sx127X_write_reg(spi, SX127X_REG_FIFO, lrpack.data, lrpack.len);
+	//printk(KERN_DEBUG "lora-spi: write %d bytes to chip\n", lrpack.len);
+	printk(KERN_DEBUG "lora-spi: write %d bytes to chip\n", lrdata->tx_buflen);
+	c = sx127X_write_reg(spi, SX127X_REG_FIFO, lrdata->tx_buf, lrdata->tx_buflen);
 //	/* Write LoRa packet retry. */
 //	sx127X_write_reg(spi, SX127X_REG_FIFO, &lrpack.retry, 1);
 
