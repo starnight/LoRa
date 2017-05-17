@@ -85,7 +85,7 @@ static ssize_t loraspi_read(struct lora_data *lrdata, const char __user *buf, si
 	sx127X_clearLoRaAllFlag(spi);
 
 	/* Set chip to standby state. */
-	sx127X_setState(spi, SX127X_SLEEP_MODE);
+	sx127X_setState(spi, SX127X_STANDBY_MODE);
 
 	mutex_unlock(&(lrdata->buf_lock));
 
