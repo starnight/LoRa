@@ -148,6 +148,9 @@ sx127X_setLoRaMaxRXBuff(struct spi_device *spi, uint8_t len);
 ssize_t
 sx127X_readLoRaData(struct spi_device *spi, uint8_t *buf, size_t len);
 
+ssize_t
+sx127X_sendLoRaData(struct spi_device *spi, uint8_t *buf, size_t len);
+
 int32_t
 sx127X_getLastLoRaPacketRSSI(struct spi_device *spi);
 

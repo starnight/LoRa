@@ -247,8 +247,6 @@ sx127X_clearLoRaFlag(struct spi_device *spi, uint8_t f) {
 	flag |= f;
 	sx127X_write_reg(spi, SX127X_REG_IRQ_FLAGS, &flag, 1);
 }
-//uint8_t sx127X_getLoRaRXEndFlag(struct spi_device *spi) {}
-//ssize_t sz127X_setLoRaDataToSend(struct spi_device *spi, uint8_t *buf, size_t len) {}
 
 void
 sx127X_setLoRaSPRFactor(struct spi_device *spi, uint32_t chips) {
@@ -413,7 +411,34 @@ sx127X_readLoRaData(struct spi_device *spi, uint8_t *buf, size_t len) {
 	return c;
 }
 
-//void sx127X_discardLoRaRX(struct spi_device *spi) {}
+//uint8_t sx127X_getLoRaRXEndFlag(struct spi_device *spi) {}
+
+ssize_t
+sx127X_sendLoRaData(struct spi_device *spi, uint8_t *buf, size_t len) {
+	uint8_t base_adr;
+	uint8_t blen;
+	uint8_t c;
+
+	/* Set chip FIFO pointer to FIFO TX base. */
+	//printk(KERN_DEBUG "lora-spi: Going to get TX base address\n");
+	sx127X_read_reg(spi, SX127X_REG_FIFO_TX_BASE_ADDR, &base_adr, 1);
+	//printk(KERN_DEBUG "lora-spi: Going to set FIFO pointer to TX base address 0x%X\n", base_adr);
+	sx127X_write_reg(spi, SX127X_REG_FIFO_ADDR_PTR, &base_adr, 1);
+
+#define SX127X_MAX_FIFO_LENGTH	0xFF
+	blen = (len < SX127X_MAX_FIFO_LENGTH) ? len : SX127X_MAX_FIFO_LENGTH;
+
+	/* Write to SPI chip synchronously to fill the FIFO of the chip. */
+	//printk(KERN_DEBUG "lora-spi: write %d bytes to chip\n", blen);
+	c = sx127X_write_reg(spi, SX127X_REG_FIFO, buf, blen);
+
+	/* Set the FIFO payload length. */
+	//printk(KERN_DEBUG "lora-spi: set payload length %d\n", c);
+	sx127X_write_reg(spi, SX127X_REG_PAYLOAD_LENGTH, &c, 1);
+
+	return c;
+}
+
 int32_t
 sx127X_getLastLoRaPacketRSSI(struct spi_device *spi) {
 	uint32_t dbm;

@@ -25,8 +25,8 @@ static DECLARE_BITMAP(minors, N_LORASPI_MINORS);
 static DEFINE_MUTEX(minors_lock);
 
 static ssize_t loraspi_read(struct lora_data *lrdata, const char __user *buf, size_t size) {
-	int status;
 	struct spi_device *spi;
+	ssize_t status;
 	int c = 0;
 	uint8_t base_adr;
 	uint8_t flag;
@@ -55,9 +55,11 @@ static ssize_t loraspi_read(struct lora_data *lrdata, const char __user *buf, si
 	sx127X_setState(spi, SX127X_RXCONTINUOUS_MODE);
 	/* Wait and check there is any packet received ready. */
 	for(timeout = 0; timeout < 500; timeout++) {
-		flag = sx127X_getLoRaFlag(spi, SX127X_FLAG_RXTIMEOUT | SX127X_FLAG_RXDONE | SX127X_FLAG_PAYLOADCRCERROR);
+		flag = sx127X_getLoRaFlag(spi, SX127X_FLAG_RXTIMEOUT |
+									   SX127X_FLAG_RXDONE |
+									   SX127X_FLAG_PAYLOADCRCERROR);
 		//printk(KERN_DEBUG "lora-spi: LoRa flag in receiving is %X\n", flag);
-		if(flag == 0) mdelay(10);
+		if(flag == 0) usleep_range(10000, 10010);
 		else break;
 	}
 
@@ -78,7 +80,7 @@ static ssize_t loraspi_read(struct lora_data *lrdata, const char __user *buf, si
 		c = sx127X_readLoRaData(spi, lrdata->rx_buf, size);
 		/* Copy from LoRa data RX buffer to user space. */
 		if(c > 0)
-			copy_to_user((void *)buf, lrdata->rx_buf, c);
+			status = copy_to_user((void *)buf, lrdata->rx_buf, c);
 	}
 
 	/* Clear all of the IRQ flags. */
@@ -93,15 +95,13 @@ static ssize_t loraspi_read(struct lora_data *lrdata, const char __user *buf, si
 }
 
 static ssize_t loraspi_write(struct lora_data *lrdata, const char __user *buf, size_t size) {
-	uint8_t c;
-	ssize_t status;
 	struct spi_device *spi;
+	ssize_t status;
+	int c;
 	uint8_t data;
 	uint8_t base_adr;
 	uint8_t flag;
 	uint32_t timeout;
-
-	struct lora_packet lrpack;
 
 	spi = lrdata->lora_device;
 	printk(KERN_DEBUG "lora-spi: SPI device #%d.%d write %u bytes from user space\n",
@@ -116,52 +116,19 @@ static ssize_t loraspi_write(struct lora_data *lrdata, const char __user *buf, s
 
 	lrdata->tx_buflen = size - status;
 
-//	/* Initial LoRa packet. */
-//	lrpack.dst = 2;
-//	lrpack.src = lrdata->node_adr;
-//	lrpack.packet_num = lrdata->packet_num;
-//	lrdata->packet_num += 1;
-//	memcpy(lrpack.data, lrdata->tx_buf, lrdata->tx_buflen);
-//	lrpack.len = lrdata->tx_buflen;
-
 	/* Set chip to standby state. */
 	printk(KERN_DEBUG "lora-spi: Going to set standby state\n");
 	sx127X_setState(spi, SX127X_STANDBY_MODE);
 	data = sx127X_readMode(spi);
 	printk(KERN_DEBUG "lora-spi: Current OP mode is 0x%X\n", data);
 
-	/* Set chip FIFO pointer to FIFO TX base. */
+	/* Set chip FIFO TX base. */
 	base_adr = 0x80;
 	printk(KERN_DEBUG "lora-spi: Going to set TX base address\n");
 	sx127X_write_reg(spi, SX127X_REG_FIFO_TX_BASE_ADDR, &base_adr, 1);
-	printk(KERN_DEBUG "lora-spi: Going to set FIFO pointer to TX base address 0x%X\n", base_adr);
-	sx127X_write_reg(spi, SX127X_REG_FIFO_ADDR_PTR, &base_adr, 1);
 
 	/* Write to SPI chip synchronously to fill the FIFO of the chip. */
-//	/* Write LoRa packet destination. */
-//	sx127X_write_reg(spi, SX127X_REG_FIFO, &lrpack.dst, 1);
-//	/* Write LoRa packet source. */
-//	sx127X_write_reg(spi, SX127X_REG_FIFO, &lrpack.src, 1);
-//	/* Write LoRa packet number. */
-//	sx127X_write_reg(spi, SX127X_REG_FIFO, &lrpack.packet_num, 1);
-//	/* Write LoRa packet payload length. */
-//	sx127X_write_reg(spi, SX127X_REG_FIFO, &lrpack.len, 1);
-//	/* Write LoRa packet payload. */
-	//printk(KERN_DEBUG "lora-spi: write %d bytes to chip\n", lrpack.len);
-	printk(KERN_DEBUG "lora-spi: write %d bytes to chip\n", lrdata->tx_buflen);
-	c = sx127X_write_reg(spi, SX127X_REG_FIFO, lrdata->tx_buf, lrdata->tx_buflen);
-//	/* Write LoRa packet retry. */
-//	sx127X_write_reg(spi, SX127X_REG_FIFO, &lrpack.retry, 1);
-
-	/* Set the FIFO payload length. */
-	data = c;
-	printk(KERN_DEBUG "lora-spi: set payload length %d\n", data);
-	sx127X_write_reg(spi, SX127X_REG_PAYLOAD_LENGTH, &data, 1);
-	sx127X_read_reg(spi, SX127X_REG_PAYLOAD_LENGTH, &data, 1);
-	printk(KERN_DEBUG "lora-spi: read payload length %d btyes\n", data);
-
-	sx127X_read_reg(spi, SX127X_REG_FIFO_ADDR_PTR, &data, 1);
-	printk(KERN_DEBUG "lora-spi: FIFO address is 0x%X now\n", data);
+	c = sx127X_sendLoRaData(spi, lrdata->tx_buf, lrdata->tx_buflen);
 
 	/* Clear LoRa IRQ TX flag. */
 	sx127X_clearLoRaFlag(spi, SX127X_FLAG_TXDONE);
@@ -189,7 +156,7 @@ static ssize_t loraspi_write(struct lora_data *lrdata, const char __user *buf, s
 					printk(KERN_DEBUG "lora-spi: wait TX is time out\n");
 				}
 				else {
-					udelay(1000);
+					usleep_range(1000, 1010);
 				}
 			}
 		}
