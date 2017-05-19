@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/select.h>
+#include <unistd.h>
 
 /* Read the device data. */
 ssize_t do_read(int fd, char *buf, size_t len) {
@@ -57,6 +58,8 @@ int main(int argc, char **argv) {
 	printf("Going to read %s\n", path);
 	len = do_read(fd, buf, MAX_BUFFER_LEN);
 	printf("Read %s\n", path);
+
+	sleep(1);
 
 	/* Echo */
 	printf("Going to echo %s\n", path);

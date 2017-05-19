@@ -58,6 +58,12 @@ int main(int argc, char **argv) {
 	do_write(fd, data, strlen(data));
 	printf("Written %s\n", path);
 
+	/* Read from echo if it is ready to be read. */
+	memset(buf, 0, MAX_BUFFER_LEN);
+	printf("Going to read %s\n", path);
+	do_read(fd, buf, MAX_BUFFER_LEN);
+	printf("Read %s\n", path);
+
 	/* Close device node. */
 	close(fd);
 
