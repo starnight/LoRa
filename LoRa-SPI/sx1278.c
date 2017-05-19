@@ -5,7 +5,7 @@
 #include "sx1278.h"
 
 #define F_XOSC		32000000
-#define	POW_2_19	0x80000
+#define	__POW_2_19	0x80000
 
 int init_sx127X(struct spi_device *spi) {
 	char ver[5];
@@ -117,6 +117,9 @@ sx127X_startLoRaMode(struct spi_device *spi) {
 	sx127X_setState(spi, SX127X_STANDBY_MODE);
 	op_mode = sx127X_readMode(spi);
 	printk(KERN_DEBUG "sx127X: the current OP mode is 0x%X\n", op_mode);
+
+	/* Set LoRa in explicit header mode. */
+	sx127X_setLoRaImplicit(spi, 0);
 }
 
 uint8_t 
@@ -155,7 +158,7 @@ sx127X_setFreq(struct spi_device *spi, uint32_t fr) {
 	uint8_t buf[3];
 	int i;
 
-	frt = fr * POW_2_19 / F_XOSC;
+	frt = fr * __POW_2_19 / F_XOSC;
 
 	for(i = 2; i <= 0; i--) {
 		buf[i] = frt % 256;
@@ -180,7 +183,7 @@ sx127X_getFreq(struct spi_device *spi) {
 	for(i = 2; i >= 0; i--)
 		frt = frt * 256 + buf[i];
 
-	fr =  frt * F_XOSC / POW_2_19;
+	fr =  frt * F_XOSC / __POW_2_19;
 
 	return fr;
 }
@@ -333,7 +336,16 @@ sx127X_getLoRaCR(struct spi_device *spi) {
 	
 	return cr;
 }
-//float sx127X_getSRate(struct spi_device *spi) {}
+
+void
+sx127X_setLoRaImplicit(struct spi_device *spi, uint8_t yesno) {
+	uint8_t mcf1;
+
+	sx127X_read_reg(spi, SX127X_REG_MODEM_CONFIG1, &mcf1, 1);
+	mcf1 = (yesno) ? (mcf1 | 0x01) : (mcf1 & 0xFE);
+	sx127X_write_reg(spi, SX127X_REG_MODEM_CONFIG1, &mcf1, 1);
+}
+
 void
 sx127X_setLoRaRXByteTimeout(struct spi_device *spi, uint32_t n) {
 	uint8_t buf[2];

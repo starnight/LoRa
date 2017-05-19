@@ -137,6 +137,15 @@ uint32_t
 sx127X_getLoRaBW(struct spi_device *spi);
 
 void
+sx127X_setLoRaCR(struct spi_device *spi, uint8_t cr);
+
+uint8_t
+sx127X_getLoRaCR(struct spi_device *spi);
+
+void
+sx127X_setLoRaImplicit(struct spi_device *spi, uint8_t yesno);
+
+void
 sx127X_setLoRaRXTimeout(struct spi_device *spi, uint32_t ms);
 
 uint32_t
