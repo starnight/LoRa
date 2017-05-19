@@ -48,14 +48,12 @@ sx127X_read_reg(struct spi_device *spi, uint8_t start_adr, uint8_t *buf, size_t 
 	memset(&at, 0, sizeof(at));
 	at.tx_buf = &start_adr;
 	at.len = 1;
-	at.speed_hz = 15200;
 	spi_message_add_tail(&at, &m);
 
 	/* Read value. */
 	memset(&bt, 0, sizeof(bt));
 	bt.rx_buf = buf;
 	bt.len = len;
-	bt.speed_hz = 15200;
 	spi_message_add_tail(&bt, &m);
 
 	status = sx127X_sync(spi, &m);
@@ -79,14 +77,12 @@ sx127X_write_reg(struct spi_device *spi, uint8_t start_adr, uint8_t *buf, size_t
 	memset(&at, 0, sizeof(at));
 	at.tx_buf = &start_adr;
 	at.len = 1;
-	at.speed_hz = 15200;
 	spi_message_add_tail(&at, &m);
 
 	/* Write value. */
 	memset(&bt, 0, sizeof(bt));
 	bt.tx_buf = buf;
 	bt.len = len;
-	bt.speed_hz = 15200;
 	spi_message_add_tail(&bt, &m);
 
 	status = sx127X_sync(spi, &m);
@@ -429,7 +425,7 @@ ssize_t
 sx127X_sendLoRaData(struct spi_device *spi, uint8_t *buf, size_t len) {
 	uint8_t base_adr;
 	uint8_t blen;
-	uint8_t c;
+	ssize_t c;
 
 	/* Set chip FIFO pointer to FIFO TX base. */
 	//printk(KERN_DEBUG "lora-spi: Going to get TX base address\n");
@@ -445,8 +441,9 @@ sx127X_sendLoRaData(struct spi_device *spi, uint8_t *buf, size_t len) {
 	c = sx127X_write_reg(spi, SX127X_REG_FIFO, buf, blen);
 
 	/* Set the FIFO payload length. */
-	//printk(KERN_DEBUG "lora-spi: set payload length %d\n", c);
-	sx127X_write_reg(spi, SX127X_REG_PAYLOAD_LENGTH, &c, 1);
+	blen = c;
+	//printk(KERN_DEBUG "lora-spi: set payload length %d\n", blen);
+	sx127X_write_reg(spi, SX127X_REG_PAYLOAD_LENGTH, &blen, 1);
 
 	return c;
 }

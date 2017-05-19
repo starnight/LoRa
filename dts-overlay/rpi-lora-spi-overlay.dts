@@ -20,14 +20,14 @@
 				compatible = "lora-spi";
 				reg = <0>;
 				status = "okay";
-				spi-max-frequency = <0x7a120>;
+				spi-max-frequency = <0x3b60>;
 			};
 
 			lora-spi@1 {
 				compatible = "lora-spi";
 				reg = <1>;
 				status = "okay";
-				spi-max-frequency = <0x7a120>;
+				spi-max-frequency = <0x3b60>;
 			};
 		};
 	};
