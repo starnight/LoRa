@@ -108,6 +108,12 @@ sx127X_setState(struct spi_device *spi, uint8_t st);
 uint8_t
 sx127X_readState(struct spi_device *spi);
 
+void
+sx127X_setFreq(struct spi_device *spi, uint32_t fr);
+
+uint32_t
+sx127X_getFreq(struct spi_device *spi);
+
 uint8_t
 sx127X_getPower(struct spi_device *spi);
 

@@ -11,7 +11,6 @@
 
 #include "lora.h"
 
-
 static LIST_HEAD(device_list);
 static DEFINE_MUTEX(device_list_lock);
 
@@ -127,6 +126,32 @@ static ssize_t file_write(struct file *filp, const char __user *buf, size_t size
 		return 0;
 }
 
+static long file_ioctl(struct file *filp, unsigned int cmd, unsigned long arg) {
+	long ret;
+	int *pval;
+	struct lora_data *lrdata;
+
+	ret = -ENOTTY;
+	pval = (void __user *)arg;
+	lrdata = filp->private_data;
+
+	/* I/O control by each command. */
+	switch(cmd) {
+		case LORA_SET_FREQUENCY:
+			if(lrdata->ops->setFreq != NULL)
+				ret = lrdata->ops->setFreq(lrdata, pval);
+			break;
+		case LORA_GET_FREQUENCY:
+			if(lrdata->ops->getFreq != NULL)
+				ret = lrdata->ops->getFreq(lrdata, pval);
+			break;
+		default:
+			ret = -ENOTTY;
+	}
+
+	return ret;
+}
+
 /* Add an lora compatible device. */
 static int lora_device_add(struct lora_data *lrdata) {
 	INIT_LIST_HEAD(&(lrdata->device_entry));
@@ -154,6 +179,7 @@ static struct file_operations lora_fops = {
 	.release	= file_close,
 	.read		= file_read,
 	.write		= file_write,
+	.unlocked_ioctl = file_ioctl,
 	.llseek		= no_llseek,
 };
 
@@ -166,9 +192,9 @@ static int lora_register_driver(struct lora_driver *driver) {
 
 	/* Allocate a character device. */
 	alloc_ret = alloc_chrdev_region(&dev,
-									driver->minor_start,
-									driver->num,
-									driver->name);
+					driver->minor_start,
+					driver->num,
+					driver->name);
 	if(alloc_ret) {
 		printk(KERN_DEBUG "lora: Failed to allocate a character device\n");
 		return alloc_ret;

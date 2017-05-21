@@ -55,9 +55,10 @@ static ssize_t loraspi_read(struct lora_data *lrdata, const char __user *buf, si
 	sx127X_setState(spi, SX127X_RXCONTINUOUS_MODE);
 	/* Wait and check there is any packet received ready. */
 	for(timeout = 0; timeout < 500; timeout++) {
-		flag = sx127X_getLoRaFlag(spi, SX127X_FLAG_RXTIMEOUT |
-									   SX127X_FLAG_RXDONE |
-									   SX127X_FLAG_PAYLOADCRCERROR);
+		flag = sx127X_getLoRaFlag(spi,
+					SX127X_FLAG_RXTIMEOUT |
+					SX127X_FLAG_RXDONE |
+					SX127X_FLAG_PAYLOADCRCERROR);
 		//printk(KERN_DEBUG "lora-spi: LoRa flag in receiving is %X\n", flag);
 		if(flag == 0) usleep_range(10000, 10010);
 		else break;
@@ -105,7 +106,7 @@ static ssize_t loraspi_write(struct lora_data *lrdata, const char __user *buf, s
 
 	spi = lrdata->lora_device;
 	printk(KERN_DEBUG "lora-spi: SPI device #%d.%d write %u bytes from user space\n",
-		   spi->master->bus_num, spi->chip_select, size);
+		spi->master->bus_num, spi->chip_select, size);
 
 	mutex_lock(&(lrdata->buf_lock));
 	memset(lrdata->tx_buf, 0, lrdata->bufmaxlen);
@@ -173,6 +174,38 @@ static ssize_t loraspi_write(struct lora_data *lrdata, const char __user *buf, s
 	return c;
 }
 
+/* Set & get the carrier frequency. */
+long loraspi_setfreq(struct lora_data *lrdata, void __user *arg) {
+	struct spi_device *spi;
+	uint32_t freq;
+	int status;
+
+	spi = lrdata->lora_device;
+	status = copy_from_user(&freq, arg, sizeof(uint32_t));
+	printk(KERN_DEBUG "lora-spi: SPI device #%d.%d set frequency %u Hz from user space\n",
+		spi->master->bus_num, spi->chip_select, freq);
+
+	sx127X_setFreq(spi, freq);
+
+	return 0;
+}
+
+long loraspi_getfreq(struct lora_data *lrdata, void __user *arg) {
+	struct spi_device *spi;
+	uint32_t freq;
+	int status;
+
+	spi = lrdata->lora_device;
+	printk(KERN_DEBUG "lora-spi: SPI device #%d.%d get frequency to user space\n",
+		spi->master->bus_num, spi->chip_select);
+
+	freq = sx127X_getFreq(spi);
+
+	status = copy_to_user(arg, &freq, sizeof(uint32_t));
+
+	return 0;
+}
+
 struct lora_driver lr_driver = {
 	.name = __DRIVER_NAME,
 	.num = N_LORASPI_MINORS,
@@ -182,6 +215,8 @@ struct lora_driver lr_driver = {
 struct lora_operations lrops = {
 	.read = loraspi_read,
 	.write = loraspi_write,
+	.setFreq = loraspi_setfreq,
+	.getFreq = loraspi_getfreq,
 };
 
 /* The compatible SoC array. */
@@ -237,13 +272,13 @@ static int loraspi_probe(struct spi_device *spi) {
 	int status;
 
 	printk(KERN_DEBUG "lora-spi: probe a SPI device with address %d.%d\n",
-		   spi->master->bus_num, spi->chip_select);
+		spi->master->bus_num, spi->chip_select);
 
 #ifdef CONFIG_OF
 	if(spi->dev.of_node && !of_match_device(lora_dt_ids, &(spi->dev))) {
 		dev_err(&(spi->dev), "buggy DT: LoRa listed directly in DT\n");
 		WARN_ON(spi->dev.of_node &&
-				!of_match_device(lora_dt_ids, (&spi->dev)));
+			!of_match_device(lora_dt_ids, (&spi->dev)));
 	}
 #endif
 
@@ -266,10 +301,11 @@ static int loraspi_probe(struct spi_device *spi) {
 		set_bit(minor, minors);
 		lrdata->devt = MKDEV(lr_driver.major, minor);
 		dev = device_create(lr_driver.lora_class,
-							&(spi->dev),
-							lrdata->devt,
-							lrdata,
-							"loraSPI%d.%d", spi->master->bus_num, spi->chip_select);
+				&(spi->dev),
+				lrdata->devt,
+				lrdata,
+				"loraSPI%d.%d",
+				spi->master->bus_num, spi->chip_select);
 		/* Set the SPI device's driver data for later use.  */
 		spi_set_drvdata(spi, lrdata);
 		lora_device_add(lrdata);
@@ -294,7 +330,7 @@ static int loraspi_remove(struct spi_device *spi) {
 	struct lora_data *lrdata;
 	
 	printk(KERN_DEBUG "lora-spi: remove a SPI device with address %d.%d",
-		   spi->master->bus_num, spi->chip_select);
+		spi->master->bus_num, spi->chip_select);
 
 	lrdata = spi_get_drvdata(spi);
 
