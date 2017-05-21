@@ -20,8 +20,8 @@ struct lora_operations {
 	void (*setState)(uint8_t);
 	uint8_t (*readState)(void);
 	/* Set & get the carrier frequency. */
-	void (*setFreq)(float);
-	float (*getFreq)(void);
+	void (*setFreq)(uint32_t);
+	uint32_t (*getFreq)(void);
 	/* Set & get the PA power. */
 	void (*setPower)(uint32_t);
 	uint32_t (*getPower)(void);

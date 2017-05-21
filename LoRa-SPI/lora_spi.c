@@ -241,7 +241,7 @@ static int loraspi_probe(struct spi_device *spi) {
 
 #ifdef CONFIG_OF
 	if(spi->dev.of_node && !of_match_device(lora_dt_ids, &(spi->dev))) {
-		dev_err(&(spi->dev), "buggy DT: lora listed directly in DT\n");
+		dev_err(&(spi->dev), "buggy DT: LoRa listed directly in DT\n");
 		WARN_ON(spi->dev.of_node &&
 				!of_match_device(lora_dt_ids, (&spi->dev)));
 	}
