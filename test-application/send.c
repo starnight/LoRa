@@ -1,9 +1,17 @@
 #include <stdio.h>
 #include <string.h>
+#include <stdint.h>
 #include <errno.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/select.h>
+#include <sys/ioctl.h>
+
+/* I/O control by each command. */
+#define LORA_IOC_MAGIC '\x66'
+
+#define LORA_SET_FREQUENCY	(_IOR(LORA_IOC_MAGIC, 0, int))
+#define LORA_GET_FREQUENCY	(_IOR(LORA_IOC_MAGIC, 1, int))
 
 /* Read the device data. */
 ssize_t do_read(int fd, char *buf, size_t len) {
@@ -32,6 +40,8 @@ int main(int argc, char **argv) {
 	char pstr[40];
 #define MAX_BUFFER_LEN	16
 	char buf[MAX_BUFFER_LEN];
+	int len;
+	uint32_t frq;
 
 	/* Parse command. */
 	if(argc >= 3) {
@@ -53,6 +63,10 @@ int main(int argc, char **argv) {
 		return -1;
 	}
 
+	/* Get the carrier frequency. */
+	ioctl(fd, LORA_GET_FREQUENCY, &frq);
+	printf("The LoRa carrier frequency is %u Hz\n", frq);
+
 	/* Write to the file descriptor if it is ready to be written. */
 	printf("Going to write %s\n", path);
 	do_write(fd, data, strlen(data));
@@ -61,8 +75,9 @@ int main(int argc, char **argv) {
 	/* Read from echo if it is ready to be read. */
 	memset(buf, 0, MAX_BUFFER_LEN);
 	printf("Going to read %s\n", path);
-	do_read(fd, buf, MAX_BUFFER_LEN);
-	printf("Read %s\n", path);
+	len = do_read(fd, buf, MAX_BUFFER_LEN);
+	if(len > 0)
+		printf("Read %s\n", path);
 
 	/* Close device node. */
 	close(fd);
