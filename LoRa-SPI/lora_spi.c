@@ -185,7 +185,9 @@ long loraspi_setfreq(struct lora_data *lrdata, void __user *arg) {
 	printk(KERN_DEBUG "lora-spi: SPI device #%d.%d set frequency %u Hz from user space\n",
 		spi->master->bus_num, spi->chip_select, freq);
 
+	mutex_lock(&(lrdata->buf_lock));
 	sx127X_setFreq(spi, freq);
+	mutex_unlock(&(lrdata->buf_lock));
 
 	return 0;
 }
@@ -199,7 +201,10 @@ long loraspi_getfreq(struct lora_data *lrdata, void __user *arg) {
 	printk(KERN_DEBUG "lora-spi: SPI device #%d.%d get frequency to user space\n",
 		spi->master->bus_num, spi->chip_select);
 
+	mutex_lock(&(lrdata->buf_lock));
 	freq = sx127X_getFreq(spi);
+	mutex_unlock(&(lrdata->buf_lock));
+	printk(KERN_DEBUG "lora-spi: the carrier freq is %u Hz\n", freq);
 
 	status = copy_to_user(arg, &freq, sizeof(uint32_t));
 

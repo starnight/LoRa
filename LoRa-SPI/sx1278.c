@@ -166,7 +166,7 @@ sx127X_setFreq(struct spi_device *spi, uint32_t fr) {
 
 uint32_t
 sx127X_getFreq(struct spi_device *spi) {
-	uint32_t frt = 0;
+	uint64_t frt = 0;
 	uint8_t buf[3];
 	int status;
 	int i;
@@ -176,7 +176,7 @@ sx127X_getFreq(struct spi_device *spi) {
 	if(status <= 0)
 		return 0.0;
 
-	for(i = 2; i >= 0; i--)
+	for(i = 0; i <= 2; i++)
 		frt = frt * 256 + buf[i];
 
 	fr =  frt * F_XOSC / __POW_2_19;
