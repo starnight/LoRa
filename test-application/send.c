@@ -63,9 +63,10 @@ int main(int argc, char **argv) {
 		return -1;
 	}
 
-	/* Get the carrier frequency. */
-	ioctl(fd, LORA_GET_FREQUENCY, &frq);
-	printf("The LoRa carrier frequency is %u Hz\n", frq);
+	/* Set the carrier frequency. */
+	frq = 433000000;
+	ioctl(fd, LORA_SET_FREQUENCY, &frq);
+	printf("Set he LoRa carrier frequency to be %u Hz\n", frq);
 
 	/* Write to the file descriptor if it is ready to be written. */
 	printf("Going to write %s\n", path);
@@ -78,6 +79,10 @@ int main(int argc, char **argv) {
 	len = do_read(fd, buf, MAX_BUFFER_LEN);
 	if(len > 0)
 		printf("Read %s\n", path);
+
+	/* Get the carrier frequency. */
+	ioctl(fd, LORA_GET_FREQUENCY, &frq);
+	printf("The LoRa carrier frequency is %u Hz\n", frq);
 
 	/* Close device node. */
 	close(fd);

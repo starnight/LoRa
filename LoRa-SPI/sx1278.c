@@ -1,6 +1,7 @@
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/spi/spi.h>
+#include <asm/div64.h>
 
 #include "sx1278.h"
 
@@ -150,13 +151,16 @@ sx127X_readState(struct spi_device *spi) {
 
 void
 sx127X_setFreq(struct spi_device *spi, uint32_t fr) {
-	uint32_t frt = 0;
+	uint64_t frt64;
+	uint32_t frt;
 	uint8_t buf[3];
 	int i;
 
-	frt = fr * __POW_2_19 / F_XOSC;
+	frt64 = (uint64_t)fr * (uint64_t)__POW_2_19;
+	do_div(frt64, F_XOSC);
+	frt = frt64;
 
-	for(i = 2; i <= 0; i--) {
+	for(i = 2; i >= 0; i--) {
 		buf[i] = frt % 256;
 		frt = frt >> 8;
 	}

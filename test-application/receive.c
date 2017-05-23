@@ -41,6 +41,7 @@ int main(int argc, char **argv) {
 #define MAX_BUFFER_LEN	16
 	char buf[MAX_BUFFER_LEN];
 	int len;
+	int i;
 	uint32_t frq;
 
 	/* Parse command. */
@@ -62,9 +63,10 @@ int main(int argc, char **argv) {
 		return -1;
 	}
 
-	/* Get the carrier frequency. */
-	ioctl(fd, LORA_GET_FREQUENCY, &frq);
-	printf("The LoRa carrier frequency is %u Hz\n", frq);
+	/* Set the carrier frequency. */
+	frq = 433000000;
+	ioctl(fd, LORA_SET_FREQUENCY, &frq);
+	printf("Set he LoRa carrier frequency to be %u Hz\n", frq);
 
 	/* Read from the file descriptor if it is ready to be read. */
 	memset(buf, 0, MAX_BUFFER_LEN);
@@ -78,9 +80,15 @@ int main(int argc, char **argv) {
 
 		/* Echo */
 		printf("Going to echo %s\n", path);
+		for(i = 0; i < len; i++)
+			buf[i] = toupper(buf[i]);
 		do_write(fd, buf, len);
 		printf("Echoed %s\n", path);
 	}
+
+	/* Get the carrier frequency. */
+	ioctl(fd, LORA_GET_FREQUENCY, &frq);
+	printf("The LoRa carrier frequency is %u Hz\n", frq);
 
 	/* Close device node. */
 	close(fd);
