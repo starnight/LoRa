@@ -137,6 +137,16 @@ static long file_ioctl(struct file *filp, unsigned int cmd, unsigned long arg) {
 
 	/* I/O control by each command. */
 	switch(cmd) {
+		/* Set & read the state of the LoRa device. */
+		case LORA_SET_STATE:
+			if(lrdata->ops->setState != NULL)
+				ret = lrdata->ops->setState(lrdata, pval);
+			break;
+		case LORA_GET_STATE:
+			if(lrdata->ops->getState != NULL)
+				ret = lrdata->ops->getState(lrdata, pval);
+			break;
+		/* Set & get the carrier frequency. */
 		case LORA_SET_FREQUENCY:
 			if(lrdata->ops->setFreq != NULL)
 				ret = lrdata->ops->setFreq(lrdata, pval);
@@ -144,6 +154,24 @@ static long file_ioctl(struct file *filp, unsigned int cmd, unsigned long arg) {
 		case LORA_GET_FREQUENCY:
 			if(lrdata->ops->getFreq != NULL)
 				ret = lrdata->ops->getFreq(lrdata, pval);
+			break;
+		/* Set & get the PA power. */
+		case LORA_SET_POWER:
+			if(lrdata->ops->setPower != NULL)
+				ret = lrdata->ops->setPower(lrdata, pval);
+			break;
+		case LORA_GET_POWER:
+			if(lrdata->ops->getPower != NULL)
+				ret = lrdata->ops->getPower(lrdata, pval);
+			break;
+		/* Set & get the RF bandwith. */
+		case LORA_SET_BANDWIDTH:
+			if(lrdata->ops->setBW != NULL)
+				ret = lrdata->ops->setBW(lrdata, pval);
+			break;
+		case LORA_GET_BANDWIDTH:
+			if(lrdata->ops->getBW != NULL)
+				ret = lrdata->ops->getBW(lrdata, pval);
 			break;
 		default:
 			ret = -ENOTTY;

@@ -220,8 +220,14 @@ struct lora_driver lr_driver = {
 struct lora_operations lrops = {
 	.read = loraspi_read,
 	.write = loraspi_write,
+	.setState = NULL,
+	.getState = NULL,
 	.setFreq = loraspi_setfreq,
 	.getFreq = loraspi_getfreq,
+	.setPower = NULL,
+	.getPower = NULL,
+	.setBW = NULL,
+	.getBW = NULL,
 };
 
 /* The compatible SoC array. */

@@ -7,12 +7,9 @@
 #include <sys/select.h>
 #include <sys/ioctl.h>
 #include <unistd.h>
+#include <ctype.h>
 
-/* I/O control by each command. */
-#define LORA_IOC_MAGIC '\x66'
-
-#define LORA_SET_FREQUENCY	(_IOR(LORA_IOC_MAGIC, 0, int))
-#define LORA_GET_FREQUENCY	(_IOR(LORA_IOC_MAGIC, 1, int))
+#include "lora-ioctl.h"
 
 /* Read the device data. */
 ssize_t do_read(int fd, char *buf, size_t len) {
