@@ -54,13 +54,13 @@ static ssize_t loraspi_read(struct lora_data *lrdata, const char __user *buf, si
 	/* Set chip to RX continuous state.  The chip start to wait for receiving. */
 	sx127X_setState(spi, SX127X_RXCONTINUOUS_MODE);
 	/* Wait and check there is any packet received ready. */
-	for(timeout = 0; timeout < 500; timeout++) {
+	for(timeout = 0; timeout < 250; timeout++) {
 		flag = sx127X_getLoRaFlag(spi,
 					SX127X_FLAG_RXTIMEOUT |
 					SX127X_FLAG_RXDONE |
 					SX127X_FLAG_PAYLOADCRCERROR);
 		//printk(KERN_DEBUG "lora-spi: LoRa flag in receiving is %X\n", flag);
-		if(flag == 0) usleep_range(10000, 10010);
+		if(flag == 0) msleep(20);
 		else break;
 	}
 
@@ -157,7 +157,7 @@ static ssize_t loraspi_write(struct lora_data *lrdata, const char __user *buf, s
 					printk(KERN_DEBUG "lora-spi: wait TX is time out\n");
 				}
 				else {
-					usleep_range(1000, 1010);
+					msleep(20);
 				}
 			}
 		}
