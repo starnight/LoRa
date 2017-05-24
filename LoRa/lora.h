@@ -20,10 +20,11 @@
 
 
 /* List the state of the LoRa device. */
-#define LORA_SLEEP		0
-#define LORA_STANDBY		1
-#define LORA_TX			2
-#define LORA_RX			3
+#define LORA_STATE_SLEEP	0
+#define LORA_STATE_STANDBY	1
+#define LORA_STATE_TX		2
+#define LORA_STATE_RX		3
+#define LORA_STATE_CAD		4
 
 struct lora_data;
 

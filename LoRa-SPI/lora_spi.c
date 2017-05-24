@@ -174,11 +174,77 @@ static ssize_t loraspi_write(struct lora_data *lrdata, const char __user *buf, s
 	return c;
 }
 
+/* Set & get the state of the LoRa device. */
+long loraspi_setstate(struct lora_data *lrdata, void __user *arg) {
+	struct spi_device *spi;
+	int status;
+	uint32_t st32;
+	uint8_t st;
+
+	spi = lrdata->lora_device;
+	status = copy_from_user(&st32, arg, sizeof(uint32_t));
+	switch(st32) {
+		case LORA_STATE_SLEEP:
+			st = SX127X_SLEEP_MODE;		break;
+		case LORA_STATE_STANDBY:
+			st = SX127X_STANDBY_MODE;	break;
+		case LORA_STATE_TX:
+			st = SX127X_TX_MODE;		break;
+		case LORA_STATE_RX:
+			st = SX127X_RXCONTINUOUS_MODE;	break;
+		case LORA_STATE_CAD:
+			st = SX127X_CAD_MODE;		break;
+		default:
+			st = SX127X_STANDBY_MODE;
+	}
+
+	mutex_lock(&(lrdata->buf_lock));
+	sx127X_setState(spi, st);
+	mutex_unlock(&(lrdata->buf_lock));
+
+	return 0;
+}
+
+long loraspi_getstate(struct lora_data *lrdata, void __user *arg) {
+	struct spi_device *spi;
+	int status;
+	uint32_t st32;
+	uint8_t st;
+
+	spi = lrdata->lora_device;
+
+	mutex_lock(&(lrdata->buf_lock));
+	st = sx127X_readState(spi);
+	mutex_unlock(&(lrdata->buf_lock));
+
+	st32 = st;
+	switch(st) {
+		case SX127X_SLEEP_MODE:
+			st32 = LORA_STATE_SLEEP;	break;
+		case SX127X_STANDBY_MODE:
+			st32 = LORA_STATE_STANDBY;	break;
+		case SX127X_FSTX_MODE:
+		case SX127X_TX_MODE:
+			st32 = LORA_STATE_TX;		break;
+		case SX127X_FSRX_MODE:
+		case SX127X_RXSINGLE_MODE:
+		case SX127X_RXCONTINUOUS_MODE:
+			st32 = LORA_STATE_RX;		break;
+		case SX127X_CAD_MODE:
+			st32 = LORA_STATE_CAD;		break;
+		default:
+			st32 = LORA_STATE_SLEEP;
+	}
+	status = copy_to_user(arg, &st32, sizeof(uint32_t));
+
+	return 0;
+}
+
 /* Set & get the carrier frequency. */
 long loraspi_setfreq(struct lora_data *lrdata, void __user *arg) {
 	struct spi_device *spi;
-	uint32_t freq;
 	int status;
+	uint32_t freq;
 
 	spi = lrdata->lora_device;
 	status = copy_from_user(&freq, arg, sizeof(uint32_t));
@@ -194,8 +260,8 @@ long loraspi_setfreq(struct lora_data *lrdata, void __user *arg) {
 
 long loraspi_getfreq(struct lora_data *lrdata, void __user *arg) {
 	struct spi_device *spi;
-	uint32_t freq;
 	int status;
+	uint32_t freq;
 
 	spi = lrdata->lora_device;
 	printk(KERN_DEBUG "lora-spi: SPI device #%d.%d get frequency to user space\n",
