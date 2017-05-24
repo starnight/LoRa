@@ -37,7 +37,6 @@ int main(int argc, char **argv) {
 #define MAX_BUFFER_LEN	16
 	char buf[MAX_BUFFER_LEN];
 	int len;
-	uint32_t frq;
 
 	/* Parse command. */
 	if(argc >= 3) {
@@ -59,6 +58,11 @@ int main(int argc, char **argv) {
 		return -1;
 	}
 
+	/* Set the RF bandwidth. */
+	uint32_t bw = 500000;
+	ioctl(fd, LORA_SET_BANDWIDTH, &bw);
+	printf("Going to set the RF bandwith %u Hz\n", bw);
+
 	/* Write to the file descriptor if it is ready to be written. */
 	printf("Going to write %s\n", path);
 	do_write(fd, data, strlen(data));
@@ -72,8 +76,14 @@ int main(int argc, char **argv) {
 		printf("Read %s\n", path);
 
 	/* Get the carrier frequency. */
+	uint32_t frq;
 	ioctl(fd, LORA_GET_FREQUENCY, &frq);
 	printf("The LoRa carrier frequency is %u Hz\n", frq);
+
+	/* Get the RF bandwidth. */
+	bw = 0;
+	ioctl(fd, LORA_GET_BANDWIDTH, &bw);
+	printf("The RF bandwith is %u Hz\n", bw);
 
 	/* Set the device in sleep state. */
 	uint32_t st = LORA_STATE_SLEEP;

@@ -145,7 +145,7 @@ static ssize_t loraspi_write(struct lora_data *lrdata, const char __user *buf, s
 
 		/* Wait until TX is finished by checking the TX flag. */
 		for(flag = 0; timeout > 0; timeout--) {
-			flag = sx127X_getLoRaAllFlag(spi);//, SX127X_FLAG_TXDONE);
+			flag = sx127X_getLoRaAllFlag(spi);
 			//printk(KERN_DEBUG "lora-spi: wait TX flag is %X\n", flag);
 			if((flag & SX127X_FLAG_TXDONE) != 0) {
 				printk(KERN_DEBUG "lora-spi: wait TX is finished\n");
@@ -277,6 +277,38 @@ long loraspi_getfreq(struct lora_data *lrdata, void __user *arg) {
 	return 0;
 }
 
+/* Set & get the RF bandwith. */
+long loraspi_setbandwidth(struct lora_data *lrdata, void __user *arg) {
+	struct spi_device *spi;
+	int status;
+	uint32_t bw;
+
+	spi = lrdata->lora_device;
+	status = copy_from_user(&bw, arg, sizeof(uint32_t));
+
+	mutex_lock(&(lrdata->buf_lock));
+	sx127X_setLoRaBW(spi, bw);
+	mutex_unlock(&(lrdata->buf_lock));
+
+	return 0;
+}
+
+long loraspi_getbandwidth(struct lora_data *lrdata, void __user *arg) {
+	struct spi_device *spi;
+	int status;
+	uint32_t bw;
+
+	spi = lrdata->lora_device;
+
+	mutex_lock(&(lrdata->buf_lock));
+	bw = sx127X_getLoRaBW(spi);
+	mutex_unlock(&(lrdata->buf_lock));
+
+	status = copy_to_user(arg, &bw, sizeof(uint32_t));
+
+	return 0;
+}
+
 struct lora_driver lr_driver = {
 	.name = __DRIVER_NAME,
 	.num = N_LORASPI_MINORS,
@@ -292,8 +324,8 @@ struct lora_operations lrops = {
 	.getFreq = loraspi_getfreq,
 	.setPower = NULL,
 	.getPower = NULL,
-	.setBW = NULL,
-	.getBW = NULL,
+	.setBW = loraspi_setbandwidth,
+	.getBW = loraspi_getbandwidth,
 };
 
 /* The compatible SoC array. */

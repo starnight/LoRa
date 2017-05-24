@@ -297,12 +297,12 @@ sx127X_setLoRaBW(struct spi_device *spi, uint32_t bw) {
 	uint8_t mcf1;
 
 	for(i = 0; i < 9; i++) {
-		if(hz[i] <= bw)
+		if(hz[i] >= bw)
 			break;
 	}
 
 	sx127X_read_reg(spi, SX127X_REG_MODEM_CONFIG1, &mcf1, 1);
-	mcf1 = (mcf1 & 0x0F) | i;
+	mcf1 = (mcf1 & 0x0F) | (i << 4);
 	sx127X_write_reg(spi, SX127X_REG_MODEM_CONFIG1, &mcf1, 1);
 }
 
