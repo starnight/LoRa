@@ -60,11 +60,6 @@ int main(int argc, char **argv) {
 		return -1;
 	}
 
-	/* Set the carrier frequency. */
-	frq = 433000000;
-	ioctl(fd, LORA_SET_FREQUENCY, &frq);
-	printf("Set he LoRa carrier frequency to be %u Hz\n", frq);
-
 	/* Read from the file descriptor if it is ready to be read. */
 	memset(buf, 0, MAX_BUFFER_LEN);
 	printf("Going to read %s\n", path);
@@ -86,6 +81,13 @@ int main(int argc, char **argv) {
 	/* Get the carrier frequency. */
 	ioctl(fd, LORA_GET_FREQUENCY, &frq);
 	printf("The LoRa carrier frequency is %u Hz\n", frq);
+
+	/* Set the device in sleep state. */
+	uint32_t st = LORA_STATE_SLEEP;
+	ioctl(fd, LORA_SET_STATE, &st);
+	st = 0xFF;
+	ioctl(fd, LORA_GET_STATE, &st);
+	printf("The LoRa device is in 0x%X state\n", st);
 
 	/* Close device node. */
 	close(fd);
