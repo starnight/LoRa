@@ -173,6 +173,16 @@ static long file_ioctl(struct file *filp, unsigned int cmd, unsigned long arg) {
 			if(lrdata->ops->getBW != NULL)
 				ret = lrdata->ops->getBW(lrdata, pval);
 			break;
+		/* Get current RSSI. */
+		case LORA_GET_RSSI:
+			if(lrdata->ops->getRSSI != NULL)
+				ret = lrdata->ops->getRSSI(lrdata, pval);
+			break;
+		/* Get last packet's SNR. */
+		case LORA_GET_SNR:
+			if(lrdata->ops->getSNR != NULL)
+				ret = lrdata->ops->getSNR(lrdata, pval);
+			break;
 		default:
 			ret = -ENOTTY;
 	}

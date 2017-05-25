@@ -14,7 +14,8 @@
 #define LORA_GET_POWER		(_IOR(LORA_IOC_MAGIC, 5, int))
 #define LORA_SET_BANDWIDTH	(_IOW(LORA_IOC_MAGIC, 6, int))
 #define LORA_GET_BANDWIDTH	(_IOR(LORA_IOC_MAGIC, 7, int))
-
+#define LORA_GET_RSSI		(_IOR(LORA_IOC_MAGIC, 8, int))
+#define LORA_GET_SNR		(_IOR(LORA_IOC_MAGIC, 9, int))
 
 /* List the state of the LoRa device. */
 #define LORA_STATE_SLEEP	0
