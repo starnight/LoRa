@@ -59,7 +59,7 @@ int main(int argc, char **argv) {
 	}
 
 	/* Set the RF bandwidth. */
-	uint32_t bw = 500000;
+	uint32_t bw = 62500;
 	ioctl(fd, LORA_SET_BANDWIDTH, &bw);
 	printf("Going to set the RF bandwith %u Hz\n", bw);
 
