@@ -31,6 +31,24 @@ void do_write(int fd, char *buf, size_t len) {
 	printf("Write %d bytes: %s\r\n", sz, buf);
 }
 
+/* Get current RSSI. */
+int32_t get_rssi(int fd) {
+	int32_t rssi;
+
+	ioctl(fd, LORA_GET_RSSI, &rssi);
+
+	return rssi;
+}
+
+/* Get last packet SNR. */
+uint32_t get_snr(int fd) {
+	uint32_t snr;
+
+	ioctl(fd, LORA_GET_SNR, &snr);
+
+	return snr;
+}
+
 int main(int argc, char **argv) {
 	char *path;
 	int fd;
@@ -64,6 +82,8 @@ int main(int argc, char **argv) {
 	ioctl(fd, LORA_SET_BANDWIDTH, &bw);
 	printf("Going to set the RF bandwith %u Hz\n", bw);
 
+	printf("The current RSSI is %d dbm\n", get_rssi(fd));
+
 	/* Read from the file descriptor if it is ready to be read. */
 	memset(buf, 0, MAX_BUFFER_LEN);
 	printf("Going to read %s\n", path);
@@ -91,6 +111,9 @@ int main(int argc, char **argv) {
 	bw = 0;
 	ioctl(fd, LORA_GET_BANDWIDTH, &bw);
 	printf("The RF bandwith is %u Hz\n", bw);
+
+	printf("The current RSSI is %d dbm\n", get_rssi(fd));
+	printf("The last packet SNR is %u db\n", get_snr(fd));
 
 	/* Set the device in sleep state. */
 	uint32_t st = LORA_STATE_SLEEP;
