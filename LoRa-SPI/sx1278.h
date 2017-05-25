@@ -167,10 +167,10 @@ ssize_t
 sx127X_sendLoRaData(struct spi_device *spi, uint8_t *buf, size_t len);
 
 int32_t
-sx127X_getLastLoRaPacketRSSI(struct spi_device *spi);
+sx127X_getLoRaLastPacketRSSI(struct spi_device *spi);
 
 uint32_t
-sx127X_getLastLoRaPacketSNR(struct spi_device *spi);
+sx127X_getLoRaLastPacketSNR(struct spi_device *spi);
 
 int32_t
 sx127X_getLoRaRSSI(struct spi_device *spi);

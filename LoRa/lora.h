@@ -44,6 +44,8 @@ struct lora_operations {
 	long (*getBW)(struct lora_data *, void __user *);
 	/* Get current RSSI. */
 	long (*getRSSI)(struct lora_data *, void __user *);
+	/* Get last packet's SNR. */
+	long (*getSNR)(struct lora_data *, void __user *);
 	/* Read from the LoRa device's communication. */
 	ssize_t (*read)(struct lora_data *, const char __user *, size_t);
 	/* Write to the LoRa device's communication. */

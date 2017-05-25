@@ -326,6 +326,23 @@ long loraspi_getrssi(struct lora_data *lrdata, void __user *arg) {
 	return 0;
 }
 
+/* Get last packet's SNR. */
+long loraspi_getsnr(struct lora_data *lrdata, void __user *arg) {
+	struct spi_device *spi;
+	int status;
+	uint32_t snr;
+
+	spi = lrdata->lora_device;
+
+	mutex_lock(&(lrdata->buf_lock));
+	snr = sx127X_getLoRaLastPacketSNR(spi);
+	mutex_unlock(&(lrdata->buf_lock));
+
+	status = copy_to_user(arg, &snr, sizeof(uint32_t));
+
+	return 0;
+}
+
 struct lora_driver lr_driver = {
 	.name = __DRIVER_NAME,
 	.num = N_LORASPI_MINORS,
@@ -344,6 +361,7 @@ struct lora_operations lrops = {
 	.setBW = loraspi_setbandwidth,
 	.getBW = loraspi_getbandwidth,
 	.getRSSI = loraspi_getrssi,
+	.getSNR = loraspi_getsnr,
 };
 
 /* The compatible SoC array. */
