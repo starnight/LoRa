@@ -309,6 +309,23 @@ long loraspi_getbandwidth(struct lora_data *lrdata, void __user *arg) {
 	return 0;
 }
 
+/* Get current RSSI. */
+long loraspi_getrssi(struct lora_data *lrdata, void __user *arg) {
+	struct spi_device *spi;
+	int status;
+	int32_t rssi;
+
+	spi = lrdata->lora_device;
+
+	mutex_lock(&(lrdata->buf_lock));
+	rssi = sx127X_getLoRaRSSI(spi);
+	mutex_unlock(&(lrdata->buf_lock));
+
+	status = copy_to_user(arg, &rssi, sizeof(int32_t));
+
+	return 0;
+}
+
 struct lora_driver lr_driver = {
 	.name = __DRIVER_NAME,
 	.num = N_LORASPI_MINORS,
@@ -326,6 +343,7 @@ struct lora_operations lrops = {
 	.getPower = NULL,
 	.setBW = loraspi_setbandwidth,
 	.getBW = loraspi_getbandwidth,
+	.getRSSI = loraspi_getrssi,
 };
 
 /* The compatible SoC array. */
