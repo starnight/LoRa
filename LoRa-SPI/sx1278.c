@@ -150,7 +150,7 @@ sx127X_readState(struct spi_device *spi) {
 }
 
 void
-sx127X_setFreq(struct spi_device *spi, uint32_t fr) {
+sx127X_setLoRaFreq(struct spi_device *spi, uint32_t fr) {
 	uint64_t frt64;
 	uint32_t frt;
 	uint8_t buf[3];
@@ -169,7 +169,7 @@ sx127X_setFreq(struct spi_device *spi, uint32_t fr) {
 }
 
 uint32_t
-sx127X_getFreq(struct spi_device *spi) {
+sx127X_getLoRaFreq(struct spi_device *spi) {
 	uint64_t frt = 0;
 	uint8_t buf[3];
 	int status;
@@ -188,29 +188,29 @@ sx127X_getFreq(struct spi_device *spi) {
 	return fr;
 }
 
-//void sx127X_setPower(struct spi_device *spi, uint32_t mW) {}
+//void sx127X_setLoRaPower(struct spi_device *spi, uint32_t mW) {}
 
 uint8_t
-sx127X_getPower(struct spi_device *spi) {
+sx127X_getLoRaPower(struct spi_device *spi) {
 	uint8_t pac;
 	uint8_t boost;
+	uint8_t outputPower;
 	uint8_t pmax;
 	uint8_t pout;
-	uint8_t dbm;
 
 	sx127X_read_reg(spi, SX127X_REG_PA_CONFIG, &pac, 1);
 	boost = (pac & 0x80) >> 7;
-	pout = pac & 0x0F;
+	outputPower = pac & 0x0F;
 	if(boost) {
-		dbm = pout - 2;
+		pout = 2 + outputPower;
 	}
 	else {
 		/* Power max should be pmax/10.  Itis 10 times for now. */
 		pmax = (108 + 6 * ((pac & 0x70) >> 4));
-		dbm = (150 - pmax + pout * 10) / 10;
+		pout = (pmax - (150 - outputPower * 10)) / 10;
 	}
 
-	return dbm;
+	return pout;
 }
 
 int

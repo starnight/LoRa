@@ -109,13 +109,13 @@ uint8_t
 sx127X_readState(struct spi_device *spi);
 
 void
-sx127X_setFreq(struct spi_device *spi, uint32_t fr);
+sx127X_setLoRaFreq(struct spi_device *spi, uint32_t fr);
 
 uint32_t
-sx127X_getFreq(struct spi_device *spi);
+sx127X_getLoRaFreq(struct spi_device *spi);
 
 uint8_t
-sx127X_getPower(struct spi_device *spi);
+sx127X_getLoRaPower(struct spi_device *spi);
 
 int
 sx127X_readVersion(struct spi_device *spi, char *vstr, size_t len);
