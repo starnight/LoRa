@@ -49,6 +49,15 @@ uint32_t get_snr(int fd) {
 	return snr;
 }
 
+/* Get output power. */
+uint32_t get_power(int fd) {
+	uint32_t power;
+
+	ioctl(fd, LORA_GET_POWER, &power);
+
+	return power;
+}
+
 int main(int argc, char **argv) {
 	char *path;
 	int fd;
@@ -114,6 +123,7 @@ int main(int argc, char **argv) {
 
 	printf("The current RSSI is %d dbm\n", get_rssi(fd));
 	printf("The last packet SNR is %u db\n", get_snr(fd));
+	printf("The output power is %u dbm\n", get_power(fd));
 
 	/* Set the device in sleep state. */
 	uint32_t st = LORA_STATE_SLEEP;
