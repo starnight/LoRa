@@ -252,7 +252,7 @@ long loraspi_setfreq(struct lora_data *lrdata, void __user *arg) {
 		spi->master->bus_num, spi->chip_select, freq);
 
 	mutex_lock(&(lrdata->buf_lock));
-	sx127X_setFreq(spi, freq);
+	sx127X_setLoRaFreq(spi, freq);
 	mutex_unlock(&(lrdata->buf_lock));
 
 	return 0;
@@ -268,11 +268,28 @@ long loraspi_getfreq(struct lora_data *lrdata, void __user *arg) {
 		spi->master->bus_num, spi->chip_select);
 
 	mutex_lock(&(lrdata->buf_lock));
-	freq = sx127X_getFreq(spi);
+	freq = sx127X_getLoRaFreq(spi);
 	mutex_unlock(&(lrdata->buf_lock));
 	printk(KERN_DEBUG "lora-spi: the carrier freq is %u Hz\n", freq);
 
 	status = copy_to_user(arg, &freq, sizeof(uint32_t));
+
+	return 0;
+}
+
+/* Set & get the PA power. */
+long loraspi_getpower(struct lora_data *lrdata, void __user *arg) {
+	struct spi_device *spi;
+	int status;
+	uint32_t dbm;
+
+	spi = lrdata->lora_device;
+
+	mutex_lock(&(lrdata->buf_lock));
+	dbm = sx127X_getLoRaPower(spi);
+	mutex_unlock(&(lrdata->buf_lock));
+
+	status = copy_to_user(arg, &dbm, sizeof(uint32_t));
 
 	return 0;
 }
@@ -357,7 +374,7 @@ struct lora_operations lrops = {
 	.setFreq = loraspi_setfreq,
 	.getFreq = loraspi_getfreq,
 	.setPower = NULL,
-	.getPower = NULL,
+	.getPower = loraspi_getpower,
 	.setBW = loraspi_setbandwidth,
 	.getBW = loraspi_getbandwidth,
 	.getRSSI = loraspi_getrssi,
