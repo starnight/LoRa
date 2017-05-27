@@ -114,7 +114,10 @@ sx127X_setLoRaFreq(struct spi_device *spi, uint32_t fr);
 uint32_t
 sx127X_getLoRaFreq(struct spi_device *spi);
 
-uint8_t
+void
+sx127X_setLoRaPower(struct spi_device *spi, int32_t pout);
+
+int32_t
 sx127X_getLoRaPower(struct spi_device *spi);
 
 int

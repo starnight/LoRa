@@ -47,9 +47,13 @@ uint32_t get_snr(int fd) {
 	return snr;
 }
 
-/* Get output power. */
-uint32_t get_power(int fd) {
-	uint32_t power;
+/* Set & get output power. */
+void set_power(int fd, int32_t power) {
+	ioctl(fd, LORA_SET_POWER, &power);
+}
+
+int32_t get_power(int fd) {
+	int32_t power;
 
 	ioctl(fd, LORA_GET_POWER, &power);
 
@@ -90,6 +94,11 @@ int main(int argc, char **argv) {
 	ioctl(fd, LORA_SET_BANDWIDTH, &bw);
 	printf("Going to set the RF bandwith %u Hz\n", bw);
 
+	/* Set the RF power. */
+	int32_t power = 10;
+	set_power(fd, power);
+	printf("Going to set the RF power %d dbm\n", power);
+
 	printf("The current RSSI is %d dbm\n", get_rssi(fd));
 
 	/* Write to the file descriptor if it is ready to be written. */
@@ -116,7 +125,7 @@ int main(int argc, char **argv) {
 
 	printf("The current RSSI is %d dbm\n", get_rssi(fd));
 	printf("The last packet SNR is %u db\n", get_snr(fd));
-	printf("The output power is %u dbm\n", get_power(fd));
+	printf("The output power is %d dbm\n", get_power(fd));
 
 	/* Set the device in sleep state. */
 	uint32_t st = LORA_STATE_SLEEP;

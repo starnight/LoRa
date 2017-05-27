@@ -188,15 +188,43 @@ sx127X_getLoRaFreq(struct spi_device *spi) {
 	return fr;
 }
 
-//void sx127X_setLoRaPower(struct spi_device *spi, uint32_t mW) {}
-
-uint8_t
-sx127X_getLoRaPower(struct spi_device *spi) {
+void
+sx127X_setLoRaPower(struct spi_device *spi, int32_t pout) {
 	uint8_t pac;
 	uint8_t boost;
 	uint8_t outputPower;
-	uint8_t pmax;
-	uint8_t pout;
+	int32_t pmax;
+
+	if(pout > 15) {
+		/* Pout > 15dbm */
+		boost = 1;
+		pmax = 7;
+		outputPower = pout - 2;
+	}
+	else if(pout < 0) {
+		/* Pout < 0dbm */
+		boost = 0;
+		pmax = 2;
+		outputPower = 3 + pout;
+	}
+	else {
+		/* 0dbm <= Pout <= 15dbm */
+		boost = 0;
+		pmax = 7;
+		outputPower = pout;
+	}
+
+	pac = (boost << 7) | (pmax << 4) | (outputPower);
+	sx127X_write_reg(spi, SX127X_REG_PA_CONFIG, &pac, 1);
+}
+
+int32_t
+sx127X_getLoRaPower(struct spi_device *spi) {
+	uint8_t pac;
+	uint8_t boost;
+	int32_t outputPower;
+	int32_t pmax;
+	int32_t pout;
 
 	sx127X_read_reg(spi, SX127X_REG_PA_CONFIG, &pac, 1);
 	boost = (pac & 0x80) >> 7;
@@ -205,7 +233,7 @@ sx127X_getLoRaPower(struct spi_device *spi) {
 		pout = 2 + outputPower;
 	}
 	else {
-		/* Power max should be pmax/10.  Itis 10 times for now. */
+		/* Power max should be pmax/10.  It is 10 times for now. */
 		pmax = (108 + 6 * ((pac & 0x70) >> 4));
 		pout = (pmax - (150 - outputPower * 10)) / 10;
 	}

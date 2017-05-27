@@ -278,10 +278,30 @@ long loraspi_getfreq(struct lora_data *lrdata, void __user *arg) {
 }
 
 /* Set & get the PA power. */
+long loraspi_setpower(struct lora_data *lrdata, void __user *arg) {
+	struct spi_device *spi;
+	int status;
+	int32_t dbm;
+
+	spi = lrdata->lora_device;
+	status = copy_from_user(&dbm, arg, sizeof(uint32_t));
+
+#define LORA_MAX_POWER	(17)
+#define LORA_MIN_POWER	(-2)
+	if(dbm > LORA_MAX_POWER) dbm = LORA_MAX_POWER;
+	else if(dbm < LORA_MIN_POWER) dbm = LORA_MIN_POWER;
+
+	mutex_lock(&(lrdata->buf_lock));
+	sx127X_setLoRaPower(spi, dbm);
+	mutex_unlock(&(lrdata->buf_lock));
+
+	return 0;
+}
+
 long loraspi_getpower(struct lora_data *lrdata, void __user *arg) {
 	struct spi_device *spi;
 	int status;
-	uint32_t dbm;
+	int32_t dbm;
 
 	spi = lrdata->lora_device;
 
@@ -373,7 +393,7 @@ struct lora_operations lrops = {
 	.getState = loraspi_getstate,
 	.setFreq = loraspi_setfreq,
 	.getFreq = loraspi_getfreq,
-	.setPower = NULL,
+	.setPower = loraspi_setpower,
 	.getPower = loraspi_getpower,
 	.setBW = loraspi_setbandwidth,
 	.getBW = loraspi_getbandwidth,
