@@ -1,12 +1,8 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdint.h>
-#include <errno.h>
 #include <unistd.h>
 #include <fcntl.h>
-#include <sys/select.h>
-#include <sys/ioctl.h>
-#include <unistd.h>
 #include <ctype.h>
 
 #include "lora-ioctl.h"
@@ -46,7 +42,7 @@ int main(int argc, char **argv) {
 
 	/* Set the RF bandwidth. */
 	uint32_t bw = 125000;
-	ioctl(fd, LORA_SET_BANDWIDTH, &bw);
+	set_bw(fd, bw);
 	printf("Going to set the RF bandwith %u Hz\n", bw);
 
 	/* Set the RF power. */
@@ -59,10 +55,10 @@ int main(int argc, char **argv) {
 	/* Read from the file descriptor if it is ready to be read. */
 	memset(buf, 0, MAX_BUFFER_LEN);
 	printf("Going to read %s\n", path);
-	len = do_read(fd, buf, MAX_BUFFER_LEN);
+	len = do_read(fd, buf, MAX_BUFFER_LEN - 1);
 
 	if(len > 0) {
-		printf("Read %s\n", path);
+		printf("Read %d bytes: %s\n", len, buf);
 		printf("The current RSSI is %d dbm\n", get_rssi(fd));
 		printf("The last packet SNR is %u db\n", get_snr(fd));
 
@@ -72,30 +68,18 @@ int main(int argc, char **argv) {
 		printf("Going to echo %s\n", path);
 		for(i = 0; i < len; i++)
 			buf[i] = toupper(buf[i]);
-		do_write(fd, buf, len);
-		printf("Echoed %s\n", path);
+		len = do_write(fd, buf, len);
+		printf("Echoed %d bytes: %s\n", len, buf);
 	}
 
-	/* Get the carrier frequency. */
-	uint32_t frq;
-	ioctl(fd, LORA_GET_FREQUENCY, &frq);
-	printf("The LoRa carrier frequency is %u Hz\n", frq);
-
+	printf("The LoRa carrier frequency is %u Hz\n", get_freq(fd));
 	printf("The RF spreading factor is %u chips\n", get_sprfactor(fd));
-
-	/* Get the RF bandwidth. */
-	bw = 0;
-	ioctl(fd, LORA_GET_BANDWIDTH, &bw);
-	printf("The RF bandwith is %u Hz\n", bw);
-
+	printf("The RF bandwith is %u Hz\n", get_bw(fd));
 	printf("The output power is %d dbm\n", get_power(fd));
 
 	/* Set the device in sleep state. */
-	uint32_t st = LORA_STATE_SLEEP;
-	ioctl(fd, LORA_SET_STATE, &st);
-	st = 0xFF;
-	ioctl(fd, LORA_GET_STATE, &st);
-	printf("The LoRa device is in 0x%X state\n", st);
+	set_state(fd, LORA_STATE_SLEEP);
+	printf("The LoRa device is in 0x%X state\n", get_state(fd));
 
 	/* Close device node. */
 	close(fd);

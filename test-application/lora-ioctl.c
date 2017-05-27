@@ -9,20 +9,44 @@
 ssize_t do_read(int fd, char *buf, size_t len) {
 	ssize_t sz;
 
-	memset(buf, '\0', 16);
-
-	sz = read(fd, buf, 15);
-	printf("Read %d bytes: %s\r\n", sz, buf);
+	sz = read(fd, buf, len);
 
 	return sz;
 }
 
 /* Write data into the device. */
-void do_write(int fd, char *buf, size_t len) {
+ssize_t do_write(int fd, char *buf, size_t len) {
 	ssize_t sz;
 
-	sz = write(fd, buf, strlen(buf));
-	printf("Write %d bytes: %s\r\n", sz, buf);
+	sz = write(fd, buf, len);
+
+	return sz;
+}
+
+/* Set the device in sleep state. */
+void set_state(int fd, uint32_t st) {
+	ioctl(fd, LORA_SET_STATE, &st);
+}
+
+uint32_t get_state(int fd) {
+	uint32_t st;
+
+	ioctl(fd, LORA_GET_STATE, &st);
+
+	return st;
+}
+
+/* Set & get the carrier frequency. */
+void set_freq(int fd, uint32_t freq) {
+	ioctl(fd, LORA_SET_FREQUENCY, &freq);
+}
+
+uint32_t get_freq(int fd) {
+	uint32_t freq;
+
+	ioctl(fd, LORA_GET_FREQUENCY, &freq);
+
+	return freq;
 }
 
 /* Get current RSSI. */
@@ -67,4 +91,17 @@ uint32_t get_sprfactor(int fd) {
 	ioctl(fd, LORA_GET_SPRFACTOR, &sprf);
 
 	return sprf;
+}
+
+/* Set & get the RF bandwidth. */
+void set_bw(int fd, uint32_t bw) {
+	ioctl(fd, LORA_SET_BANDWIDTH, &bw);
+}
+
+uint32_t get_bw(int fd) {
+	uint32_t bw;
+
+	ioctl(fd, LORA_GET_BANDWIDTH, &bw);
+
+	return bw;
 }

@@ -1,3 +1,5 @@
+CC=cc
+
 PROJ1=send
 SRC1=$(PROJ1).c lora-ioctl.c
 DEV1=/dev/loraSPI0.0
@@ -7,8 +9,8 @@ SRC2=$(PROJ2).c lora-ioctl.c
 DEV2=/dev/loraSPI0.1
 
 all:
-	cc $(SRC1) -o $(PROJ1)
-	cc $(SRC2) -o $(PROJ2)
+	$(CC) $(SRC1) -o $(PROJ1)
+	$(CC) $(SRC2) -o $(PROJ2)
 
 test:
 	sudo ./$(PROJ1) $(DEV1)

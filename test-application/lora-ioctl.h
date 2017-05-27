@@ -30,7 +30,15 @@
 ssize_t do_read(int fd, char *buf, size_t len);
 
 /* Write data into the device. */
-void do_write(int fd, char *buf, size_t len);
+ssize_t do_write(int fd, char *buf, size_t len);
+
+/* Set the device in sleep state. */
+void set_state(int fd, uint32_t st);
+uint32_t get_state(int fd);
+
+/* Set & get the carrier frequency. */
+void set_freq(int fd, uint32_t freq);
+uint32_t get_freq(int fd);
 
 /* Get current RSSI. */
 int32_t get_rssi(int fd);
@@ -45,5 +53,9 @@ int32_t get_power(int fd);
 /* Set & get the RF spreading factor. */
 void set_sprfactor(int fd, uint32_t sprf);
 uint32_t get_sprfactor(int fd);
+
+/* Set & get the RF bandwidth. */
+void set_bw(int fd, uint32_t bw);
+uint32_t get_bw(int fd);
 
 #endif
