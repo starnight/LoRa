@@ -1,7 +1,7 @@
 # LoRa
 This is a LoRa Linux kernel module with file operation interfaces.
 
-## Compatible chips
+## Compatible Chips
 * Semtech SX1276/77/78/79
 
 ## Folders

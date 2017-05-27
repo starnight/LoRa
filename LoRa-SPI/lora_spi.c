@@ -404,7 +404,10 @@ struct lora_operations lrops = {
 /* The compatible SoC array. */
 #ifdef CONFIG_OF
 static const struct of_device_id lora_dt_ids[] = {
+	{ .compatible = "semtech,sx1276" },
+	{ .compatible = "semtech,sx1277" },
 	{ .compatible = "semtech,sx1278" },
+	{ .compatible = "semtech,sx1279" },
 	{ .compatible = "lora-spi" },
 	{}, /* Should be terminated with a NULL entry. */
 };
@@ -579,4 +582,6 @@ static void loraspi_exit(void) {
 module_init(loraspi_init);
 module_exit(loraspi_exit);
 
+MODULE_AUTHOR("JianHong Pan, <starnight@g.ncu.edu.tw>");
+MODULE_DESCRIPTION("LoRa device kernel module with SPI interface");
 MODULE_LICENSE("Dual BSD/GPL");
