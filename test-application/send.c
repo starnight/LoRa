@@ -60,6 +60,19 @@ int32_t get_power(int fd) {
 	return power;
 }
 
+/* Set & get the RF spreading factor. */
+void set_sprfactor(int fd, uint32_t sprf) {
+	ioctl(fd, LORA_SET_SPRFACTOR, &sprf);
+}
+
+uint32_t get_sprfactor(int fd) {
+	uint32_t sprf;
+
+	ioctl(fd, LORA_GET_SPRFACTOR, &sprf);
+
+	return sprf;
+}
+
 int main(int argc, char **argv) {
 	char *path;
 	char *data;
@@ -89,6 +102,11 @@ int main(int argc, char **argv) {
 		return -1;
 	}
 
+	/*Set the RF spreading factor. */
+	uint32_t sprf = 2048;
+	set_sprfactor(fd, sprf);
+	printf("Going to set the RF spreading factor %u chips\n", sprf);
+
 	/* Set the RF bandwidth. */
 	uint32_t bw = 125000;
 	ioctl(fd, LORA_SET_BANDWIDTH, &bw);
@@ -117,6 +135,8 @@ int main(int argc, char **argv) {
 	uint32_t frq;
 	ioctl(fd, LORA_GET_FREQUENCY, &frq);
 	printf("The LoRa carrier frequency is %u Hz\n", frq);
+
+	printf("The RF spreading factor is %u chips\n", get_sprfactor(fd));
 
 	/* Get the RF bandwidth. */
 	bw = 0;
