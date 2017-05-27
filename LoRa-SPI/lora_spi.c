@@ -314,6 +314,38 @@ long loraspi_getpower(struct lora_data *lrdata, void __user *arg) {
 	return 0;
 }
 
+/* Set & get the RF spreading factor. */
+long loraspi_setsprfactor(struct lora_data *lrdata, void __user *arg) {
+	struct spi_device *spi;
+	int status;
+	uint32_t sprf;
+
+	spi = lrdata->lora_device;
+	status = copy_from_user(&sprf, arg, sizeof(uint32_t));
+
+	mutex_lock(&(lrdata->buf_lock));
+	sx127X_setLoRaSPRFactor(spi, sprf);
+	mutex_unlock(&(lrdata->buf_lock));
+
+	return 0;
+}
+
+long loraspi_getsprfactor(struct lora_data *lrdata, void __user *arg) {
+	struct spi_device *spi;
+	int status;
+	uint32_t sprf;
+
+	spi = lrdata->lora_device;
+
+	mutex_lock(&(lrdata->buf_lock));
+	sprf = sx127X_getLoRaSPRFactor(spi);
+	mutex_unlock(&(lrdata->buf_lock));
+
+	status = copy_to_user(arg, &sprf, sizeof(uint32_t));
+
+	return 0;
+}
+
 /* Set & get the RF bandwith. */
 long loraspi_setbandwidth(struct lora_data *lrdata, void __user *arg) {
 	struct spi_device *spi;
@@ -395,6 +427,8 @@ struct lora_operations lrops = {
 	.getFreq = loraspi_getfreq,
 	.setPower = loraspi_setpower,
 	.getPower = loraspi_getpower,
+	.setSPRFactor = loraspi_setsprfactor,
+	.getSPRFactor = loraspi_getsprfactor,
 	.setBW = loraspi_setbandwidth,
 	.getBW = loraspi_getbandwidth,
 	.getRSSI = loraspi_getrssi,

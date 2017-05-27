@@ -164,6 +164,15 @@ static long file_ioctl(struct file *filp, unsigned int cmd, unsigned long arg) {
 			if(lrdata->ops->getPower != NULL)
 				ret = lrdata->ops->getPower(lrdata, pval);
 			break;
+		/* Set & get the RF spreading factor. */
+		case LORA_SET_SPRFACTOR:
+			if(lrdata->ops->setSPRFactor != NULL)
+				ret = lrdata->ops->setSPRFactor(lrdata, pval);
+			break;
+		case LORA_GET_SPRFACTOR:
+			if(lrdata->ops->getSPRFactor != NULL)
+				ret = lrdata->ops->getSPRFactor(lrdata, pval);
+			break;
 		/* Set & get the RF bandwith. */
 		case LORA_SET_BANDWIDTH:
 			if(lrdata->ops->setBW != NULL)
