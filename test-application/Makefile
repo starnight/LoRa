@@ -1,9 +1,9 @@
 PROJ1=send
-SRC1=$(PROJ1).c
+SRC1=$(PROJ1).c lora-ioctl.c
 DEV1=/dev/loraSPI0.0
 
 PROJ2=receive
-SRC2=$(PROJ2).c
+SRC2=$(PROJ2).c lora-ioctl.c
 DEV2=/dev/loraSPI0.1
 
 all:

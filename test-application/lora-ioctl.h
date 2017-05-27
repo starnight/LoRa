@@ -26,4 +26,24 @@
 #define LORA_STATE_RX		3
 #define LORA_STATE_CAD		4
 
+/* Read the device data. */
+ssize_t do_read(int fd, char *buf, size_t len);
+
+/* Write data into the device. */
+void do_write(int fd, char *buf, size_t len);
+
+/* Get current RSSI. */
+int32_t get_rssi(int fd);
+
+/* Get last packet SNR. */
+uint32_t get_snr(int fd);
+
+/* Set & get output power. */
+void set_power(int fd, int32_t power);
+int32_t get_power(int fd);
+
+/* Set & get the RF spreading factor. */
+void set_sprfactor(int fd, uint32_t sprf);
+uint32_t get_sprfactor(int fd);
+
 #endif
