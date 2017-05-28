@@ -17,7 +17,7 @@ static DEFINE_MUTEX(device_list_lock);
 #define LORA_BUFLEN	123
 
 static int file_open(struct inode *inode, struct file *filp) {
-	struct lora_data *lrdata;
+	struct lora_struct *lrdata;
 	int status = -ENXIO;
 
 	printk(KERN_DEBUG "lora: open\n");
@@ -75,7 +75,7 @@ err_find_dev:
 }
 
 static int file_close(struct inode *inode, struct file *filp) {
-	struct lora_data *lrdata;
+	struct lora_struct *lrdata;
 	
 	printk(KERN_DEBUG "lora: close\n");
 	
@@ -100,7 +100,7 @@ static int file_close(struct inode *inode, struct file *filp) {
 }
 
 static ssize_t file_read(struct file *filp, char __user *buf, size_t size, loff_t *f_pos) {
-	struct lora_data *lrdata;
+	struct lora_struct *lrdata;
 
 	printk(KERN_DEBUG "lora: read (size=%zu)\n", size);
 
@@ -113,7 +113,7 @@ static ssize_t file_read(struct file *filp, char __user *buf, size_t size, loff_
 }
 
 static ssize_t file_write(struct file *filp, const char __user *buf, size_t size, loff_t *f_pos) {
-	struct lora_data *lrdata;
+	struct lora_struct *lrdata;
 
 	printk(KERN_DEBUG "lora: write (size=%zu)\n", size);
 
@@ -129,7 +129,7 @@ static ssize_t file_write(struct file *filp, const char __user *buf, size_t size
 static long file_ioctl(struct file *filp, unsigned int cmd, unsigned long arg) {
 	long ret;
 	int *pval;
-	struct lora_data *lrdata;
+	struct lora_struct *lrdata;
 
 	ret = -ENOTTY;
 	pval = (void __user *)arg;
@@ -200,7 +200,7 @@ static long file_ioctl(struct file *filp, unsigned int cmd, unsigned long arg) {
 }
 
 /* Add an lora compatible device. */
-static int lora_device_add(struct lora_data *lrdata) {
+static int lora_device_add(struct lora_struct *lrdata) {
 	INIT_LIST_HEAD(&(lrdata->device_entry));
 
 	mutex_lock(&device_list_lock);
@@ -212,7 +212,7 @@ static int lora_device_add(struct lora_data *lrdata) {
 EXPORT_SYMBOL(lora_device_add);
 
 /* Remove an lora compatible device. */
-static int lora_device_remove(struct lora_data *lrdata) {
+static int lora_device_remove(struct lora_struct *lrdata) {
 	mutex_lock(&device_list_lock);
 	list_del(&(lrdata->device_entry));
 	mutex_unlock(&device_list_lock);

@@ -24,7 +24,7 @@ static DECLARE_BITMAP(minors, N_LORASPI_MINORS);
 
 static DEFINE_MUTEX(minors_lock);
 
-static ssize_t loraspi_read(struct lora_data *lrdata, const char __user *buf, size_t size) {
+static ssize_t loraspi_read(struct lora_struct *lrdata, const char __user *buf, size_t size) {
 	struct spi_device *spi;
 	ssize_t status;
 	int c = 0;
@@ -95,7 +95,7 @@ static ssize_t loraspi_read(struct lora_data *lrdata, const char __user *buf, si
 	return c;
 }
 
-static ssize_t loraspi_write(struct lora_data *lrdata, const char __user *buf, size_t size) {
+static ssize_t loraspi_write(struct lora_struct *lrdata, const char __user *buf, size_t size) {
 	struct spi_device *spi;
 	ssize_t status;
 	int c;
@@ -175,7 +175,7 @@ static ssize_t loraspi_write(struct lora_data *lrdata, const char __user *buf, s
 }
 
 /* Set & get the state of the LoRa device. */
-long loraspi_setstate(struct lora_data *lrdata, void __user *arg) {
+long loraspi_setstate(struct lora_struct *lrdata, void __user *arg) {
 	struct spi_device *spi;
 	int status;
 	uint32_t st32;
@@ -205,7 +205,7 @@ long loraspi_setstate(struct lora_data *lrdata, void __user *arg) {
 	return 0;
 }
 
-long loraspi_getstate(struct lora_data *lrdata, void __user *arg) {
+long loraspi_getstate(struct lora_struct *lrdata, void __user *arg) {
 	struct spi_device *spi;
 	int status;
 	uint32_t st32;
@@ -241,7 +241,7 @@ long loraspi_getstate(struct lora_data *lrdata, void __user *arg) {
 }
 
 /* Set & get the carrier frequency. */
-long loraspi_setfreq(struct lora_data *lrdata, void __user *arg) {
+long loraspi_setfreq(struct lora_struct *lrdata, void __user *arg) {
 	struct spi_device *spi;
 	int status;
 	uint32_t freq;
@@ -258,7 +258,7 @@ long loraspi_setfreq(struct lora_data *lrdata, void __user *arg) {
 	return 0;
 }
 
-long loraspi_getfreq(struct lora_data *lrdata, void __user *arg) {
+long loraspi_getfreq(struct lora_struct *lrdata, void __user *arg) {
 	struct spi_device *spi;
 	int status;
 	uint32_t freq;
@@ -278,7 +278,7 @@ long loraspi_getfreq(struct lora_data *lrdata, void __user *arg) {
 }
 
 /* Set & get the PA power. */
-long loraspi_setpower(struct lora_data *lrdata, void __user *arg) {
+long loraspi_setpower(struct lora_struct *lrdata, void __user *arg) {
 	struct spi_device *spi;
 	int status;
 	int32_t dbm;
@@ -298,7 +298,7 @@ long loraspi_setpower(struct lora_data *lrdata, void __user *arg) {
 	return 0;
 }
 
-long loraspi_getpower(struct lora_data *lrdata, void __user *arg) {
+long loraspi_getpower(struct lora_struct *lrdata, void __user *arg) {
 	struct spi_device *spi;
 	int status;
 	int32_t dbm;
@@ -315,7 +315,7 @@ long loraspi_getpower(struct lora_data *lrdata, void __user *arg) {
 }
 
 /* Set & get the RF spreading factor. */
-long loraspi_setsprfactor(struct lora_data *lrdata, void __user *arg) {
+long loraspi_setsprfactor(struct lora_struct *lrdata, void __user *arg) {
 	struct spi_device *spi;
 	int status;
 	uint32_t sprf;
@@ -330,7 +330,7 @@ long loraspi_setsprfactor(struct lora_data *lrdata, void __user *arg) {
 	return 0;
 }
 
-long loraspi_getsprfactor(struct lora_data *lrdata, void __user *arg) {
+long loraspi_getsprfactor(struct lora_struct *lrdata, void __user *arg) {
 	struct spi_device *spi;
 	int status;
 	uint32_t sprf;
@@ -347,7 +347,7 @@ long loraspi_getsprfactor(struct lora_data *lrdata, void __user *arg) {
 }
 
 /* Set & get the RF bandwith. */
-long loraspi_setbandwidth(struct lora_data *lrdata, void __user *arg) {
+long loraspi_setbandwidth(struct lora_struct *lrdata, void __user *arg) {
 	struct spi_device *spi;
 	int status;
 	uint32_t bw;
@@ -362,7 +362,7 @@ long loraspi_setbandwidth(struct lora_data *lrdata, void __user *arg) {
 	return 0;
 }
 
-long loraspi_getbandwidth(struct lora_data *lrdata, void __user *arg) {
+long loraspi_getbandwidth(struct lora_struct *lrdata, void __user *arg) {
 	struct spi_device *spi;
 	int status;
 	uint32_t bw;
@@ -379,7 +379,7 @@ long loraspi_getbandwidth(struct lora_data *lrdata, void __user *arg) {
 }
 
 /* Get current RSSI. */
-long loraspi_getrssi(struct lora_data *lrdata, void __user *arg) {
+long loraspi_getrssi(struct lora_struct *lrdata, void __user *arg) {
 	struct spi_device *spi;
 	int status;
 	int32_t rssi;
@@ -396,7 +396,7 @@ long loraspi_getrssi(struct lora_data *lrdata, void __user *arg) {
 }
 
 /* Get last packet's SNR. */
-long loraspi_getsnr(struct lora_data *lrdata, void __user *arg) {
+long loraspi_getsnr(struct lora_struct *lrdata, void __user *arg) {
 	struct spi_device *spi;
 	int status;
 	uint32_t snr;
@@ -485,7 +485,7 @@ MODULE_DEVICE_TABLE(spi, spi_ids);
 
 /* The SPI probe callback function. */
 static int loraspi_probe(struct spi_device *spi) {
-	struct lora_data *lrdata;
+	struct lora_struct *lrdata;
 	struct device *dev;
 	unsigned long minor;
 	int status;
@@ -504,7 +504,7 @@ static int loraspi_probe(struct spi_device *spi) {
 	loraspi_probe_acpi(spi);
 
 	/* Allocate lora device's data. */
-	lrdata = kzalloc(sizeof(struct lora_data), GFP_KERNEL);
+	lrdata = kzalloc(sizeof(struct lora_struct), GFP_KERNEL);
 	if(!lrdata)
 		return -ENOMEM;
 
@@ -546,7 +546,7 @@ static int loraspi_probe(struct spi_device *spi) {
 
 /* The SPI remove callback function. */
 static int loraspi_remove(struct spi_device *spi) {
-	struct lora_data *lrdata;
+	struct lora_struct *lrdata;
 	
 	printk(KERN_DEBUG "lora-spi: remove a SPI device with address %d.%d",
 		spi->master->bus_num, spi->chip_select);

@@ -29,36 +29,36 @@
 #define LORA_STATE_RX		3
 #define LORA_STATE_CAD		4
 
-struct lora_data;
+struct lora_struct;
 
 /* The structure lists the LoRa device's operations. */
 struct lora_operations {
 	/* Set & get the state of the LoRa device. */
-	long (*setState)(struct lora_data *, void __user *);
-	long (*getState)(struct lora_data *, void __user *);
+	long (*setState)(struct lora_struct *, void __user *);
+	long (*getState)(struct lora_struct *, void __user *);
 	/* Set & get the carrier frequency. */
-	long (*setFreq)(struct lora_data *, void __user *);
-	long (*getFreq)(struct lora_data *, void __user *);
+	long (*setFreq)(struct lora_struct *, void __user *);
+	long (*getFreq)(struct lora_struct *, void __user *);
 	/* Set & get the PA power. */
-	long (*setPower)(struct lora_data *, void __user *);
-	long (*getPower)(struct lora_data *, void __user *);
+	long (*setPower)(struct lora_struct *, void __user *);
+	long (*getPower)(struct lora_struct *, void __user *);
 	/* Set & get the RF spreading factor. */
-	long (*setSPRFactor)(struct lora_data *, void __user *);
-	long (*getSPRFactor)(struct lora_data *, void __user *);
+	long (*setSPRFactor)(struct lora_struct *, void __user *);
+	long (*getSPRFactor)(struct lora_struct *, void __user *);
 	/* Set & get the RF bandwith. */
-	long (*setBW)(struct lora_data *, void __user *);
-	long (*getBW)(struct lora_data *, void __user *);
+	long (*setBW)(struct lora_struct *, void __user *);
+	long (*getBW)(struct lora_struct *, void __user *);
 	/* Get current RSSI. */
-	long (*getRSSI)(struct lora_data *, void __user *);
+	long (*getRSSI)(struct lora_struct *, void __user *);
 	/* Get last packet's SNR. */
-	long (*getSNR)(struct lora_data *, void __user *);
+	long (*getSNR)(struct lora_struct *, void __user *);
 	/* Read from the LoRa device's communication. */
-	ssize_t (*read)(struct lora_data *, const char __user *, size_t);
+	ssize_t (*read)(struct lora_struct *, const char __user *, size_t);
 	/* Write to the LoRa device's communication. */
-	ssize_t (*write)(struct lora_data *, const char __user *, size_t);
+	ssize_t (*write)(struct lora_struct *, const char __user *, size_t);
 };
 
-struct lora_data {
+struct lora_struct {
 	dev_t devt;
 	void *lora_device;
 	struct list_head device_entry;
