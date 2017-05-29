@@ -99,7 +99,6 @@ static ssize_t loraspi_write(struct lora_struct *lrdata, const char __user *buf,
 	struct spi_device *spi;
 	ssize_t status;
 	int c;
-	uint8_t data;
 	uint8_t base_adr;
 	uint8_t flag;
 	uint32_t timeout;
@@ -120,8 +119,6 @@ static ssize_t loraspi_write(struct lora_struct *lrdata, const char __user *buf,
 	/* Set chip to standby state. */
 	printk(KERN_DEBUG "lora-spi: Going to set standby state\n");
 	sx127X_setState(spi, SX127X_STANDBY_MODE);
-	data = sx127X_readMode(spi);
-	printk(KERN_DEBUG "lora-spi: Current OP mode is 0x%X\n", data);
 
 	/* Set chip FIFO TX base. */
 	base_adr = 0x80;

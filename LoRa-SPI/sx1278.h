@@ -100,7 +100,7 @@ void
 sx127X_startLoRaMode(struct spi_device *spi);
 
 uint8_t 
-sx127X_readMode(struct spi_device *spi);
+sx127X_getMode(struct spi_device *spi);
 
 void
 sx127X_setState(struct spi_device *spi, uint8_t st);

@@ -102,17 +102,17 @@ sx127X_startLoRaMode(struct spi_device *spi) {
 	uint8_t op_mode;
 
 	/* Get original OP Mode register. */
-	op_mode = sx127X_readMode(spi);
+	op_mode = sx127X_getMode(spi);
 	printk(KERN_DEBUG "sx127X: the original OP mode is 0x%X\n", op_mode);
 	/* Set device to sleep state. */
 	sx127X_setState(spi, SX127X_SLEEP_MODE);
 	/* Set device to LoRa mode. */
-	op_mode = sx127X_readMode(spi);
+	op_mode = sx127X_getMode(spi);
 	op_mode = op_mode | 0x80;
 	sx127X_write_reg(spi, SX127X_REG_OP_MODE, &op_mode, 1);
 	/* Set device to standby state. */
 	sx127X_setState(spi, SX127X_STANDBY_MODE);
-	op_mode = sx127X_readMode(spi);
+	op_mode = sx127X_getMode(spi);
 	printk(KERN_DEBUG "sx127X: the current OP mode is 0x%X\n", op_mode);
 
 	/* Set LoRa in explicit header mode. */
@@ -120,7 +120,7 @@ sx127X_startLoRaMode(struct spi_device *spi) {
 }
 
 uint8_t 
-sx127X_readMode(struct spi_device *spi) {
+sx127X_getMode(struct spi_device *spi) {
 	uint8_t op_mode;
 
 	/* Get original OP Mode register. */
@@ -134,7 +134,7 @@ sx127X_setState(struct spi_device *spi, uint8_t st) {
 	uint8_t op_mode;
 
 	/* Get original OP Mode register. */
-	op_mode = sx127X_readMode(spi);
+	op_mode = sx127X_getMode(spi);
 	/* Set device to designated state. */
 	op_mode = (op_mode & 0xF8) | (st & 0x07);
 	sx127X_write_reg(spi, SX127X_REG_OP_MODE, &op_mode, 1);
@@ -144,7 +144,7 @@ uint8_t
 sx127X_readState(struct spi_device *spi) {
 	uint8_t op_mode;
 
-	op_mode = sx127X_readMode(spi);
+	op_mode = sx127X_getMode(spi);
 
 	return op_mode & 0x07;
 }
@@ -487,7 +487,7 @@ sx127X_getLoRaLastPacketRSSI(struct spi_device *spi) {
 	uint8_t rssi;
 
 	/* Get LoRa is in high or low frequency mode. */
-	lhf = sx127X_readMode(spi) & 0x08;
+	lhf = sx127X_getMode(spi) & 0x08;
 	/* Get RSSI value. */
 	sx127X_read_reg(spi, SX127X_REG_PKT_RSSI_VALUE, &rssi, 1);
 	dbm = (lhf) ? -164 + rssi : -157 + rssi;
@@ -513,7 +513,7 @@ sx127X_getLoRaRSSI(struct spi_device *spi) {
 	uint8_t rssi;
 
 	/* Get LoRa is in high or low frequency mode. */
-	lhf = sx127X_readMode(spi) & 0x08;
+	lhf = sx127X_getMode(spi) & 0x08;
 	/* Get RSSI value. */
 	sx127X_read_reg(spi, SX127X_REG_RSSI_VALUE, &rssi, 1);
 	dbm = (lhf) ? -164 + rssi : -157 + rssi;
