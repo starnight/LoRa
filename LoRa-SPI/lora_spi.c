@@ -95,9 +95,6 @@ static ssize_t loraspi_read(struct lora_struct *lrdata, const char __user *buf, 
 	/* Clear all of the IRQ flags. */
 	sx127X_clearLoRaAllFlag(spi);
 
-	/* Set chip to standby state. */
-	sx127X_setState(spi, SX127X_STANDBY_MODE);
-
 	mutex_unlock(&(lrdata->buf_lock));
 
 	return c;
@@ -168,9 +165,10 @@ static ssize_t loraspi_write(struct lora_struct *lrdata, const char __user *buf,
 		}
 	}
 
-	/* Set chip to standby state. */
-	printk(KERN_DEBUG "lora-spi: set back to standby state\n");
+	/* Set chip to RX continuous state. */
+	printk(KERN_DEBUG "lora-spi: set back to RX continuous state\n");
 	sx127X_setState(spi, SX127X_STANDBY_MODE);
+	sx127X_setState(spi, SX127X_RXCONTINUOUS_MODE);
 
 	lrdata->tx_buflen = 0;
 
