@@ -41,22 +41,25 @@ static ssize_t loraspi_read(struct lora_struct *lrdata, const char __user *buf, 
 	/* Get chip's current state. */
 	st = sx127X_getState(spi);
 
-	/* Set chip to standby state. */
-	printk(KERN_DEBUG "lora-spi: Going to set standby state\n");
-	sx127X_setState(spi, SX127X_STANDBY_MODE);
+	/*  Prepare and set the chip to RX continuous mode, if it is not. */
+	if(st != SX127X_RXCONTINUOUS_MODE) {
+		/* Set chip to standby state. */
+		printk(KERN_DEBUG "lora-spi: Going to set standby state\n");
+		sx127X_setState(spi, SX127X_STANDBY_MODE);
 
-	/* Set chip FIFO RX base. */
-	base_adr = 0x00;
-	printk(KERN_DEBUG "lora-spi: Going to set RX base address\n");
-	sx127X_write_reg(spi, SX127X_REG_FIFO_RX_BASE_ADDR, &base_adr, 1);
-	sx127X_write_reg(spi, SX127X_REG_FIFO_ADDR_PTR, &base_adr, 1);
+		/* Set chip FIFO RX base. */
+		base_adr = 0x00;
+		printk(KERN_DEBUG "lora-spi: Going to set RX base address\n");
+		sx127X_write_reg(spi, SX127X_REG_FIFO_RX_BASE_ADDR, &base_adr, 1);
+		sx127X_write_reg(spi, SX127X_REG_FIFO_ADDR_PTR, &base_adr, 1);
 
-	/* Set chip wait for LoRa timeout time. */
-	sx127X_setLoRaRXTimeout(spi, 300);
-	/* Clear all of the IRQ flags. */
-	sx127X_clearLoRaAllFlag(spi);
-	/* Set chip to RX continuous state.  The chip start to wait for receiving. */
-	sx127X_setState(spi, SX127X_RXCONTINUOUS_MODE);
+		/* Set chip wait for LoRa timeout time. */
+		sx127X_setLoRaRXTimeout(spi, 300);
+		/* Clear all of the IRQ flags. */
+		sx127X_clearLoRaAllFlag(spi);
+		/* Set chip to RX continuous state.  The chip start to wait for receiving. */
+		sx127X_setState(spi, SX127X_RXCONTINUOUS_MODE);
+	}
 
 	/* Wait and check there is any packet received ready. */
 	for(timeout = 0; timeout < 250; timeout++) {
