@@ -141,7 +141,7 @@ sx127X_setState(struct spi_device *spi, uint8_t st) {
 }
 
 uint8_t
-sx127X_readState(struct spi_device *spi) {
+sx127X_getState(struct spi_device *spi) {
 	uint8_t op_mode;
 
 	op_mode = sx127X_getMode(spi);

@@ -106,7 +106,7 @@ void
 sx127X_setState(struct spi_device *spi, uint8_t st);
 
 uint8_t
-sx127X_readState(struct spi_device *spi);
+sx127X_getState(struct spi_device *spi);
 
 void
 sx127X_setLoRaFreq(struct spi_device *spi, uint32_t fr);

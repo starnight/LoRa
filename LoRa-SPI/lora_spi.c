@@ -30,6 +30,7 @@ static ssize_t loraspi_read(struct lora_struct *lrdata, const char __user *buf, 
 	int c = 0;
 	uint8_t base_adr;
 	uint8_t flag;
+	uint8_t st;
 	uint32_t timeout;
 
 	spi = lrdata->lora_device;
@@ -37,6 +38,9 @@ static ssize_t loraspi_read(struct lora_struct *lrdata, const char __user *buf, 
 		   spi->master->bus_num, spi->chip_select);
 
 	mutex_lock(&(lrdata->buf_lock));
+	/* Get chip's current state. */
+	st = sx127X_getState(spi);
+
 	/* Set chip to standby state. */
 	printk(KERN_DEBUG "lora-spi: Going to set standby state\n");
 	sx127X_setState(spi, SX127X_STANDBY_MODE);
@@ -53,6 +57,7 @@ static ssize_t loraspi_read(struct lora_struct *lrdata, const char __user *buf, 
 	sx127X_clearLoRaAllFlag(spi);
 	/* Set chip to RX continuous state.  The chip start to wait for receiving. */
 	sx127X_setState(spi, SX127X_RXCONTINUOUS_MODE);
+
 	/* Wait and check there is any packet received ready. */
 	for(timeout = 0; timeout < 250; timeout++) {
 		flag = sx127X_getLoRaFlag(spi,
@@ -211,7 +216,7 @@ long loraspi_getstate(struct lora_struct *lrdata, void __user *arg) {
 	spi = lrdata->lora_device;
 
 	mutex_lock(&(lrdata->buf_lock));
-	st = sx127X_readState(spi);
+	st = sx127X_getState(spi);
 	mutex_unlock(&(lrdata->buf_lock));
 
 	st32 = st;
