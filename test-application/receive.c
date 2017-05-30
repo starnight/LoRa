@@ -4,8 +4,41 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <ctype.h>
+#include <sys/select.h>
 
 #include "lora-ioctl.h"
+
+/* Bit 1: 1 for ready to read, 0 for not ready
+ * Bit 0: 1 for ready to write, 0 for not write
+ */
+uint8_t ready2rw(int fd) {
+	fd_set read_fds, write_fds;
+	struct timeval tv = {.tv_sec = 5, .tv_usec = 0};
+	uint8_t flag;
+
+	/* I/O multiplexing. */
+	FD_ZERO(&read_fds);
+	FD_ZERO(&write_fds);
+	FD_SET(fd, &read_fds);
+	FD_SET(fd, &write_fds);
+	if(select(fd+1, &read_fds, &write_fds, NULL, &tv) == -1)
+		perror("Select failed");
+
+	flag = 0;
+	/* Read from the file descriptor if it is ready to be read. */
+	if(FD_ISSET(fd, &read_fds)) {
+		flag |= (1 << 1);
+	}
+	/* Write to the file descriptor if it is ready to be written. */
+	if(FD_ISSET(fd, &write_fds)) {
+		flag |= (1 << 0);
+	}
+
+	return flag;
+}
+
+#define ready2read(fd)	(ready2rw(fd) & (1 << 1))
+#define ready2write(fd)	(ready2rw(fd) & (1 << 0))
 
 int main(int argc, char **argv) {
 	char *path;
@@ -15,6 +48,7 @@ int main(int argc, char **argv) {
 	char buf[MAX_BUFFER_LEN];
 	int len;
 	int i;
+	unsigned int s;
 
 	/* Parse command. */
 	if(argc >= 2) {
@@ -55,6 +89,14 @@ int main(int argc, char **argv) {
 	/* Read from the file descriptor if it is ready to be read. */
 	memset(buf, 0, MAX_BUFFER_LEN);
 	printf("Going to read %s\n", path);
+	s = 0;
+	while(!ready2read(fd)) {
+		sleep(1);
+		s++;
+		printf("\t%s is not ready to read, do other things.", path);
+		printf("  %u s\r", s);
+	}
+	printf("\n");
 	len = do_read(fd, buf, MAX_BUFFER_LEN - 1);
 
 	if(len > 0) {
@@ -68,6 +110,14 @@ int main(int argc, char **argv) {
 		printf("Going to echo %s\n", path);
 		for(i = 0; i < len; i++)
 			buf[i] = toupper(buf[i]);
+		s = 0;
+		while(!ready2write(fd)) {
+			sleep(1);
+			s++;
+			printf("\t%s is not ready to write, do other things.", path);
+			printf("  %u s\r", s);
+		}
+		printf("\n");
 		len = do_write(fd, buf, len);
 		printf("Echoed %d bytes: %s\n", len, buf);
 	}
