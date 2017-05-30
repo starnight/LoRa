@@ -51,7 +51,7 @@ static ssize_t loraspi_read(struct lora_struct *lrdata, const char __user *buf, 
 		base_adr = 0x00;
 		printk(KERN_DEBUG "lora-spi: Going to set RX base address\n");
 		sx127X_write_reg(spi, SX127X_REG_FIFO_RX_BASE_ADDR, &base_adr, 1);
-		sx127X_write_reg(spi, SX127X_REG_FIFO_ADDR_PTR, &base_adr, 1);
+		//sx127X_write_reg(spi, SX127X_REG_FIFO_ADDR_PTR, &base_adr, 1);
 
 		/* Set chip wait for LoRa timeout time. */
 		sx127X_setLoRaRXTimeout(spi, 300);

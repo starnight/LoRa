@@ -58,6 +58,7 @@ static int file_open(struct inode *inode, struct file *filp) {
 	lrdata->tx_buflen = 0;
 	lrdata->bufmaxlen = LORA_BUFLEN;
 	lrdata->users++;
+	init_waitqueue_head(&(lrdata->waitqueue));
 	mutex_unlock(&device_list_lock);
 
 	/* Map the data location to the file data pointer. */

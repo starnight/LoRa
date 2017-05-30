@@ -100,6 +100,7 @@ sx127X_restart(struct spi_device *spi) {}
 void
 sx127X_startLoRaMode(struct spi_device *spi) {
 	uint8_t op_mode;
+	uint8_t base_adr;
 
 	/* Get original OP Mode register. */
 	op_mode = sx127X_getMode(spi);
@@ -117,6 +118,17 @@ sx127X_startLoRaMode(struct spi_device *spi) {
 
 	/* Set LoRa in explicit header mode. */
 	sx127X_setLoRaImplicit(spi, 0);
+
+	/* Set chip FIFO RX base. */
+	base_adr = 0x00;
+	printk(KERN_DEBUG "lora-spi: Going to set RX base address\n");
+	sx127X_write_reg(spi, SX127X_REG_FIFO_RX_BASE_ADDR, &base_adr, 1);
+	sx127X_write_reg(spi, SX127X_REG_FIFO_ADDR_PTR, &base_adr, 1);
+
+	/* Clear all of the IRQ flags. */
+	sx127X_clearLoRaAllFlag(spi);
+	/* Set chip to RX continuous state.  The chip start to wait for receiving. */
+	sx127X_setState(spi, SX127X_RXCONTINUOUS_MODE);
 }
 
 uint8_t 

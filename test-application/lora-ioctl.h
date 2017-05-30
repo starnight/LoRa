@@ -32,7 +32,7 @@ ssize_t do_read(int fd, char *buf, size_t len);
 /* Write data into the device. */
 ssize_t do_write(int fd, char *buf, size_t len);
 
-/* Set the device in sleep state. */
+/* Set & get the device's state. */
 void set_state(int fd, uint32_t st);
 uint32_t get_state(int fd);
 

@@ -89,6 +89,8 @@ int main(int argc, char **argv) {
 	/* Read from the file descriptor if it is ready to be read. */
 	memset(buf, 0, MAX_BUFFER_LEN);
 	printf("Going to read %s\n", path);
+	/* Set the device in read state. */
+	set_state(fd, LORA_STATE_RX);
 	s = 0;
 	while(!ready2read(fd)) {
 		sleep(1);
