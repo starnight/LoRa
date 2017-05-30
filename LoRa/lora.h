@@ -56,6 +56,10 @@ struct lora_operations {
 	ssize_t (*read)(struct lora_struct *, const char __user *, size_t);
 	/* Write to the LoRa device's communication. */
 	ssize_t (*write)(struct lora_struct *, const char __user *, size_t);
+	/* Is ready to write & read. */
+	long (*ready2write)(struct lora_struct *);
+	long (*ready2read)(struct lora_struct *);
+
 };
 
 struct lora_struct {
@@ -70,6 +74,7 @@ struct lora_struct {
 	uint8_t bufmaxlen;
 	uint8_t users;
 	struct mutex buf_lock;
+	wait_queue_head_t waitqueue;
 	uint8_t node_adr;
 	uint8_t packet_num;
 };

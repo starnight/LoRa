@@ -415,6 +415,34 @@ long loraspi_getsnr(struct lora_struct *lrdata, void __user *arg) {
 	return 0;
 }
 
+/* Is ready to write & read. */
+long loraspi_ready2write(struct lora_struct *lrdata) {
+	long ret;
+
+	/* Mutex is not lock, than it is not writing. */
+	ret = mutex_is_locked(&(lrdata->buf_lock)) ? 0 : 1;
+
+	return ret;
+}
+
+long loraspi_ready2read(struct lora_struct *lrdata) {
+	struct spi_device *spi;
+	long ret;
+
+	spi = lrdata->lora_device;
+
+	ret = 0;
+	/* Mutex is not lock, than it is not in reading file operation. */
+	if(!mutex_is_locked(&(lrdata->buf_lock))) {
+		/* Check the chip have recieved full data. */
+		mutex_lock(&(lrdata->buf_lock));
+		ret = sx127X_getLoRaFlag(spi, SX127X_FLAG_RXDONE) != 0;
+		mutex_unlock(&(lrdata->buf_lock));
+	}
+
+	return ret;
+}
+
 struct lora_driver lr_driver = {
 	.name = __DRIVER_NAME,
 	.num = N_LORASPI_MINORS,
@@ -436,6 +464,8 @@ struct lora_operations lrops = {
 	.getBW = loraspi_getbandwidth,
 	.getRSSI = loraspi_getrssi,
 	.getSNR = loraspi_getsnr,
+	.ready2write = loraspi_ready2write,
+	.ready2read = loraspi_ready2read,
 };
 
 /* The compatible SoC array. */

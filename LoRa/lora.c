@@ -3,6 +3,7 @@
 #include <linux/cdev.h>
 #include <linux/fs.h>
 #include <linux/device.h>
+#include <linux/poll.h>
 #include <asm/uaccess.h>
 #include <linux/string.h>
 #include <linux/errno.h>
@@ -199,6 +200,31 @@ static long file_ioctl(struct file *filp, unsigned int cmd, unsigned long arg) {
 	return ret;
 }
 
+static unsigned int file_poll(struct file *filp, poll_table *wait) {
+	struct lora_struct *lrdata;
+	unsigned int mask;
+
+	printk(KERN_DEBUG "lora: poll\n");
+
+	lrdata = filp->private_data;
+	if(lrdata == NULL)
+		return -EBADFD;
+
+	/* Register the file into wait queue for multiplexing. */
+	poll_wait(filp, &lrdata->waitqueue, wait);
+
+	/* Check ready to write / read. */
+	mask = 0;
+	if((lrdata->ops->ready2write != NULL)
+		&& lrdata->ops->ready2write(lrdata))
+		mask |= POLLOUT | POLLWRNORM;
+	if((lrdata->ops->ready2read != NULL)
+		&& lrdata->ops->ready2read(lrdata))
+		mask |= POLLIN | POLLRDNORM;
+
+	return mask;
+}
+
 /* Add an lora compatible device. */
 static int lora_device_add(struct lora_struct *lrdata) {
 	INIT_LIST_HEAD(&(lrdata->device_entry));
@@ -227,6 +253,7 @@ static struct file_operations lora_fops = {
 	.read		= file_read,
 	.write		= file_write,
 	.unlocked_ioctl = file_ioctl,
+	.poll		= file_poll,
 	.llseek		= no_llseek,
 };
 
