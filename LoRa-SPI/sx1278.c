@@ -1,11 +1,14 @@
 #include <linux/init.h>
 #include <linux/module.h>
+#include <linux/of.h>
 #include <linux/spi/spi.h>
 #include <asm/div64.h>
 
 #include "sx1278.h"
 
+#ifndef F_XOSC
 #define F_XOSC		32000000
+#endif
 #define	__POW_2_19	0x80000
 
 int init_sx127X(struct spi_device *spi) {
@@ -167,9 +170,20 @@ sx127X_setLoRaFreq(struct spi_device *spi, uint32_t fr) {
 	uint32_t frt;
 	uint8_t buf[3];
 	int i;
+	uint32_t f_xosc;
+
+#ifdef CONFIG_OF
+	/* Set the LoRa module's crystal oscillator's clock if OF is defined. */
+	const void *ptr;
+
+	ptr = of_get_property(spi->dev.of_node, "clock-frequency", NULL);
+	f_xosc = (ptr != NULL) ? be32_to_cpup(ptr) : F_XOSC;
+#else
+	f_xosc = F_XOSC;
+#endif
 
 	frt64 = (uint64_t)fr * (uint64_t)__POW_2_19;
-	do_div(frt64, F_XOSC);
+	do_div(frt64, f_xosc);
 	frt = frt64;
 
 	for(i = 2; i >= 0; i--) {
@@ -187,6 +201,17 @@ sx127X_getLoRaFreq(struct spi_device *spi) {
 	int status;
 	int i;
 	uint32_t fr;
+	uint32_t f_xosc;
+
+#ifdef CONFIG_OF
+	/* Set the LoRa module's crystal oscillator's clock if OF is defined. */
+	const void *ptr;
+
+	ptr = of_get_property(spi->dev.of_node, "clock-frequency", NULL);
+	f_xosc = (ptr != NULL) ? be32_to_cpup(ptr) : F_XOSC;
+#else
+	f_xosc = F_XOSC;
+#endif
 
 	status = sx127X_read_reg(spi, SX127X_REG_FRF_MSB, buf, 3);
 	if(status <= 0)
@@ -195,7 +220,7 @@ sx127X_getLoRaFreq(struct spi_device *spi) {
 	for(i = 0; i <= 2; i++)
 		frt = frt * 256 + buf[i];
 
-	fr =  frt * F_XOSC / __POW_2_19;
+	fr =  frt * f_xosc / __POW_2_19;
 
 	return fr;
 }
