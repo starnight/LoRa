@@ -111,20 +111,4 @@ struct lora_driver {
 	struct module *owner;
 };
 
-#ifndef MAX_PACKETLENGTH
-#define MAX_PACKETLENGTH		123
-#endif
-#ifndef LORA_OFFSET_PAYLOADLENGTH
-#define LORA_OFFSET_PAYLOADLENGTH	5
-#endif
-
-struct lora_packet {
-	uint8_t dst;
-	uint8_t src;
-	uint8_t packet_num;
-	uint8_t len;
-	uint8_t data[MAX_PACKETLENGTH];
-	uint8_t retry;
-};
-
 #endif
