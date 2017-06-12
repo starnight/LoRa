@@ -15,7 +15,9 @@
 static LIST_HEAD(device_list);
 static DEFINE_MUTEX(device_list_lock);
 
+#ifndef LORA_BUFLEN
 #define LORA_BUFLEN	123
+#endif
 
 static int file_open(struct inode *inode, struct file *filp) {
 	struct lora_struct *lrdata;
