@@ -7,7 +7,7 @@
 #include <linux/mutex.h>
 
 /* I/O control by each command. */
-#define LORA_IOC_MAGIC '\x66'
+#define LORA_IOC_MAGIC '\x74'
 
 #define LORA_SET_STATE		(_IOW(LORA_IOC_MAGIC,  0, int))
 #define LORA_GET_STATE		(_IOR(LORA_IOC_MAGIC,  1, int))
@@ -59,9 +59,23 @@ struct lora_operations {
 	/* Is ready to write & read. */
 	long (*ready2write)(struct lora_struct *);
 	long (*ready2read)(struct lora_struct *);
-
 };
 
+/**
+ * struct lora_struct: Master side proxy of an LoRa slave device
+ * @devt:		It is a device search key
+ * @lora_device:	LoRa controller used with the device
+ * @device_entry:	The entry going to be added into the device list
+ * @ops:		Handle of LoRa operations interfaces
+ * @tx_buf:		Pointer of the TX buffer
+ * @rx_buf:		Pointer of the RX buffer
+ * @tx_buflen:		The length of the TX buffer
+ * @rx_buffer:		The length of the RX buffer
+ * @bufmaxlen:		The max length of the TX and RX buffer
+ * @users:		How many program use this LoRa device
+ * @buf_lock:		The lock to protect the synchroniztion of this structure
+ * @waitqueue:		The queue to be hung on the wait table for multiplexing
+ */
 struct lora_struct {
 	dev_t devt;
 	void *lora_device;
@@ -75,22 +89,34 @@ struct lora_struct {
 	uint8_t users;
 	struct mutex buf_lock;
 	wait_queue_head_t waitqueue;
-	uint8_t node_adr;
-	uint8_t packet_num;
 };
 
+/**
+ * struct lora_driver: Host side LoRa driver
+ * @name:		Name of the driver to use with this device
+ * @major:		Driver's major number
+ * @minor_start:	Driver's minor number starts from
+ * @num:		The max number of the devices which use this driver
+ * @lora_cdev:		The handle lets the devices act as character devices
+ * @lora_class:		The class for being registed into file system
+ * @owner:		This driver owned by which kernel module
+ */
 struct lora_driver {
 	char *name;
 	int major;
 	int minor_start;
-	int num; // Max number of minor
+	int num;
 	struct cdev lora_cdev;
 	struct class *lora_class;
 	struct module *owner;
 };
 
+#ifndef MAX_PACKETLENGTH
 #define MAX_PACKETLENGTH		123
+#endif
+#ifndef LORA_OFFSET_PAYLOADLENGTH
 #define LORA_OFFSET_PAYLOADLENGTH	5
+#endif
 
 struct lora_packet {
 	uint8_t dst;

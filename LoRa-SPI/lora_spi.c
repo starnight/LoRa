@@ -543,8 +543,6 @@ static int loraspi_probe(struct spi_device *spi) {
 	/* Initial the lora device's data. */
 	lrdata->lora_device = spi;
 	lrdata->ops = &lrops;
-	lrdata->node_adr = 1 + spi->chip_select;
-	lrdata->packet_num = 0;
 	mutex_init(&(lrdata->buf_lock));
 	mutex_lock(&minors_lock);
 	minor = find_first_zero_bit(minors, N_LORASPI_MINORS);
