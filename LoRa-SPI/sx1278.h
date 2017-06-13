@@ -55,6 +55,7 @@
 #define SX127X_REG_AGC_THRESH3			0x64
 #define SX127X_REG_PLL				0x70
 
+/* SX127X's operating states in LoRa mode */
 #define SX127X_SLEEP_MODE			0x00
 #define SX127X_STANDBY_MODE			0x01
 #define SX127X_FSTX_MODE			0x02
@@ -64,6 +65,7 @@
 #define SX127X_RXSINGLE_MODE			0x06
 #define SX127X_CAD_MODE				0x07
 
+/* SX127X's IRQ flags in LoRa mode */
 #define SX127X_FLAG_RXTIMEOUT			0x80
 #define	SX127X_FLAG_RXDONE			0x40
 #define SX127X_FLAG_PAYLOADCRCERROR		0x20
@@ -73,6 +75,7 @@
 #define SX127X_FLAG_FHSSCHANGECHANNEL		0x02
 #define SX127X_FLAG_CADDETECTED			0x01
 
+/* SX127X's IRQ flags' mask for output pins in LoRa mode */
 #define SX127X_FLAGMASK_RXTIMEOUT		0x80
 #define	SX127X_FLAGMASK_RXDONE			0x40
 #define SX127X_FLAGMASK_PAYLOADCRCERROR		0x20
@@ -82,7 +85,8 @@
 #define SX127X_FLAGMASK_FHSSCHANGECHANNEL	0x02
 #define SX127X_FLAGMASK_CADDETECTED		0x01
 
-int init_sx127X(struct spi_device *spi);
+int
+init_sx127X(struct spi_device *spi);
 
 ssize_t
 sx127X_sync(struct spi_device *spi, struct spi_message *);

@@ -568,6 +568,12 @@ sx127X_setLoRaPreambleLen(struct spi_device *spi, uint32_t len) {
 	sx127X_write_reg(spi, SX127X_REG_PREAMBLE_MSB, pl, 2);
 }
 
+/**
+ * sx127X_getLoRaPreambleLen - Get LoRa preamble length
+ * @spi:	spi device to communicate with
+ *
+ * Return:	length of the LoRa preamble
+ * */
 uint32_t
 sx127X_getLoRaPreambleLen(struct spi_device *spi) {
 	uint8_t pl[2];
@@ -579,6 +585,11 @@ sx127X_getLoRaPreambleLen(struct spi_device *spi) {
 	return len;
 }
 
+/**
+ * sx127X_setLoRaCRC - Enable CRC generation and check on received payload
+ * @spi:	spi device to communicate with
+ * @yesno:	1 / 0 for check / not check
+ * */
 void
 sx127X_setLoRaCRC(struct spi_device *spi, uint8_t yesno) {
 	uint8_t mcf2;
@@ -588,6 +599,11 @@ sx127X_setLoRaCRC(struct spi_device *spi, uint8_t yesno) {
 	sx127X_write_reg(spi, SX127X_REG_MODEM_CONFIG2, &mcf2, 1);
 }
 
+/**
+ * sx127X_setBoost - Set RF power amplifier boost in normal output range
+ * @spi:	spi device to communicate with
+ * @yesno:	1 / 0 for boost / not boost
+ * */
 void
 sx127X_setBoost(struct spi_device *spi, uint8_t yesno) {
 	uint8_t pacf;
