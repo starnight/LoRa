@@ -434,7 +434,7 @@ void
 sx127X_setLoRaRXTimeout(struct spi_device *spi, uint32_t ms) {
 	uint32_t n;
 
-	n = ms * sx127X_getLoRaBW(spi) / sx127X_getLoRaSPRFactor(spi);
+	n = ms * sx127X_getLoRaBW(spi) / (sx127X_getLoRaSPRFactor(spi) * 1000);
 
 	sx127X_setLoRaRXByteTimeout(spi, n);
 }
@@ -461,13 +461,14 @@ sx127X_getLoRaRXByteTimeout(struct spi_device *spi) {
  * sx127X_getLoRaRXTimeout - Get RX operation time-out seconds
  * @spi:	spi device to communicate with
  *
- * Return:	The RX time-out time in seconds
+ * Return:	The RX time-out time in ms
  * */
 uint32_t
 sx127X_getLoRaRXTimeout(struct spi_device *spi) {
 	uint32_t ms;
 
-	ms = sx127X_getLoRaRXByteTimeout(spi) * sx127X_getLoRaSPRFactor(spi) / sx127X_getLoRaBW(spi);
+	ms = 1000 * sx127X_getLoRaRXByteTimeout(spi) * \
+		sx127X_getLoRaSPRFactor(spi) / sx127X_getLoRaBW(spi);
 
 	return ms;
 }
