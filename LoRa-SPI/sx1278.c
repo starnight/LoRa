@@ -439,6 +439,12 @@ sx127X_setLoRaRXTimeout(struct spi_device *spi, uint32_t ms) {
 	sx127X_setLoRaRXByteTimeout(spi, n);
 }
 
+/**
+ * sx127X_getLoRaRXByteTimeout - Get RX operation time-out in terms of symbols
+ * @spi:	spi device to communicate with
+ *
+ * Return:	Time-out in terms of symbols (bytes)
+ * */
 uint32_t
 sx127X_getLoRaRXByteTimeout(struct spi_device *spi) {
 	uint32_t n;
@@ -451,6 +457,12 @@ sx127X_getLoRaRXByteTimeout(struct spi_device *spi) {
 	return n;
 }
 
+/**
+ * sx127X_getLoRaRXTimeout - Get RX operation time-out seconds
+ * @spi:	spi device to communicate with
+ *
+ * Return:	The RX time-out time in seconds
+ * */
 uint32_t
 sx127X_getLoRaRXTimeout(struct spi_device *spi) {
 	uint32_t ms;
@@ -460,11 +472,24 @@ sx127X_getLoRaRXTimeout(struct spi_device *spi) {
 	return ms;
 }
 
+/**
+ * sx127X_setLoRaMaxRXBuff - Maximum payload length in LoRa packet
+ * @spi:	spi device to communicate with
+ * @len:	the max payload length going to be assigned in bytes
+ * */
 void
 sx127X_setLoRaMaxRXBuff(struct spi_device *spi, uint8_t len) {
 	sx127X_write_reg(spi, SX127X_REG_MAX_PAYLOAD_LENGTH, &len, 1);
 }
 
+/**
+ * sx127X_readLoRaData - Read data from LoRa device (RX)
+ * @spi:	spi device to communicate with
+ * @buf:	buffer going to be read data into
+ * @len:	the length of the data going to be read in bytes
+ *
+ * Return:	the actual data length read from the LoRa device in bytes
+ * */
 ssize_t
 sx127X_readLoRaData(struct spi_device *spi, uint8_t *buf, size_t len) {
 	uint8_t start_adr;
@@ -488,8 +513,14 @@ sx127X_readLoRaData(struct spi_device *spi, uint8_t *buf, size_t len) {
 	return c;
 }
 
-//uint8_t sx127X_getLoRaRXEndFlag(struct spi_device *spi) {}
-
+/**
+ * sx127X_sendLoRaData - Send data out through LoRa device (TX)
+ * @spi:	spi device to communicate with
+ * @buf:	buffer going to be send
+ * @len:	the length of the buffer in bytes
+ *
+ * Return:	the actual length written into the LoRa device in bytes
+ * */
 ssize_t
 sx127X_sendLoRaData(struct spi_device *spi, uint8_t *buf, size_t len) {
 	uint8_t base_adr;
@@ -517,6 +548,12 @@ sx127X_sendLoRaData(struct spi_device *spi, uint8_t *buf, size_t len) {
 	return c;
 }
 
+/**
+ * sx127X_getLoRaLastPacketRSSI - Get last LoRa packet's SNR
+ * @spi:	spi device to communicate with
+ *
+ * Return:	the last LoRa packet's RSSI in dbm
+ * */
 int32_t
 sx127X_getLoRaLastPacketRSSI(struct spi_device *spi) {
 	uint32_t dbm;
@@ -532,6 +569,12 @@ sx127X_getLoRaLastPacketRSSI(struct spi_device *spi) {
 	return dbm;
 }
 
+/**
+ * sx127X_getLoRaLastPacketSNR - Get last LoRa packet's SNR
+ * @spi:	spi device to communicate with
+ *
+ * Return:	the last LoRa packet's SNR in db
+ * */
 uint32_t
 sx127X_getLoRaLastPacketSNR(struct spi_device *spi) {
 	uint32_t db;
@@ -543,6 +586,12 @@ sx127X_getLoRaLastPacketSNR(struct spi_device *spi) {
 	return db;
 }
 
+/**
+ * sx127X_getLoRaRSSI - Get current RSSI value
+ * @spi:	spi device to communicate with
+ *
+ * Return:	the current RSSI in dbm
+ * */
 int32_t
 sx127X_getLoRaRSSI(struct spi_device *spi) {
 	uint32_t dbm;
@@ -558,6 +607,11 @@ sx127X_getLoRaRSSI(struct spi_device *spi) {
 	return dbm;
 }
 
+/**
+ * sx127X_setLoRaPreambleLen - Set LoRa preamble length
+ * @spi:	spi device to communicate with
+ * @len:	the preamble length going to be assigned
+ * */
 void
 sx127X_setLoRaPreambleLen(struct spi_device *spi, uint32_t len) {
 	uint8_t pl[2];
