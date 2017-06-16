@@ -97,9 +97,17 @@ sx127X_write_reg(struct spi_device *spi, uint8_t start_adr, uint8_t *buf, size_t
 	return status;
 }
 
+/**
+ * sx127X_restart - Reset the device (not used for now)
+ * @spi:	spi device to communicate with
+ */
 void
 sx127X_restart(struct spi_device *spi) {}
 
+/**
+ * sx127X_startLoRaMode - Start the device and set it in LoRa mode
+ * @spi:	spi device to communicate with
+ */
 void
 sx127X_startLoRaMode(struct spi_device *spi) {
 	uint8_t op_mode;
@@ -134,6 +142,12 @@ sx127X_startLoRaMode(struct spi_device *spi) {
 	sx127X_setState(spi, SX127X_RXCONTINUOUS_MODE);
 }
 
+/**
+ * sx127X_getMode - Get LoRa device's mode register
+ * @spi:	spi device to communicate with
+ *
+ * Return:	LoRa device's register value
+ */
 uint8_t 
 sx127X_getMode(struct spi_device *spi) {
 	uint8_t op_mode;
@@ -144,6 +158,11 @@ sx127X_getMode(struct spi_device *spi) {
 	return op_mode;
 }
 
+/**
+ * sx127X_getState - Set LoRa device's operating state
+ * @spi:	spi device to communicate with
+ * @st:		LoRa device's operating state going to be assigned
+ */
 void
 sx127X_setState(struct spi_device *spi, uint8_t st) {
 	uint8_t op_mode;
@@ -155,6 +174,12 @@ sx127X_setState(struct spi_device *spi, uint8_t st) {
 	sx127X_write_reg(spi, SX127X_REG_OP_MODE, &op_mode, 1);
 }
 
+/**
+ * sx127X_getState - Get LoRa device's operating state
+ * @spi:	spi device to communicate with
+ *
+ * Return:	LoRa device's operating state
+ */
 uint8_t
 sx127X_getState(struct spi_device *spi) {
 	uint8_t op_mode;
@@ -164,6 +189,11 @@ sx127X_getState(struct spi_device *spi) {
 	return op_mode & 0x07;
 }
 
+/**
+ * sx127X_getLoRaFreq - Set RF frequency
+ * @spi:	spi device to communicate with
+ * @fr:		RF frequency going to be assigned in Hz
+ */
 void
 sx127X_setLoRaFreq(struct spi_device *spi, uint32_t fr) {
 	uint64_t frt64;
@@ -194,6 +224,12 @@ sx127X_setLoRaFreq(struct spi_device *spi, uint32_t fr) {
 	sx127X_write_reg(spi, SX127X_REG_FRF_MSB, buf, 3);
 }
 
+/**
+ * sx127X_getLoRaFreq - Get RF frequency
+ * @spi:	spi device to communicate with
+ *
+ * Return:	RF frequency in Hz
+ */
 uint32_t
 sx127X_getLoRaFreq(struct spi_device *spi) {
 	uint64_t frt = 0;
@@ -225,6 +261,11 @@ sx127X_getLoRaFreq(struct spi_device *spi) {
 	return fr;
 }
 
+/**
+ * sx127X_setLoRaPower - Set RF output power
+ * @spi:	spi device to communicate with
+ * @pout:	RF output power going to be assigned in dbm
+ */
 void
 sx127X_setLoRaPower(struct spi_device *spi, int32_t pout) {
 	uint8_t pac;
@@ -255,6 +296,12 @@ sx127X_setLoRaPower(struct spi_device *spi, int32_t pout) {
 	sx127X_write_reg(spi, SX127X_REG_PA_CONFIG, &pac, 1);
 }
 
+/**
+ * sx127X_getLoRaPower - Get RF output power
+ * @spi:	spi device to communicate with
+ *
+ * Return:	RF output power in dbm
+ */
 int32_t
 sx127X_getLoRaPower(struct spi_device *spi) {
 	uint8_t pac;
@@ -278,6 +325,14 @@ sx127X_getLoRaPower(struct spi_device *spi) {
 	return pout;
 }
 
+/**
+ * sx127X_readVersion - Get LoRa device's chip version
+ * @spi:	spi device to communicate with
+ * @vstr:	the buffer going to hold the chip's version string
+ * @len:	the max length of the buffer
+ *
+ * Return:	All of the LoRa device's IRQ flags' current state in a byte
+ */
 int
 sx127X_readVersion(struct spi_device *spi, char *vstr, size_t len) {
 	uint8_t v;
@@ -295,7 +350,12 @@ sx127X_readVersion(struct spi_device *spi, char *vstr, size_t len) {
 	return status;
 }
 
-/* LoRa Mode */
+/**
+ * sx127X_getLoRaAllFlag - Get all of the LoRa device's IRQ flags' current state
+ * @spi:	spi device to communicate with
+ *
+ * Return:	All of the LoRa device's IRQ flags' current state in a byte
+ */
 uint8_t
 sx127X_getLoRaAllFlag(struct spi_device *spi) {
 	uint8_t flags;
@@ -305,6 +365,11 @@ sx127X_getLoRaAllFlag(struct spi_device *spi) {
 	return flags;
 }
 
+/**
+ * sx127X_clearLoRaFlag - Clear designated LoRa device's IRQ flag
+ * @spi:	spi device to communicate with
+ * @f:		flags going to be cleared
+ */
 void
 sx127X_clearLoRaFlag(struct spi_device *spi, uint8_t f) {
 	uint8_t flag;
@@ -316,13 +381,18 @@ sx127X_clearLoRaFlag(struct spi_device *spi, uint8_t f) {
 	sx127X_write_reg(spi, SX127X_REG_IRQ_FLAGS, &flag, 1);
 }
 
+/**
+ * sx127X_getLoRaSPRFactor - Get the RF modulation's spreading factor
+ * @spi:	spi device to communicate with
+ * @c_s:	Spreading factor in chips / symbol
+ */
 void
-sx127X_setLoRaSPRFactor(struct spi_device *spi, uint32_t chips) {
+sx127X_setLoRaSPRFactor(struct spi_device *spi, uint32_t c_s) {
 	uint8_t sf;
 	uint8_t mcf2;
 
 	for(sf = 6; sf < 12; sf++) {
-		if(chips == ((uint32_t)1 << sf))
+		if(c_s == ((uint32_t)1 << sf))
 			break;
 	}
 
@@ -331,16 +401,22 @@ sx127X_setLoRaSPRFactor(struct spi_device *spi, uint32_t chips) {
 	sx127X_write_reg(spi, SX127X_REG_MODEM_CONFIG2, &mcf2, 1);
 }
 
+/**
+ * sx127X_getLoRaSPRFactor - Get the RF modulation's spreading factor
+ * @spi:	spi device to communicate with
+ *
+ * Return:	Spreading factor in chips / symbol
+ */
 uint32_t
 sx127X_getLoRaSPRFactor(struct spi_device *spi) {
 	uint8_t sf;
-	uint32_t chips;
+	uint32_t c_s;
 
 	sx127X_read_reg(spi, SX127X_REG_MODEM_CONFIG2, &sf, 1);
 	sf = sf >> 4;
-	chips = 1 << sf;
+	c_s = 1 << sf;
 
-	return chips;
+	return c_s;
 }
 
 const uint32_t hz[] = {
@@ -356,6 +432,11 @@ const uint32_t hz[] = {
 	500000
 };
 
+/**
+ * sx127X_getLoRaBW - Set RF bandwidth
+ * @spi:	spi device to communicate with
+ * @bw:		RF bandwidth going to be assigned in Hz
+ */
 void
 sx127X_setLoRaBW(struct spi_device *spi, uint32_t bw) {
 	uint8_t i;
@@ -371,6 +452,12 @@ sx127X_setLoRaBW(struct spi_device *spi, uint32_t bw) {
 	sx127X_write_reg(spi, SX127X_REG_MODEM_CONFIG1, &mcf1, 1);
 }
 
+/**
+ * sx127X_getLoRaBW - Get RF bandwidth
+ * @spi:	spi device to communicate with
+ *
+ * Return:	RF bandwidth in Hz
+ */
 uint32_t
 sx127X_getLoRaBW(struct spi_device *spi) {
 	uint8_t mcf1;
@@ -382,6 +469,12 @@ sx127X_getLoRaBW(struct spi_device *spi) {
 	return hz[bw];
 }
 
+/**
+ * sx127X_setLoRaCR  - Get LoRa package's coding rate
+ * @spi:	spi device to communicate with
+ * @cr:		Coding rate going to be assigned in a byte
+ * 		high 4 bits / low 4 bits: numerator / denominator
+ */
 void
 sx127X_setLoRaCR(struct spi_device *spi, uint8_t cr) {
 	uint8_t mcf1;
@@ -391,10 +484,17 @@ sx127X_setLoRaCR(struct spi_device *spi, uint8_t cr) {
 	sx127X_write_reg(spi, SX127X_REG_MODEM_CONFIG1, &mcf1, 1);
 }
 
+/**
+ * sx127X_getLoRaCR - Get LoRa package's coding rate
+ * @spi:	spi device to communicate with
+ *
+ * Return:	Coding rate in a byte
+ * 		high 4 bits / low 4 bits: numerator / denominator
+ */
 uint8_t
 sx127X_getLoRaCR(struct spi_device *spi) {
 	uint8_t mcf1;
-	uint8_t cr; // ex: 0x45 represents cr=4/5
+	uint8_t cr;	/* ex: 0x45 represents cr=4/5 */
 
 	sx127X_read_reg(spi, SX127X_REG_MODEM_CONFIG1, &mcf1, 1);
 	cr = 0x40 + ((mcf1 & 0x0E) >> 1) + 4;
@@ -402,6 +502,11 @@ sx127X_getLoRaCR(struct spi_device *spi) {
 	return cr;
 }
 
+/**
+ * sx127X_setLoRaImplicit - Set LoRa packages in Explicit / Implicit Header Mode
+ * @spi:	spi device to communicate with
+ * @yesno:	1 / 0 for Implicit Header Mode / Explicit Header Mode
+ */
 void
 sx127X_setLoRaImplicit(struct spi_device *spi, uint8_t yesno) {
 	uint8_t mcf1;
@@ -411,6 +516,11 @@ sx127X_setLoRaImplicit(struct spi_device *spi, uint8_t yesno) {
 	sx127X_write_reg(spi, SX127X_REG_MODEM_CONFIG1, &mcf1, 1);
 }
 
+/**
+ * sx127X_setLoRaRXByteTimeout - Get RX operation time-out in terms of symbols
+ * @spi:	spi device to communicate with
+ * @n:		Time-out in terms of symbols (bytes) going to be assigned
+ */
 void
 sx127X_setLoRaRXByteTimeout(struct spi_device *spi, uint32_t n) {
 	uint8_t buf[2];
@@ -430,6 +540,11 @@ sx127X_setLoRaRXByteTimeout(struct spi_device *spi, uint32_t n) {
 	sx127X_write_reg(spi, SX127X_REG_MODEM_CONFIG2, buf, 2);
 }
 
+/**
+ * sx127X_setLoRaRXTimeout - Set RX operation time-out seconds
+ * @spi:	spi device to communicate with
+ * @ms:		The RX time-out time in ms
+ */
 void
 sx127X_setLoRaRXTimeout(struct spi_device *spi, uint32_t ms) {
 	uint32_t n;
@@ -444,7 +559,7 @@ sx127X_setLoRaRXTimeout(struct spi_device *spi, uint32_t ms) {
  * @spi:	spi device to communicate with
  *
  * Return:	Time-out in terms of symbols (bytes)
- * */
+ */
 uint32_t
 sx127X_getLoRaRXByteTimeout(struct spi_device *spi) {
 	uint32_t n;
@@ -462,7 +577,7 @@ sx127X_getLoRaRXByteTimeout(struct spi_device *spi) {
  * @spi:	spi device to communicate with
  *
  * Return:	The RX time-out time in ms
- * */
+ */
 uint32_t
 sx127X_getLoRaRXTimeout(struct spi_device *spi) {
 	uint32_t ms;
@@ -477,7 +592,7 @@ sx127X_getLoRaRXTimeout(struct spi_device *spi) {
  * sx127X_setLoRaMaxRXBuff - Maximum payload length in LoRa packet
  * @spi:	spi device to communicate with
  * @len:	the max payload length going to be assigned in bytes
- * */
+ */
 void
 sx127X_setLoRaMaxRXBuff(struct spi_device *spi, uint8_t len) {
 	sx127X_write_reg(spi, SX127X_REG_MAX_PAYLOAD_LENGTH, &len, 1);
@@ -490,7 +605,7 @@ sx127X_setLoRaMaxRXBuff(struct spi_device *spi, uint8_t len) {
  * @len:	the length of the data going to be read in bytes
  *
  * Return:	the actual data length read from the LoRa device in bytes
- * */
+ */
 ssize_t
 sx127X_readLoRaData(struct spi_device *spi, uint8_t *buf, size_t len) {
 	uint8_t start_adr;
@@ -521,7 +636,7 @@ sx127X_readLoRaData(struct spi_device *spi, uint8_t *buf, size_t len) {
  * @len:	the length of the buffer in bytes
  *
  * Return:	the actual length written into the LoRa device in bytes
- * */
+ */
 ssize_t
 sx127X_sendLoRaData(struct spi_device *spi, uint8_t *buf, size_t len) {
 	uint8_t base_adr;
@@ -554,7 +669,7 @@ sx127X_sendLoRaData(struct spi_device *spi, uint8_t *buf, size_t len) {
  * @spi:	spi device to communicate with
  *
  * Return:	the last LoRa packet's RSSI in dbm
- * */
+ */
 int32_t
 sx127X_getLoRaLastPacketRSSI(struct spi_device *spi) {
 	uint32_t dbm;
@@ -575,7 +690,7 @@ sx127X_getLoRaLastPacketRSSI(struct spi_device *spi) {
  * @spi:	spi device to communicate with
  *
  * Return:	the last LoRa packet's SNR in db
- * */
+ */
 uint32_t
 sx127X_getLoRaLastPacketSNR(struct spi_device *spi) {
 	uint32_t db;
@@ -592,7 +707,7 @@ sx127X_getLoRaLastPacketSNR(struct spi_device *spi) {
  * @spi:	spi device to communicate with
  *
  * Return:	the current RSSI in dbm
- * */
+ */
 int32_t
 sx127X_getLoRaRSSI(struct spi_device *spi) {
 	uint32_t dbm;
@@ -612,7 +727,7 @@ sx127X_getLoRaRSSI(struct spi_device *spi) {
  * sx127X_setLoRaPreambleLen - Set LoRa preamble length
  * @spi:	spi device to communicate with
  * @len:	the preamble length going to be assigned
- * */
+ */
 void
 sx127X_setLoRaPreambleLen(struct spi_device *spi, uint32_t len) {
 	uint8_t pl[2];
@@ -628,7 +743,7 @@ sx127X_setLoRaPreambleLen(struct spi_device *spi, uint32_t len) {
  * @spi:	spi device to communicate with
  *
  * Return:	length of the LoRa preamble
- * */
+ */
 uint32_t
 sx127X_getLoRaPreambleLen(struct spi_device *spi) {
 	uint8_t pl[2];
@@ -644,7 +759,7 @@ sx127X_getLoRaPreambleLen(struct spi_device *spi) {
  * sx127X_setLoRaCRC - Enable CRC generation and check on received payload
  * @spi:	spi device to communicate with
  * @yesno:	1 / 0 for check / not check
- * */
+ */
 void
 sx127X_setLoRaCRC(struct spi_device *spi, uint8_t yesno) {
 	uint8_t mcf2;
@@ -658,7 +773,7 @@ sx127X_setLoRaCRC(struct spi_device *spi, uint8_t yesno) {
  * sx127X_setBoost - Set RF power amplifier boost in normal output range
  * @spi:	spi device to communicate with
  * @yesno:	1 / 0 for boost / not boost
- * */
+ */
 void
 sx127X_setBoost(struct spi_device *spi, uint8_t yesno) {
 	uint8_t pacf;
