@@ -21,6 +21,7 @@
 				reg = <0>;
 				status = "okay";
 				spi-max-frequency = <0x3b60>;
+				clock-frequency = <32000000>;
 			};
 
 			lora-spi@1 {
@@ -28,6 +29,7 @@
 				reg = <1>;
 				status = "okay";
 				spi-max-frequency = <0x3b60>;
+				clock-frequency = <32000000>;
 			};
 		};
 	};
