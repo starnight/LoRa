@@ -11,19 +11,15 @@
 #endif
 #define	__POW_2_19	0x80000
 
-int init_sx127X(struct spi_device *spi) {
-	char ver[5];
-	printk(KERN_DEBUG "sx127X: init sx127X\n");
+/*------------------------------ SPI Functions -------------------------------*/
 
-	sx127X_readVersion(spi, ver, 4);
-	ver[4] = '\0';
-	printk(KERN_DEBUG "sx127X: chip version %s\n", ver);
-
-	sx127X_startLoRaMode(spi);
-
-	return 0;
-}
-
+/**
+ * sx127X_sync - Do the SPI communication with the device
+ * @spi:	spi device to communicate with
+ * @m:		spi message going to be transferred
+ *
+ * Return:	How many bytes has been transferred, -1 for failed
+ */
 ssize_t
 sx127X_sync(struct spi_device *spi, struct spi_message *m) {
 	DECLARE_COMPLETION_ONSTACK(done);
@@ -40,6 +36,15 @@ sx127X_sync(struct spi_device *spi, struct spi_message *m) {
 	return status;
 }
 
+/**
+ * sx127X_read_reg - Build SPI read message and read from the SPI device
+ * @spi:	spi device to communicate with
+ * @start_adr:	the register's start address which is going to be read from
+ * @buf:	the buffer going to be read into, from the registers
+ * @len:	the length of the buffer in bytes
+ *
+ * Return:	How many bytes has been read, -1 for failed
+ */
 int
 sx127X_read_reg(struct spi_device *spi, uint8_t start_adr, uint8_t *buf, size_t len) {
 	int status = 0;
@@ -68,6 +73,15 @@ sx127X_read_reg(struct spi_device *spi, uint8_t start_adr, uint8_t *buf, size_t 
 	return status;
 }
 
+/**
+ * sx127X_write_reg - Build SPI write message and write into the SPI device
+ * @spi:	spi device to communicate with
+ * @start_adr:	the register's start address which is going to be written into
+ * @buf:	the buffer going to be written into the registers
+ * @len:	the length of the buffer in bytes
+ *
+ * Return:	How many bytes has been written, -1 for failed
+ */
 int
 sx127X_write_reg(struct spi_device *spi, uint8_t start_adr, uint8_t *buf, size_t len) {
 	int status = 0;
@@ -96,6 +110,8 @@ sx127X_write_reg(struct spi_device *spi, uint8_t start_adr, uint8_t *buf, size_t
 
 	return status;
 }
+
+/*------------------------------ LoRa Functions ------------------------------*/
 
 /**
  * sx127X_restart - Reset the device (not used for now)
@@ -140,6 +156,24 @@ sx127X_startLoRaMode(struct spi_device *spi) {
 	sx127X_clearLoRaAllFlag(spi);
 	/* Set chip to RX continuous state.  The chip start to wait for receiving. */
 	sx127X_setState(spi, SX127X_RXCONTINUOUS_MODE);
+}
+
+/**
+ * init_sx127X - Initial the SX127X device
+ * @spi:	spi device to communicate with
+ */
+int
+init_sx127X(struct spi_device *spi) {
+	char ver[5];
+	printk(KERN_DEBUG "sx127X: init sx127X\n");
+
+	sx127X_readVersion(spi, ver, 4);
+	ver[4] = '\0';
+	printk(KERN_DEBUG "sx127X: chip version %s\n", ver);
+
+	sx127X_startLoRaMode(spi);
+
+	return 0;
 }
 
 /**
