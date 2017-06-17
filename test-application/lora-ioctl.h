@@ -4,7 +4,7 @@
 #include <sys/ioctl.h>
 
 /* I/O control by each command. */
-#define LORA_IOC_MAGIC '\x66'
+#define LORA_IOC_MAGIC '\x74'
 
 #define LORA_SET_STATE		(_IOW(LORA_IOC_MAGIC,  0, int))
 #define LORA_GET_STATE		(_IOR(LORA_IOC_MAGIC,  1, int))
