@@ -121,59 +121,28 @@ void
 sx127X_restart(struct spi_device *spi) {}
 
 /**
- * sx127X_startLoRaMode - Start the device and set it in LoRa mode
+ * sx127X_readVersion - Get LoRa device's chip version
  * @spi:	spi device to communicate with
- */
-void
-sx127X_startLoRaMode(struct spi_device *spi) {
-	uint8_t op_mode;
-	uint8_t base_adr;
-
-	/* Get original OP Mode register. */
-	op_mode = sx127X_getMode(spi);
-	printk(KERN_DEBUG "sx127X: the original OP mode is 0x%X\n", op_mode);
-	/* Set device to sleep state. */
-	sx127X_setState(spi, SX127X_SLEEP_MODE);
-	/* Set device to LoRa mode. */
-	op_mode = sx127X_getMode(spi);
-	op_mode = op_mode | 0x80;
-	sx127X_write_reg(spi, SX127X_REG_OP_MODE, &op_mode, 1);
-	/* Set device to standby state. */
-	sx127X_setState(spi, SX127X_STANDBY_MODE);
-	op_mode = sx127X_getMode(spi);
-	printk(KERN_DEBUG "sx127X: the current OP mode is 0x%X\n", op_mode);
-
-	/* Set LoRa in explicit header mode. */
-	sx127X_setLoRaImplicit(spi, 0);
-
-	/* Set chip FIFO RX base. */
-	base_adr = 0x00;
-	printk(KERN_DEBUG "lora-spi: Going to set RX base address\n");
-	sx127X_write_reg(spi, SX127X_REG_FIFO_RX_BASE_ADDR, &base_adr, 1);
-	sx127X_write_reg(spi, SX127X_REG_FIFO_ADDR_PTR, &base_adr, 1);
-
-	/* Clear all of the IRQ flags. */
-	sx127X_clearLoRaAllFlag(spi);
-	/* Set chip to RX continuous state.  The chip start to wait for receiving. */
-	sx127X_setState(spi, SX127X_RXCONTINUOUS_MODE);
-}
-
-/**
- * init_sx127X - Initial the SX127X device
- * @spi:	spi device to communicate with
+ * @vstr:	the buffer going to hold the chip's version string
+ * @len:	the max length of the buffer
+ *
+ * Return:	All of the LoRa device's IRQ flags' current state in a byte
  */
 int
-init_sx127X(struct spi_device *spi) {
-	char ver[5];
-	printk(KERN_DEBUG "sx127X: init sx127X\n");
+sx127X_readVersion(struct spi_device *spi, char *vstr, size_t len) {
+	uint8_t v;
+	uint8_t fv, mmv;
+	int status;
 
-	sx127X_readVersion(spi, ver, 4);
-	ver[4] = '\0';
-	printk(KERN_DEBUG "sx127X: chip version %s\n", ver);
+	status = sx127X_read_reg(spi, SX127X_REG_VERSION, &v, 1);
 
-	sx127X_startLoRaMode(spi);
+	if(status == 1) {
+		fv = v >> 4;
+		mmv = v & 0x0F;
+		snprintf(vstr, len, "%d.%d", fv, mmv);
+	}
 
-	return 0;
+	return status;
 }
 
 /**
@@ -357,31 +326,6 @@ sx127X_getLoRaPower(struct spi_device *spi) {
 	}
 
 	return pout;
-}
-
-/**
- * sx127X_readVersion - Get LoRa device's chip version
- * @spi:	spi device to communicate with
- * @vstr:	the buffer going to hold the chip's version string
- * @len:	the max length of the buffer
- *
- * Return:	All of the LoRa device's IRQ flags' current state in a byte
- */
-int
-sx127X_readVersion(struct spi_device *spi, char *vstr, size_t len) {
-	uint8_t v;
-	uint8_t fv, mmv;
-	int status;
-
-	status = sx127X_read_reg(spi, SX127X_REG_VERSION, &v, 1);
-
-	if(status == 1) {
-		fv = v >> 4;
-		mmv = v & 0x0F;
-		snprintf(vstr, len, "%d.%d", fv, mmv);
-	}
-
-	return status;
 }
 
 /**
@@ -815,4 +759,60 @@ sx127X_setBoost(struct spi_device *spi, uint8_t yesno) {
 	sx127X_read_reg(spi, SX127X_REG_PA_CONFIG, &pacf, 1);
 	pacf = (yesno) ? pacf | (1 << 7) : pacf & (~(1 << 7));
 	sx127X_write_reg(spi, SX127X_REG_PA_CONFIG, &pacf, 1);
+}
+
+/**
+ * sx127X_startLoRaMode - Start the device and set it in LoRa mode
+ * @spi:	spi device to communicate with
+ */
+void
+sx127X_startLoRaMode(struct spi_device *spi) {
+	uint8_t op_mode;
+	uint8_t base_adr;
+
+	/* Get original OP Mode register. */
+	op_mode = sx127X_getMode(spi);
+	printk(KERN_DEBUG "sx127X: the original OP mode is 0x%X\n", op_mode);
+	/* Set device to sleep state. */
+	sx127X_setState(spi, SX127X_SLEEP_MODE);
+	/* Set device to LoRa mode. */
+	op_mode = sx127X_getMode(spi);
+	op_mode = op_mode | 0x80;
+	sx127X_write_reg(spi, SX127X_REG_OP_MODE, &op_mode, 1);
+	/* Set device to standby state. */
+	sx127X_setState(spi, SX127X_STANDBY_MODE);
+	op_mode = sx127X_getMode(spi);
+	printk(KERN_DEBUG "sx127X: the current OP mode is 0x%X\n", op_mode);
+
+	/* Set LoRa in explicit header mode. */
+	sx127X_setLoRaImplicit(spi, 0);
+
+	/* Set chip FIFO RX base. */
+	base_adr = 0x00;
+	printk(KERN_DEBUG "lora-spi: Going to set RX base address\n");
+	sx127X_write_reg(spi, SX127X_REG_FIFO_RX_BASE_ADDR, &base_adr, 1);
+	sx127X_write_reg(spi, SX127X_REG_FIFO_ADDR_PTR, &base_adr, 1);
+
+	/* Clear all of the IRQ flags. */
+	sx127X_clearLoRaAllFlag(spi);
+	/* Set chip to RX continuous state.  The chip start to wait for receiving. */
+	sx127X_setState(spi, SX127X_RXCONTINUOUS_MODE);
+}
+
+/**
+ * init_sx127X - Initial the SX127X device
+ * @spi:	spi device to communicate with
+ */
+int
+init_sx127X(struct spi_device *spi) {
+	char ver[5];
+	printk(KERN_DEBUG "sx127X: init sx127X\n");
+
+	sx127X_readVersion(spi, ver, 4);
+	ver[4] = '\0';
+	printk(KERN_DEBUG "sx127X: chip version %s\n", ver);
+
+	sx127X_startLoRaMode(spi);
+
+	return 0;
 }
