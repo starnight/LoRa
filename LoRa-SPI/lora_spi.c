@@ -24,7 +24,16 @@ static DECLARE_BITMAP(minors, N_LORASPI_MINORS);
 
 static DEFINE_MUTEX(minors_lock);
 
-static ssize_t loraspi_read(struct lora_struct *lrdata, const char __user *buf, size_t size) {
+/**
+ * loraspi_read - Read from the LoRa device's communication
+ * @lrdata:	LoRa device
+ * @arg:	the buffer going to hold the read data in user space
+ * @size:	the length of the buffer in bytes
+ *
+ * Return:	Read how many bytes actually, negative number for error
+ */
+static ssize_t
+loraspi_read(struct lora_struct *lrdata, const char __user *buf, size_t size) {
 	struct spi_device *spi;
 	ssize_t status;
 	int c = 0;
@@ -99,7 +108,16 @@ static ssize_t loraspi_read(struct lora_struct *lrdata, const char __user *buf, 
 	return c;
 }
 
-static ssize_t loraspi_write(struct lora_struct *lrdata, const char __user *buf, size_t size) {
+/**
+ * loraspi_write - Write to the LoRa device's communication
+ * @lrdata:	LoRa device
+ * @arg:	the buffer holding the data going to be written in user space
+ * @size:	the length of the buffer in bytes
+ *
+ * Return:	Write how many bytes actually, negative number for error
+ */
+static ssize_t
+loraspi_write(struct lora_struct *lrdata, const char __user *buf, size_t size) {
 	struct spi_device *spi;
 	ssize_t status;
 	int c;
@@ -176,8 +194,15 @@ static ssize_t loraspi_write(struct lora_struct *lrdata, const char __user *buf,
 	return c;
 }
 
-/* Set & get the state of the LoRa device. */
-long loraspi_setstate(struct lora_struct *lrdata, void __user *arg) {
+/**
+ * loraspi_setstate - Set the state of the LoRa device
+ * @lrdata:	LoRa device
+ * @arg:	the buffer holding the state value in user space
+ *
+ * Return:	0 / other values for success / error
+ */
+static long
+loraspi_setstate(struct lora_struct *lrdata, void __user *arg) {
 	struct spi_device *spi;
 	int status;
 	uint32_t st32;
@@ -207,7 +232,15 @@ long loraspi_setstate(struct lora_struct *lrdata, void __user *arg) {
 	return 0;
 }
 
-long loraspi_getstate(struct lora_struct *lrdata, void __user *arg) {
+/**
+ * loraspi_getstate - Get the state of the LoRa device
+ * @lrdata:	LoRa device
+ * @arg:	the buffer going to hold the state value in user space
+ *
+ * Return:	0 / other values for success / error
+ */
+static long
+loraspi_getstate(struct lora_struct *lrdata, void __user *arg) {
 	struct spi_device *spi;
 	int status;
 	uint32_t st32;
@@ -242,8 +275,15 @@ long loraspi_getstate(struct lora_struct *lrdata, void __user *arg) {
 	return 0;
 }
 
-/* Set & get the carrier frequency. */
-long loraspi_setfreq(struct lora_struct *lrdata, void __user *arg) {
+/**
+ * loraspi_setfreq - Set the carrier frequency
+ * @lrdata:	LoRa device
+ * @arg:	the buffer holding the carrier frequency in user space
+ *
+ * Return:	0 / other values for success / error
+ */
+static long
+loraspi_setfreq(struct lora_struct *lrdata, void __user *arg) {
 	struct spi_device *spi;
 	int status;
 	uint32_t freq;
@@ -260,7 +300,15 @@ long loraspi_setfreq(struct lora_struct *lrdata, void __user *arg) {
 	return 0;
 }
 
-long loraspi_getfreq(struct lora_struct *lrdata, void __user *arg) {
+/**
+ * loraspi_getfreq - Get the carrier frequency
+ * @lrdata:	LoRa device
+ * @arg:	the buffer going to hold the carrier frequency in user space
+ *
+ * Return:	0 / other values for success / error
+ */
+static long
+loraspi_getfreq(struct lora_struct *lrdata, void __user *arg) {
 	struct spi_device *spi;
 	int status;
 	uint32_t freq;
@@ -279,8 +327,15 @@ long loraspi_getfreq(struct lora_struct *lrdata, void __user *arg) {
 	return 0;
 }
 
-/* Set & get the PA power. */
-long loraspi_setpower(struct lora_struct *lrdata, void __user *arg) {
+/**
+ * loraspi_setpower - Set the PA power
+ * @lrdata:	LoRa device
+ * @arg:	the buffer holding the PA output value in user space
+ *
+ * Return:	0 / other values for success / error
+ */
+static long
+loraspi_setpower(struct lora_struct *lrdata, void __user *arg) {
 	struct spi_device *spi;
 	int status;
 	int32_t dbm;
@@ -300,7 +355,15 @@ long loraspi_setpower(struct lora_struct *lrdata, void __user *arg) {
 	return 0;
 }
 
-long loraspi_getpower(struct lora_struct *lrdata, void __user *arg) {
+/**
+ * loraspi_getpower -  Get the PA power
+ * @lrdata:	LoRa device
+ * @arg:	the buffer going to hold the PA output value in user space
+ *
+ * Return:	0 / other values for success / error
+ */
+static long
+loraspi_getpower(struct lora_struct *lrdata, void __user *arg) {
 	struct spi_device *spi;
 	int status;
 	int32_t dbm;
@@ -316,8 +379,15 @@ long loraspi_getpower(struct lora_struct *lrdata, void __user *arg) {
 	return 0;
 }
 
-/* Set & get the RF spreading factor. */
-long loraspi_setsprfactor(struct lora_struct *lrdata, void __user *arg) {
+/**
+ * loraspi_setsprfactor - Set the RF spreading factor
+ * @lrdata:	LoRa device
+ * @arg:	the buffer holding the spreading factor in user space
+ *
+ * Return:	0 / other values for success / error
+ */
+static long
+loraspi_setsprfactor(struct lora_struct *lrdata, void __user *arg) {
 	struct spi_device *spi;
 	int status;
 	uint32_t sprf;
@@ -332,7 +402,15 @@ long loraspi_setsprfactor(struct lora_struct *lrdata, void __user *arg) {
 	return 0;
 }
 
-long loraspi_getsprfactor(struct lora_struct *lrdata, void __user *arg) {
+/**
+ * loraspi_getsprfactor - Get the RF spreading factor
+ * @lrdata:	LoRa device
+ * @arg:	the buffer going to hold the spreading factor in user space
+ *
+ * Return:	0 / other values for success / error
+ */
+static long
+loraspi_getsprfactor(struct lora_struct *lrdata, void __user *arg) {
 	struct spi_device *spi;
 	int status;
 	uint32_t sprf;
@@ -348,8 +426,15 @@ long loraspi_getsprfactor(struct lora_struct *lrdata, void __user *arg) {
 	return 0;
 }
 
-/* Set & get the RF bandwith. */
-long loraspi_setbandwidth(struct lora_struct *lrdata, void __user *arg) {
+/**
+ * loraspi_setbandwidth - Set the RF bandwith
+ * @lrdata:	LoRa device
+ * @arg:	the buffer holding the RF bandwith value in user space
+ *
+ * Return:	0 / other values for success / error
+ */
+static long
+loraspi_setbandwidth(struct lora_struct *lrdata, void __user *arg) {
 	struct spi_device *spi;
 	int status;
 	uint32_t bw;
@@ -364,7 +449,15 @@ long loraspi_setbandwidth(struct lora_struct *lrdata, void __user *arg) {
 	return 0;
 }
 
-long loraspi_getbandwidth(struct lora_struct *lrdata, void __user *arg) {
+/**
+ * loraspi_getbandwidth - Get the RF bandwith
+ * @lrdata:	LoRa device
+ * @arg:	the buffer going to hold the RF bandwith value in user space
+ *
+ * Return:	0 / other values for success / error
+ */
+static long
+loraspi_getbandwidth(struct lora_struct *lrdata, void __user *arg) {
 	struct spi_device *spi;
 	int status;
 	uint32_t bw;
@@ -380,8 +473,15 @@ long loraspi_getbandwidth(struct lora_struct *lrdata, void __user *arg) {
 	return 0;
 }
 
-/* Get current RSSI. */
-long loraspi_getrssi(struct lora_struct *lrdata, void __user *arg) {
+/**
+ * loraspi_getrssi - Get current RSSI
+ * @lrdata:	LoRa device
+ * @arg:	the buffer going to hold the RSSI value in user space
+ *
+ * Return:	0 / other values for success / error
+ */
+static long
+loraspi_getrssi(struct lora_struct *lrdata, void __user *arg) {
 	struct spi_device *spi;
 	int status;
 	int32_t rssi;
@@ -397,8 +497,15 @@ long loraspi_getrssi(struct lora_struct *lrdata, void __user *arg) {
 	return 0;
 }
 
-/* Get last packet's SNR. */
-long loraspi_getsnr(struct lora_struct *lrdata, void __user *arg) {
+/**
+ * loraspi_getsnr - Get last packet's SNR
+ * @lrdata:	LoRa device
+ * @arg:	the buffer going to hold the SNR value in user space
+ *
+ * Return:	0 / other values for success / error
+ */
+static long
+loraspi_getsnr(struct lora_struct *lrdata, void __user *arg) {
 	struct spi_device *spi;
 	int status;
 	uint32_t snr;
@@ -414,8 +521,14 @@ long loraspi_getsnr(struct lora_struct *lrdata, void __user *arg) {
 	return 0;
 }
 
-/* Is ready to write & read. */
-long loraspi_ready2write(struct lora_struct *lrdata) {
+/**
+ * loraspi_ready2write - Is ready to be written
+ * @lrdata:	LoRa device
+ *
+ * Return:	1 / 0 for ready / not ready
+ */
+static long
+loraspi_ready2write(struct lora_struct *lrdata) {
 	long ret;
 
 	/* Mutex is not lock, than it is not writing. */
@@ -424,7 +537,14 @@ long loraspi_ready2write(struct lora_struct *lrdata) {
 	return ret;
 }
 
-long loraspi_ready2read(struct lora_struct *lrdata) {
+/**
+ * loraspi_ready2read - Is ready to be read
+ * @lrdata:	LoRa device
+ *
+ * Return:	1 / 0 for ready / not ready
+ */
+static long
+loraspi_ready2read(struct lora_struct *lrdata) {
 	struct spi_device *spi;
 	long ret;
 
@@ -618,7 +738,7 @@ static struct spi_driver lora_spi_driver = {
 };
 
 
-/* UseExample kernel module's initial function. */
+/* LoRa-SPI kernel module's initial function. */
 static int loraspi_init(void) {
 	int status;
 	
@@ -633,7 +753,7 @@ static int loraspi_init(void) {
 	return status;
 }
 
-/* UseExample kernel module's exit function. */
+/* LoRa-SPI kernel module's exit function. */
 static void loraspi_exit(void) {
 	printk(KERN_DEBUG "lora-spi: exit\n");
 
