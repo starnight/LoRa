@@ -98,9 +98,6 @@ int
 sx127X_write_reg(struct spi_device *spi, uint8_t start_adr, uint8_t *buf, size_t len);
 
 void
-sx127X_restart(struct spi_device *spi);
-
-void
 sx127X_startLoRaMode(struct spi_device *spi);
 
 uint8_t 

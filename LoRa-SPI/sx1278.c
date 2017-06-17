@@ -114,13 +114,6 @@ sx127X_write_reg(struct spi_device *spi, uint8_t start_adr, uint8_t *buf, size_t
 /*------------------------------ LoRa Functions ------------------------------*/
 
 /**
- * sx127X_restart - Reset the device (not used for now)
- * @spi:	spi device to communicate with
- */
-void
-sx127X_restart(struct spi_device *spi) {}
-
-/**
  * sx127X_readVersion - Get LoRa device's chip version
  * @spi:	spi device to communicate with
  * @vstr:	the buffer going to hold the chip's version string
