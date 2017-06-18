@@ -23,7 +23,7 @@ static int file_open(struct inode *inode, struct file *filp) {
 	struct lora_struct *lrdata;
 	int status = -ENXIO;
 
-	printk(KERN_DEBUG "lora: open\n");
+	pr_debug("lora: open\n");
 	
 	mutex_lock(&device_list_lock);
 	/* Use device_entry to find the lora date with matched dev_t in inode. */
@@ -43,7 +43,7 @@ static int file_open(struct inode *inode, struct file *filp) {
 	if(!(lrdata->rx_buf)) {
 		lrdata->rx_buf = kzalloc(LORA_BUFLEN, GFP_KERNEL);
 		if(!(lrdata->rx_buf)) {
-			pr_debug("lora: no more memory\n");
+			pr_err("lora: no more memory\n");
 			status = -ENOMEM;
 			goto err_find_dev;
 		}
@@ -51,7 +51,7 @@ static int file_open(struct inode *inode, struct file *filp) {
 	if(!(lrdata->tx_buf)) {
 		lrdata->tx_buf = kzalloc(LORA_BUFLEN, GFP_KERNEL);
 		if(!(lrdata->tx_buf)) {
-			pr_debug("lora: no more memory\n");
+			pr_err("lora: no more memory\n");
 			status = -ENOMEM;
 			goto err_alloc_tx_buf;
 		}
@@ -81,7 +81,7 @@ err_find_dev:
 static int file_close(struct inode *inode, struct file *filp) {
 	struct lora_struct *lrdata;
 	
-	printk(KERN_DEBUG "lora: close\n");
+	pr_debug("lora: close\n");
 	
 	lrdata = filp->private_data;
 
@@ -106,7 +106,7 @@ static int file_close(struct inode *inode, struct file *filp) {
 static ssize_t file_read(struct file *filp, char __user *buf, size_t size, loff_t *f_pos) {
 	struct lora_struct *lrdata;
 
-	printk(KERN_DEBUG "lora: read (size=%zu)\n", size);
+	pr_debug("lora: read (size=%zu)\n", size);
 
 	lrdata = filp->private_data;
 
@@ -119,7 +119,7 @@ static ssize_t file_read(struct file *filp, char __user *buf, size_t size, loff_
 static ssize_t file_write(struct file *filp, const char __user *buf, size_t size, loff_t *f_pos) {
 	struct lora_struct *lrdata;
 
-	printk(KERN_DEBUG "lora: write (size=%zu)\n", size);
+	pr_debug(KERN_DEBUG "lora: write (size=%zu)\n", size);
 
 	lrdata = filp->private_data;
 
@@ -207,7 +207,7 @@ static unsigned int file_poll(struct file *filp, poll_table *wait) {
 	struct lora_struct *lrdata;
 	unsigned int mask;
 
-	printk(KERN_DEBUG "lora: poll\n");
+	pr_debug("lora: poll\n");
 
 	lrdata = filp->private_data;
 	if(lrdata == NULL)
@@ -265,7 +265,7 @@ static int lora_register_driver(struct lora_driver *driver) {
 	dev_t dev;
 	int alloc_ret, cdev_err;
 
-	printk(KERN_DEBUG "lora: register %s\n", driver->name);
+	pr_debug("lora: register %s\n", driver->name);
 
 	/* Allocate a character device. */
 	alloc_ret = alloc_chrdev_region(&dev,
@@ -273,7 +273,7 @@ static int lora_register_driver(struct lora_driver *driver) {
 					driver->num,
 					driver->name);
 	if(alloc_ret) {
-		printk(KERN_DEBUG "lora: Failed to allocate a character device\n");
+		pr_err("lora: Failed to allocate a character device\n");
 		return alloc_ret;
 	}
 	/* Initial the character device driver. */
@@ -283,19 +283,19 @@ static int lora_register_driver(struct lora_driver *driver) {
 	/* Add the character device driver into system. */
 	cdev_err = cdev_add(&(driver->lora_cdev), dev, driver->num);
 	if(cdev_err) {
-		printk(KERN_DEBUG "lora: Failed to register a character device\n");
+		pr_err("lora: Failed to register a character device\n");
 		/* Release the allocated character device. */
 		if(alloc_ret == 0) {
 			unregister_chrdev_region(dev, driver->num);
 		}
 		return cdev_err;
 	}
-	printk(KERN_DEBUG "lora: %s driver(major %d) installed.\n", driver->name, driver->major);
+	pr_debug("lora: %s driver(major %d) installed.\n", driver->name, driver->major);
 
 	/* Create device class. */
 	driver->lora_class = class_create(driver->owner, driver->name);
 	if(IS_ERR(driver->lora_class)) {
-		printk(KERN_DEBUG "lora: Failed to create a class of device.\n");
+		pr_err("lora: Failed to create a class of device.\n");
 		/* Release the added character device. */
 		if(cdev_err == 0)
 			cdev_del(&(driver->lora_cdev));
@@ -304,7 +304,7 @@ static int lora_register_driver(struct lora_driver *driver) {
 			unregister_chrdev_region(dev, driver->num);
 		return -1;
 	}
-	printk(KERN_DEBUG "lora: %s class created.\n", driver->name);
+	pr_debug("lora: %s class created.\n", driver->name);
 
 	return 0;
 }
@@ -314,14 +314,14 @@ EXPORT_SYMBOL(lora_register_driver);
 static int lora_unregister_driver(struct lora_driver *driver) {
 	dev_t dev = MKDEV(driver->major, driver->minor_start);
 	
-	printk(KERN_DEBUG "lora: unregister %s\n", driver->name);
+	pr_debug("lora: unregister %s\n", driver->name);
 	/* Delete device class. */
 	class_destroy(driver->lora_class);
 	/* Delete the character device driver from system. */
 	cdev_del(&(driver->lora_cdev));
 	/* Unregister the allocated character device. */
 	unregister_chrdev_region(dev, driver->num);
-	printk(KERN_DEBUG "lora: %s driver removed.\n", driver->name);
+	pr_debug("lora: %s driver removed.\n", driver->name);
 
 	return 0;
 }

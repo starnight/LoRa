@@ -43,8 +43,7 @@ loraspi_read(struct lora_struct *lrdata, const char __user *buf, size_t size) {
 	uint32_t timeout;
 
 	spi = lrdata->lora_device;
-	printk(KERN_DEBUG "lora-spi: SPI device #%d.%d read\n",
-		   spi->master->bus_num, spi->chip_select);
+	dev_dbg(&(spi->dev), "Read %zu bytes into user space\n", size);
 
 	mutex_lock(&(lrdata->buf_lock));
 	/* Get chip's current state. */
@@ -53,12 +52,12 @@ loraspi_read(struct lora_struct *lrdata, const char __user *buf, size_t size) {
 	/*  Prepare and set the chip to RX continuous mode, if it is not. */
 	if(st != SX127X_RXCONTINUOUS_MODE) {
 		/* Set chip to standby state. */
-		printk(KERN_DEBUG "lora-spi: Going to set standby state\n");
+		dev_dbg(&(spi->dev), "Going to set standby state\n");
 		sx127X_setState(spi, SX127X_STANDBY_MODE);
 
 		/* Set chip FIFO RX base. */
 		base_adr = 0x00;
-		printk(KERN_DEBUG "lora-spi: Going to set RX base address\n");
+		dev_dbg(&(spi->dev), "Going to set RX base address\n");
 		sx127X_write_reg(spi, SX127X_REG_FIFO_RX_BASE_ADDR, &base_adr, 1);
 
 		/* Set chip wait for LoRa timeout time. */
@@ -75,7 +74,6 @@ loraspi_read(struct lora_struct *lrdata, const char __user *buf, size_t size) {
 					SX127X_FLAG_RXTIMEOUT |
 					SX127X_FLAG_RXDONE |
 					SX127X_FLAG_PAYLOADCRCERROR);
-		//printk(KERN_DEBUG "lora-spi: LoRa flag in receiving is %X\n", flag);
 		if(flag == 0) msleep(20);
 		else break;
 	}
@@ -126,8 +124,7 @@ loraspi_write(struct lora_struct *lrdata, const char __user *buf, size_t size) {
 	uint32_t timeout;
 
 	spi = lrdata->lora_device;
-	printk(KERN_DEBUG "lora-spi: SPI device #%d.%d write %u bytes from user space\n",
-		spi->master->bus_num, spi->chip_select, size);
+	dev_dbg(&(spi->dev), "Write %zu bytes from user space\n", size);
 
 	mutex_lock(&(lrdata->buf_lock));
 	memset(lrdata->tx_buf, 0, lrdata->bufmaxlen);
@@ -139,12 +136,12 @@ loraspi_write(struct lora_struct *lrdata, const char __user *buf, size_t size) {
 	lrdata->tx_buflen = size - status;
 
 	/* Set chip to standby state. */
-	printk(KERN_DEBUG "lora-spi: Going to set standby state\n");
+	dev_dbg(&(spi->dev), "Going to set standby state\n");
 	sx127X_setState(spi, SX127X_STANDBY_MODE);
 
 	/* Set chip FIFO TX base. */
 	base_adr = 0x80;
-	printk(KERN_DEBUG "lora-spi: Going to set TX base address\n");
+	dev_dbg(&(spi->dev), "Going to set TX base address\n");
 	sx127X_write_reg(spi, SX127X_REG_FIFO_TX_BASE_ADDR, &base_adr, 1);
 
 	/* Write to SPI chip synchronously to fill the FIFO of the chip. */
@@ -152,28 +149,26 @@ loraspi_write(struct lora_struct *lrdata, const char __user *buf, size_t size) {
 
 	/* Clear LoRa IRQ TX flag. */
 	sx127X_clearLoRaFlag(spi, SX127X_FLAG_TXDONE);
-	printk(KERN_DEBUG "lora-spi: IRQ flags' state: 0x%X\n", sx127X_getLoRaAllFlag(spi));
 
 	if(c > 0) {
 		/* Set chip to transmit(TX) state to send the data in FIFO to RF. */
-		printk(KERN_DEBUG "lora-spi: set TX state\n");
+		dev_dbg(&(spi->dev), "Set TX state\n");
 		sx127X_setState(spi, SX127X_TX_MODE);
 
 		timeout = (c + sx127X_getLoRaPreambleLen(spi) + 1) + 2;
-		printk(KERN_DEBUG "lora-spi: the time out is %d us", timeout * 1000);
+		dev_dbg(&(spi->dev), "The time out is %u us", timeout * 1000);
 
 		/* Wait until TX is finished by checking the TX flag. */
 		for(flag = 0; timeout > 0; timeout--) {
 			flag = sx127X_getLoRaAllFlag(spi);
-			//printk(KERN_DEBUG "lora-spi: wait TX flag is %X\n", flag);
 			if((flag & SX127X_FLAG_TXDONE) != 0) {
-				printk(KERN_DEBUG "lora-spi: wait TX is finished\n");
+				dev_dbg(&(spi->dev), "Wait TX is finished\n");
 				break;
 			}
 			else {
 				if(timeout == 1) {
 					c = 0;
-					printk(KERN_DEBUG "lora-spi: wait TX is time out\n");
+					dev_dbg(&(spi->dev), "Wait TX is time out\n");
 				}
 				else {
 					msleep(20);
@@ -183,7 +178,7 @@ loraspi_write(struct lora_struct *lrdata, const char __user *buf, size_t size) {
 	}
 
 	/* Set chip to RX continuous state. */
-	printk(KERN_DEBUG "lora-spi: set back to RX continuous state\n");
+	dev_dbg(&(spi->dev), "Set back to RX continuous state\n");
 	sx127X_setState(spi, SX127X_STANDBY_MODE);
 	sx127X_setState(spi, SX127X_RXCONTINUOUS_MODE);
 
@@ -290,8 +285,7 @@ loraspi_setfreq(struct lora_struct *lrdata, void __user *arg) {
 
 	spi = lrdata->lora_device;
 	status = copy_from_user(&freq, arg, sizeof(uint32_t));
-	printk(KERN_DEBUG "lora-spi: SPI device #%d.%d set frequency %u Hz from user space\n",
-		spi->master->bus_num, spi->chip_select, freq);
+	dev_dbg(&(spi->dev), "Set frequency %u Hz from user space\n", freq);
 
 	mutex_lock(&(lrdata->buf_lock));
 	sx127X_setLoRaFreq(spi, freq);
@@ -314,13 +308,12 @@ loraspi_getfreq(struct lora_struct *lrdata, void __user *arg) {
 	uint32_t freq;
 
 	spi = lrdata->lora_device;
-	printk(KERN_DEBUG "lora-spi: SPI device #%d.%d get frequency to user space\n",
-		spi->master->bus_num, spi->chip_select);
+	dev_dbg(&(spi->dev), "Get frequency to user space\n");
 
 	mutex_lock(&(lrdata->buf_lock));
 	freq = sx127X_getLoRaFreq(spi);
 	mutex_unlock(&(lrdata->buf_lock));
-	printk(KERN_DEBUG "lora-spi: the carrier freq is %u Hz\n", freq);
+	dev_dbg(&(spi->dev), "The carrier freq is %u Hz\n", freq);
 
 	status = copy_to_user(arg, &freq, sizeof(uint32_t));
 
@@ -622,7 +615,8 @@ static void loraspi_probe_acpi(struct spi_device *spi) {
 		return;
 
 	if(id->driver_data == LORA_ACPI_DUMMY)
-		dev_warn(&(spi->dev), "do not use this driver in produciton systems.\n");
+		dev_warn(&(spi->dev),
+			"Do not use this driver in produciton systems.\n");
 }
 #else
 static void loraspi_probe_acpi(struct spi_device *spi) {};
@@ -642,8 +636,7 @@ static int loraspi_probe(struct spi_device *spi) {
 	unsigned long minor;
 	int status;
 
-	printk(KERN_DEBUG "lora-spi: probe a SPI device with address %d.%d\n",
-		spi->master->bus_num, spi->chip_select);
+	dev_info(&(spi->dev), "probe a LoRa SPI device\n");
 
 #ifdef CONFIG_OF
 	if(spi->dev.of_node && !of_match_device(lora_dt_ids, &(spi->dev))) {
@@ -698,8 +691,7 @@ static int loraspi_probe(struct spi_device *spi) {
 static int loraspi_remove(struct spi_device *spi) {
 	struct lora_struct *lrdata;
 	
-	printk(KERN_DEBUG "lora-spi: remove a SPI device with address %d.%d",
-		spi->master->bus_num, spi->chip_select);
+	dev_info(&(spi->dev), "remove a LoRa SPI device");
 
 	lrdata = spi_get_drvdata(spi);
 
@@ -742,7 +734,7 @@ static struct spi_driver lora_spi_driver = {
 static int loraspi_init(void) {
 	int status;
 	
-	printk(KERN_DEBUG "lora-spi: init SX1278 compatible kernel module\n");
+	pr_debug("lora-spi: init SX1278 compatible kernel module\n");
 	
 	/* Register a kind of LoRa driver. */
 	lora_register_driver(&lr_driver);
@@ -755,7 +747,7 @@ static int loraspi_init(void) {
 
 /* LoRa-SPI kernel module's exit function. */
 static void loraspi_exit(void) {
-	printk(KERN_DEBUG "lora-spi: exit\n");
+	pr_debug("lora-spi: exit\n");
 
 	/* Unregister the LoRa SPI driver. */
 	spi_unregister_driver(&lora_spi_driver);

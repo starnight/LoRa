@@ -615,21 +615,17 @@ sx127X_sendLoRaData(struct spi_device *spi, uint8_t *buf, size_t len) {
 	ssize_t c;
 
 	/* Set chip FIFO pointer to FIFO TX base. */
-	//printk(KERN_DEBUG "lora-spi: Going to get TX base address\n");
 	sx127X_read_reg(spi, SX127X_REG_FIFO_TX_BASE_ADDR, &base_adr, 1);
-	//printk(KERN_DEBUG "lora-spi: Going to set FIFO pointer to TX base address 0x%X\n", base_adr);
 	sx127X_write_reg(spi, SX127X_REG_FIFO_ADDR_PTR, &base_adr, 1);
 
 #define SX127X_MAX_FIFO_LENGTH	0xFF
 	blen = (len < SX127X_MAX_FIFO_LENGTH) ? len : SX127X_MAX_FIFO_LENGTH;
 
 	/* Write to SPI chip synchronously to fill the FIFO of the chip. */
-	//printk(KERN_DEBUG "lora-spi: write %d bytes to chip\n", blen);
 	c = sx127X_write_reg(spi, SX127X_REG_FIFO, buf, blen);
 
 	/* Set the FIFO payload length. */
 	blen = c;
-	//printk(KERN_DEBUG "lora-spi: set payload length %d\n", blen);
 	sx127X_write_reg(spi, SX127X_REG_PAYLOAD_LENGTH, &blen, 1);
 
 	return c;
@@ -765,7 +761,7 @@ sx127X_startLoRaMode(struct spi_device *spi) {
 
 	/* Get original OP Mode register. */
 	op_mode = sx127X_getMode(spi);
-	printk(KERN_DEBUG "sx127X: the original OP mode is 0x%X\n", op_mode);
+	dev_dbg(&(spi->dev), "the original OP mode is 0x%X\n", op_mode);
 	/* Set device to sleep state. */
 	sx127X_setState(spi, SX127X_SLEEP_MODE);
 	/* Set device to LoRa mode. */
@@ -775,14 +771,14 @@ sx127X_startLoRaMode(struct spi_device *spi) {
 	/* Set device to standby state. */
 	sx127X_setState(spi, SX127X_STANDBY_MODE);
 	op_mode = sx127X_getMode(spi);
-	printk(KERN_DEBUG "sx127X: the current OP mode is 0x%X\n", op_mode);
+	dev_dbg(&(spi->dev), "the current OP mode is 0x%X\n", op_mode);
 
 	/* Set LoRa in explicit header mode. */
 	sx127X_setLoRaImplicit(spi, 0);
 
 	/* Set chip FIFO RX base. */
 	base_adr = 0x00;
-	printk(KERN_DEBUG "lora-spi: Going to set RX base address\n");
+	dev_dbg(&(spi->dev), "going to set RX base address\n");
 	sx127X_write_reg(spi, SX127X_REG_FIFO_RX_BASE_ADDR, &base_adr, 1);
 	sx127X_write_reg(spi, SX127X_REG_FIFO_ADDR_PTR, &base_adr, 1);
 
@@ -799,11 +795,11 @@ sx127X_startLoRaMode(struct spi_device *spi) {
 int
 init_sx127X(struct spi_device *spi) {
 	char ver[5];
-	printk(KERN_DEBUG "sx127X: init sx127X\n");
+	dev_dbg(&(spi->dev), "init sx127X\n");
 
 	sx127X_readVersion(spi, ver, 4);
 	ver[4] = '\0';
-	printk(KERN_DEBUG "sx127X: chip version %s\n", ver);
+	dev_dbg(&(spi->dev), "chip version %s\n", ver);
 
 	sx127X_startLoRaMode(spi);
 
