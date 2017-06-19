@@ -1,7 +1,7 @@
-#ifndef __USE_EXAMPLE_H__
-#define __USE_EXAMPLE_H__
+#ifndef __LORA_SPI_H__
+#define __LORA_SPI_H__
 
-#include "../LoRa/lora.h"
+#include "lora.h"
 
 extern int lora_device_add(struct lora_struct *);
 extern int lora_device_remove(struct lora_struct *);
