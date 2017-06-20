@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2017 Jian Hong, Pan <starnight@g.ncu.edu.tw>
+ * Copyright (c) 2017 Jian-Hong, Pan <starnight@g.ncu.edu.tw>
  *
  * All rights reserved.
  *

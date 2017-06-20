@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2017 Jian Hong, Pan <starnight@g.ncu.edu.tw>
+ * Copyright (c) 2017 Jian-Hong, Pan <starnight@g.ncu.edu.tw>
  *
  * All rights reserved.
  *
@@ -630,10 +630,8 @@ sx127X_readLoRaData(struct spi_device *spi, uint8_t *buf, size_t len) {
 	sx127X_read_reg(spi, SX127X_REG_RX_NB_BYTES, &blen, 1);
 
 	len = (blen < len) ? blen : len;
-	//printk(KERN_DEBUG "sx127X: going to read %d bytes from RX FIFO\n", len);
 	/* Read LoRa packet payload. */
 	c = sx127X_read_reg(spi, SX127X_REG_FIFO, buf, len);
-	//printk(KERN_DEBUG "sx127X: c in read LoRa data is %d\n", c);
 
 	return c;
 }

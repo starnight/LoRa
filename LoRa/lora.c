@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2017 Jian Hong, Pan <starnight@g.ncu.edu.tw>
+ * Copyright (c) 2017 Jian-Hong, Pan <starnight@g.ncu.edu.tw>
  *
  * All rights reserved.
  *
@@ -179,63 +179,63 @@ static long file_ioctl(struct file *filp, unsigned int cmd, unsigned long arg) {
 
 	/* I/O control by each command. */
 	switch(cmd) {
-		/* Set & read the state of the LoRa device. */
-		case LORA_SET_STATE:
-			if(lrdata->ops->setState != NULL)
-				ret = lrdata->ops->setState(lrdata, pval);
-			break;
-		case LORA_GET_STATE:
-			if(lrdata->ops->getState != NULL)
-				ret = lrdata->ops->getState(lrdata, pval);
-			break;
-		/* Set & get the carrier frequency. */
-		case LORA_SET_FREQUENCY:
-			if(lrdata->ops->setFreq != NULL)
-				ret = lrdata->ops->setFreq(lrdata, pval);
-			break;
-		case LORA_GET_FREQUENCY:
-			if(lrdata->ops->getFreq != NULL)
-				ret = lrdata->ops->getFreq(lrdata, pval);
-			break;
-		/* Set & get the PA power. */
-		case LORA_SET_POWER:
-			if(lrdata->ops->setPower != NULL)
-				ret = lrdata->ops->setPower(lrdata, pval);
-			break;
-		case LORA_GET_POWER:
-			if(lrdata->ops->getPower != NULL)
-				ret = lrdata->ops->getPower(lrdata, pval);
-			break;
-		/* Set & get the RF spreading factor. */
-		case LORA_SET_SPRFACTOR:
-			if(lrdata->ops->setSPRFactor != NULL)
-				ret = lrdata->ops->setSPRFactor(lrdata, pval);
-			break;
-		case LORA_GET_SPRFACTOR:
-			if(lrdata->ops->getSPRFactor != NULL)
-				ret = lrdata->ops->getSPRFactor(lrdata, pval);
-			break;
-		/* Set & get the RF bandwith. */
-		case LORA_SET_BANDWIDTH:
-			if(lrdata->ops->setBW != NULL)
-				ret = lrdata->ops->setBW(lrdata, pval);
-			break;
-		case LORA_GET_BANDWIDTH:
-			if(lrdata->ops->getBW != NULL)
-				ret = lrdata->ops->getBW(lrdata, pval);
-			break;
-		/* Get current RSSI. */
-		case LORA_GET_RSSI:
-			if(lrdata->ops->getRSSI != NULL)
-				ret = lrdata->ops->getRSSI(lrdata, pval);
-			break;
-		/* Get last packet's SNR. */
-		case LORA_GET_SNR:
-			if(lrdata->ops->getSNR != NULL)
-				ret = lrdata->ops->getSNR(lrdata, pval);
-			break;
-		default:
-			ret = -ENOTTY;
+	/* Set & read the state of the LoRa device. */
+	case LORA_SET_STATE:
+		if(lrdata->ops->setState != NULL)
+			ret = lrdata->ops->setState(lrdata, pval);
+		break;
+	case LORA_GET_STATE:
+		if(lrdata->ops->getState != NULL)
+			ret = lrdata->ops->getState(lrdata, pval);
+		break;
+	/* Set & get the carrier frequency. */
+	case LORA_SET_FREQUENCY:
+		if(lrdata->ops->setFreq != NULL)
+			ret = lrdata->ops->setFreq(lrdata, pval);
+		break;
+	case LORA_GET_FREQUENCY:
+		if(lrdata->ops->getFreq != NULL)
+			ret = lrdata->ops->getFreq(lrdata, pval);
+		break;
+	/* Set & get the PA power. */
+	case LORA_SET_POWER:
+		if(lrdata->ops->setPower != NULL)
+			ret = lrdata->ops->setPower(lrdata, pval);
+		break;
+	case LORA_GET_POWER:
+		if(lrdata->ops->getPower != NULL)
+			ret = lrdata->ops->getPower(lrdata, pval);
+		break;
+	/* Set & get the RF spreading factor. */
+	case LORA_SET_SPRFACTOR:
+		if(lrdata->ops->setSPRFactor != NULL)
+			ret = lrdata->ops->setSPRFactor(lrdata, pval);
+		break;
+	case LORA_GET_SPRFACTOR:
+		if(lrdata->ops->getSPRFactor != NULL)
+			ret = lrdata->ops->getSPRFactor(lrdata, pval);
+		break;
+	/* Set & get the RF bandwith. */
+	case LORA_SET_BANDWIDTH:
+		if(lrdata->ops->setBW != NULL)
+			ret = lrdata->ops->setBW(lrdata, pval);
+		break;
+	case LORA_GET_BANDWIDTH:
+		if(lrdata->ops->getBW != NULL)
+			ret = lrdata->ops->getBW(lrdata, pval);
+		break;
+	/* Get current RSSI. */
+	case LORA_GET_RSSI:
+		if(lrdata->ops->getRSSI != NULL)
+			ret = lrdata->ops->getRSSI(lrdata, pval);
+		break;
+	/* Get last packet's SNR. */
+	case LORA_GET_SNR:
+		if(lrdata->ops->getSNR != NULL)
+			ret = lrdata->ops->getSNR(lrdata, pval);
+		break;
+	default:
+		ret = -ENOTTY;
 	}
 
 	return ret;
@@ -328,12 +328,13 @@ static int lora_register_driver(struct lora_driver *driver) {
 		}
 		return cdev_err;
 	}
-	pr_debug("lora: %s driver(major %d) installed.\n", driver->name, driver->major);
+	pr_debug("lora: %s driver(major %d) installed\n",
+			driver->name, driver->major);
 
 	/* Create device class. */
 	driver->lora_class = class_create(driver->owner, driver->name);
 	if(IS_ERR(driver->lora_class)) {
-		pr_err("lora: Failed to create a class of device.\n");
+		pr_err("lora: Failed to create a class of device\n");
 		/* Release the added character device. */
 		if(cdev_err == 0)
 			cdev_del(&(driver->lora_cdev));
@@ -342,7 +343,7 @@ static int lora_register_driver(struct lora_driver *driver) {
 			unregister_chrdev_region(dev, driver->num);
 		return -1;
 	}
-	pr_debug("lora: %s class created.\n", driver->name);
+	pr_debug("lora: %s class created\n", driver->name);
 
 	return 0;
 }
@@ -359,12 +360,12 @@ static int lora_unregister_driver(struct lora_driver *driver) {
 	cdev_del(&(driver->lora_cdev));
 	/* Unregister the allocated character device. */
 	unregister_chrdev_region(dev, driver->num);
-	pr_debug("lora: %s driver removed.\n", driver->name);
+	pr_debug("lora: %s driver removed\n", driver->name);
 
 	return 0;
 }
 EXPORT_SYMBOL(lora_unregister_driver);
 
-MODULE_AUTHOR("Jian Hong Pan, <starnight@g.ncu.edu.tw>");
+MODULE_AUTHOR("Jian-Hong Pan, <starnight@g.ncu.edu.tw>");
 MODULE_DESCRIPTION("User mode LoRa device interface");
 MODULE_LICENSE("Dual BSD/GPL");

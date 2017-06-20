@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2017 Jian Hong, Pan <starnight@g.ncu.edu.tw>
+ * Copyright (c) 2017 Jian-Hong, Pan <starnight@g.ncu.edu.tw>
  *
  * All rights reserved.
  *
@@ -244,18 +244,18 @@ loraspi_setstate(struct lora_struct *lrdata, void __user *arg) {
 	spi = lrdata->lora_device;
 	status = copy_from_user(&st32, arg, sizeof(uint32_t));
 	switch(st32) {
-		case LORA_STATE_SLEEP:
-			st = SX127X_SLEEP_MODE;		break;
-		case LORA_STATE_STANDBY:
-			st = SX127X_STANDBY_MODE;	break;
-		case LORA_STATE_TX:
-			st = SX127X_TX_MODE;		break;
-		case LORA_STATE_RX:
-			st = SX127X_RXCONTINUOUS_MODE;	break;
-		case LORA_STATE_CAD:
-			st = SX127X_CAD_MODE;		break;
-		default:
-			st = SX127X_STANDBY_MODE;
+	case LORA_STATE_SLEEP:
+		st = SX127X_SLEEP_MODE;		break;
+	case LORA_STATE_STANDBY:
+		st = SX127X_STANDBY_MODE;	break;
+	case LORA_STATE_TX:
+		st = SX127X_TX_MODE;		break;
+	case LORA_STATE_RX:
+		st = SX127X_RXCONTINUOUS_MODE;	break;
+	case LORA_STATE_CAD:
+		st = SX127X_CAD_MODE;		break;
+	default:
+		st = SX127X_STANDBY_MODE;
 	}
 
 	mutex_lock(&(lrdata->buf_lock));
@@ -287,21 +287,21 @@ loraspi_getstate(struct lora_struct *lrdata, void __user *arg) {
 
 	st32 = st;
 	switch(st) {
-		case SX127X_SLEEP_MODE:
-			st32 = LORA_STATE_SLEEP;	break;
-		case SX127X_STANDBY_MODE:
-			st32 = LORA_STATE_STANDBY;	break;
-		case SX127X_FSTX_MODE:
-		case SX127X_TX_MODE:
-			st32 = LORA_STATE_TX;		break;
-		case SX127X_FSRX_MODE:
-		case SX127X_RXSINGLE_MODE:
-		case SX127X_RXCONTINUOUS_MODE:
-			st32 = LORA_STATE_RX;		break;
-		case SX127X_CAD_MODE:
-			st32 = LORA_STATE_CAD;		break;
-		default:
-			st32 = LORA_STATE_SLEEP;
+	case SX127X_SLEEP_MODE:
+		st32 = LORA_STATE_SLEEP;	break;
+	case SX127X_STANDBY_MODE:
+		st32 = LORA_STATE_STANDBY;	break;
+	case SX127X_FSTX_MODE:
+	case SX127X_TX_MODE:
+		st32 = LORA_STATE_TX;		break;
+	case SX127X_FSRX_MODE:
+	case SX127X_RXSINGLE_MODE:
+	case SX127X_RXCONTINUOUS_MODE:
+		st32 = LORA_STATE_RX;		break;
+	case SX127X_CAD_MODE:
+		st32 = LORA_STATE_CAD;		break;
+	default:
+		st32 = LORA_STATE_SLEEP;
 	}
 	status = copy_to_user(arg, &st32, sizeof(uint32_t));
 
@@ -796,6 +796,6 @@ static void loraspi_exit(void) {
 module_init(loraspi_init);
 module_exit(loraspi_exit);
 
-MODULE_AUTHOR("Jian Hong Pan, <starnight@g.ncu.edu.tw>");
+MODULE_AUTHOR("Jian-Hong Pan, <starnight@g.ncu.edu.tw>");
 MODULE_DESCRIPTION("LoRa device kernel module with SPI interface");
 MODULE_LICENSE("Dual BSD/GPL");
