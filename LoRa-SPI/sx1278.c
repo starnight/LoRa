@@ -77,14 +77,14 @@ sx127X_sync(struct spi_device *spi, struct spi_message *m) {
 /**
  * sx127X_read_reg - Build SPI read message and read from the SPI device
  * @spi:	spi device to communicate with
- * @start_adr:	the register's start address which is going to be read from
+ * @adr:	the register's start address which is going to be read from
  * @buf:	the buffer going to be read into, from the registers
  * @len:	the length of the buffer in bytes
  *
  * Return:	How many bytes has been read, -1 for failed
  */
 int
-sx127X_read_reg(struct spi_device *spi, uint8_t start_adr, uint8_t *buf, size_t len) {
+sx127X_read_reg(struct spi_device *spi, uint8_t adr, void *buf, size_t len) {
 	int status = 0;
 	struct spi_transfer at, bt;
 	struct spi_message m;
@@ -93,7 +93,7 @@ sx127X_read_reg(struct spi_device *spi, uint8_t start_adr, uint8_t *buf, size_t 
 
 	/* Read address.  The MSB must be 0 because of reading an address. */
 	memset(&at, 0, sizeof(at));
-	at.tx_buf = &start_adr;
+	at.tx_buf = &adr;
 	at.len = 1;
 	spi_message_add_tail(&at, &m);
 
@@ -114,14 +114,14 @@ sx127X_read_reg(struct spi_device *spi, uint8_t start_adr, uint8_t *buf, size_t 
 /**
  * sx127X_write_reg - Build SPI write message and write into the SPI device
  * @spi:	spi device to communicate with
- * @start_adr:	the register's start address which is going to be written into
+ * @adr:	the register's start address which is going to be written into
  * @buf:	the buffer going to be written into the registers
  * @len:	the length of the buffer in bytes
  *
  * Return:	How many bytes has been written, -1 for failed
  */
 int
-sx127X_write_reg(struct spi_device *spi, uint8_t start_adr, uint8_t *buf, size_t len) {
+sx127X_write_reg(struct spi_device *spi, uint8_t adr, void *buf, size_t len) {
 	int status = 0;
 	struct spi_transfer at, bt;
 	struct spi_message m;
@@ -129,9 +129,9 @@ sx127X_write_reg(struct spi_device *spi, uint8_t start_adr, uint8_t *buf, size_t
 	spi_message_init(&m);
 
 	/* Write address.  The MSB must be 1 because of writing an address. */
-	start_adr |= 0x80;
+	adr |= 0x80;
 	memset(&at, 0, sizeof(at));
-	at.tx_buf = &start_adr;
+	at.tx_buf = &adr;
 	at.len = 1;
 	spi_message_add_tail(&at, &m);
 

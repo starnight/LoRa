@@ -130,10 +130,10 @@ ssize_t
 sx127X_sync(struct spi_device *spi, struct spi_message *);
 
 int
-sx127X_read_reg(struct spi_device *spi, uint8_t start_adr, uint8_t *buf, size_t len);
+sx127X_read_reg(struct spi_device *spi, uint8_t adr, void *buf, size_t len);
 
 int
-sx127X_write_reg(struct spi_device *spi, uint8_t start_adr, uint8_t *buf, size_t len);
+sx127X_write_reg(struct spi_device *spi, uint8_t adr, void *buf, size_t len);
 
 void
 sx127X_startLoRaMode(struct spi_device *spi);
