@@ -10,7 +10,8 @@
 /* Bit 1: 1 for ready to read, 0 for not ready
  * Bit 0: 1 for ready to write, 0 for not write
  */
-uint8_t ready2rw(int fd) {
+uint8_t ready2rw(int fd)
+{
 	fd_set read_fds, write_fds;
 	struct timeval tv = {.tv_sec = 5, .tv_usec = 0};
 	uint8_t flag;
@@ -20,16 +21,16 @@ uint8_t ready2rw(int fd) {
 	FD_ZERO(&write_fds);
 	FD_SET(fd, &read_fds);
 	FD_SET(fd, &write_fds);
-	if(select(fd+1, &read_fds, &write_fds, NULL, &tv) == -1)
+	if (select(fd+1, &read_fds, &write_fds, NULL, &tv) == -1)
 		perror("Select failed");
 
 	flag = 0;
 	/* Read from the file descriptor if it is ready to be read. */
-	if(FD_ISSET(fd, &read_fds)) {
+	if (FD_ISSET(fd, &read_fds)) {
 		flag |= (1 << 1);
 	}
 	/* Write to the file descriptor if it is ready to be written. */
-	if(FD_ISSET(fd, &write_fds)) {
+	if (FD_ISSET(fd, &write_fds)) {
 		flag |= (1 << 0);
 	}
 
@@ -39,7 +40,8 @@ uint8_t ready2rw(int fd) {
 #define ready2read(fd)	(ready2rw(fd) & (1 << 1))
 #define ready2write(fd)	(ready2rw(fd) & (1 << 0))
 
-int main(int argc, char **argv) {
+int main(int argc, char **argv)
+{
 	char *path;
 	char *data;
 	int fd;
@@ -50,7 +52,7 @@ int main(int argc, char **argv) {
 	unsigned int s;
 
 	/* Parse command. */
-	if(argc >= 3) {
+	if (argc >= 3) {
 		path = argv[1];
 		data = argv[2];
 	}
@@ -63,7 +65,7 @@ int main(int argc, char **argv) {
 	/* Open device node. */
 	fd = open(path, O_RDWR);
 	printf("Opened %s\n", path);
-	if(fd == -1) {
+	if (fd == -1) {
 		sprintf(pstr, "Open %s failed", path);
 		perror(pstr);
 		return -1;
@@ -89,7 +91,7 @@ int main(int argc, char **argv) {
 	/* Write to the file descriptor if it is ready to be written. */
 	printf("Going to write %s\n", path);
 	s = 0;
-	while(!ready2write(fd)) {
+	while (!ready2write(fd)) {
 		sleep(1);
 		s++;
 		printf("\t%s is not ready to write, do other things.", path);
@@ -105,7 +107,7 @@ int main(int argc, char **argv) {
 	/* Set the device in read state. */
 	set_state(fd, LORA_STATE_RX);
 	s = 0;
-	while(!ready2read(fd)) {
+	while (!ready2read(fd)) {
 		sleep(1);
 		s++;
 		printf("\t%s is not ready to read, do other things.", path);
@@ -113,7 +115,7 @@ int main(int argc, char **argv) {
 	}
 	printf("\n");
 	len = do_read(fd, buf, MAX_BUFFER_LEN - 1);
-	if(len > 0)
+	if (len > 0)
 		printf("Read %d bytes: %s\n", len, buf);
 
 	printf("The LoRa carrier frequency is %u Hz\n", get_freq(fd));

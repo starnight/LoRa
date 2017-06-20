@@ -57,38 +57,40 @@ static DEFINE_MUTEX(device_list_lock);
 #define LORA_BUFLEN	123
 #endif
 
-static int file_open(struct inode *inode, struct file *filp) {
+static int
+file_open(struct inode *inode, struct file *filp)
+{
 	struct lora_struct *lrdata;
 	int status = -ENXIO;
 
 	pr_debug("lora: open file\n");
 	
 	mutex_lock(&device_list_lock);
-	/* Use device_entry to find the lora date with matched dev_t in inode. */
+	/* Find the lora data in device_entry with matched dev_t in inode. */
 	list_for_each_entry(lrdata, &device_list, device_entry) {
-		if(lrdata->devt == inode->i_rdev) {
+		if (lrdata->devt == inode->i_rdev) {
 			status = 0;
 			break;
 		}
 	}
 
-	if(status) {
+	if (status) {
 		pr_debug("lora: nothing for minor %d\n", iminor(inode));
 		goto err_find_dev;
 	}
 
 	/* Have the RX/TX memory buffer. */
-	if(!(lrdata->rx_buf)) {
+	if (!(lrdata->rx_buf)) {
 		lrdata->rx_buf = kzalloc(LORA_BUFLEN, GFP_KERNEL);
-		if(!(lrdata->rx_buf)) {
+		if (!(lrdata->rx_buf)) {
 			pr_err("lora: no more memory\n");
 			status = -ENOMEM;
 			goto err_find_dev;
 		}
 	}
-	if(!(lrdata->tx_buf)) {
+	if (!(lrdata->tx_buf)) {
 		lrdata->tx_buf = kzalloc(LORA_BUFLEN, GFP_KERNEL);
-		if(!(lrdata->tx_buf)) {
+		if (!(lrdata->tx_buf)) {
 			pr_err("lora: no more memory\n");
 			status = -ENOMEM;
 			goto err_alloc_tx_buf;
@@ -113,10 +115,13 @@ err_alloc_tx_buf:
 	lrdata->rx_buf = NULL;
 err_find_dev:
 	mutex_unlock(&device_list_lock);
+
 	return status;
 }
 
-static int file_close(struct inode *inode, struct file *filp) {
+static int
+file_close(struct inode *inode, struct file *filp)
+{
 	struct lora_struct *lrdata;
 	
 	pr_debug("lora: close file\n");
@@ -126,11 +131,11 @@ static int file_close(struct inode *inode, struct file *filp) {
 	mutex_lock(&device_list_lock);
 	filp->private_data = NULL;
 	
-	if(lrdata->users > 0)
+	if (lrdata->users > 0)
 		lrdata->users--;
 	
 	/* Last close */
-	if(lrdata->users == 0) {
+	if (lrdata->users == 0) {
 		kfree(lrdata->rx_buf);
 		kfree(lrdata->tx_buf);
 		lrdata->rx_buf = NULL;
@@ -141,34 +146,40 @@ static int file_close(struct inode *inode, struct file *filp) {
 	return 0;
 }
 
-static ssize_t file_read(struct file *filp, char __user *buf, size_t size, loff_t *f_pos) {
+static ssize_t
+file_read(struct file *filp, char __user *buf, size_t size, loff_t *pos)
+{
 	struct lora_struct *lrdata;
 
 	pr_debug("lora: read file (size=%zu)\n", size);
 
 	lrdata = filp->private_data;
 
-	if(lrdata->ops->read != NULL)
+	if (lrdata->ops->read != NULL)
 		return lrdata->ops->read(lrdata, buf, size);
 	else
 		return 0;
 }
 
-static ssize_t file_write(struct file *filp, const char __user *buf, size_t size, loff_t *f_pos) {
+static ssize_t
+file_write(struct file *filp, const char __user *buf, size_t size, loff_t *pos)
+{
 	struct lora_struct *lrdata;
 
 	pr_debug("lora: write file (size=%zu)\n", size);
 
 	lrdata = filp->private_data;
 
-	if(lrdata->ops->write != NULL) {
+	if (lrdata->ops->write != NULL) {
 		return lrdata->ops->write(lrdata, buf, size);
 	}
 	else
 		return 0;
 }
 
-static long file_ioctl(struct file *filp, unsigned int cmd, unsigned long arg) {
+static long
+file_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
+{
 	long ret;
 	int *pval;
 	struct lora_struct *lrdata;
@@ -180,60 +191,60 @@ static long file_ioctl(struct file *filp, unsigned int cmd, unsigned long arg) {
 	lrdata = filp->private_data;
 
 	/* I/O control by each command. */
-	switch(cmd) {
+	switch (cmd) {
 	/* Set & read the state of the LoRa device. */
 	case LORA_SET_STATE:
-		if(lrdata->ops->setState != NULL)
+		if (lrdata->ops->setState != NULL)
 			ret = lrdata->ops->setState(lrdata, pval);
 		break;
 	case LORA_GET_STATE:
-		if(lrdata->ops->getState != NULL)
+		if (lrdata->ops->getState != NULL)
 			ret = lrdata->ops->getState(lrdata, pval);
 		break;
 	/* Set & get the carrier frequency. */
 	case LORA_SET_FREQUENCY:
-		if(lrdata->ops->setFreq != NULL)
+		if (lrdata->ops->setFreq != NULL)
 			ret = lrdata->ops->setFreq(lrdata, pval);
 		break;
 	case LORA_GET_FREQUENCY:
-		if(lrdata->ops->getFreq != NULL)
+		if (lrdata->ops->getFreq != NULL)
 			ret = lrdata->ops->getFreq(lrdata, pval);
 		break;
 	/* Set & get the PA power. */
 	case LORA_SET_POWER:
-		if(lrdata->ops->setPower != NULL)
+		if (lrdata->ops->setPower != NULL)
 			ret = lrdata->ops->setPower(lrdata, pval);
 		break;
 	case LORA_GET_POWER:
-		if(lrdata->ops->getPower != NULL)
+		if (lrdata->ops->getPower != NULL)
 			ret = lrdata->ops->getPower(lrdata, pval);
 		break;
 	/* Set & get the RF spreading factor. */
 	case LORA_SET_SPRFACTOR:
-		if(lrdata->ops->setSPRFactor != NULL)
+		if (lrdata->ops->setSPRFactor != NULL)
 			ret = lrdata->ops->setSPRFactor(lrdata, pval);
 		break;
 	case LORA_GET_SPRFACTOR:
-		if(lrdata->ops->getSPRFactor != NULL)
+		if (lrdata->ops->getSPRFactor != NULL)
 			ret = lrdata->ops->getSPRFactor(lrdata, pval);
 		break;
 	/* Set & get the RF bandwith. */
 	case LORA_SET_BANDWIDTH:
-		if(lrdata->ops->setBW != NULL)
+		if (lrdata->ops->setBW != NULL)
 			ret = lrdata->ops->setBW(lrdata, pval);
 		break;
 	case LORA_GET_BANDWIDTH:
-		if(lrdata->ops->getBW != NULL)
+		if (lrdata->ops->getBW != NULL)
 			ret = lrdata->ops->getBW(lrdata, pval);
 		break;
 	/* Get current RSSI. */
 	case LORA_GET_RSSI:
-		if(lrdata->ops->getRSSI != NULL)
+		if (lrdata->ops->getRSSI != NULL)
 			ret = lrdata->ops->getRSSI(lrdata, pval);
 		break;
 	/* Get last packet's SNR. */
 	case LORA_GET_SNR:
-		if(lrdata->ops->getSNR != NULL)
+		if (lrdata->ops->getSNR != NULL)
 			ret = lrdata->ops->getSNR(lrdata, pval);
 		break;
 	default:
@@ -243,14 +254,16 @@ static long file_ioctl(struct file *filp, unsigned int cmd, unsigned long arg) {
 	return ret;
 }
 
-static unsigned int file_poll(struct file *filp, poll_table *wait) {
+static unsigned int
+file_poll(struct file *filp, poll_table *wait)
+{
 	struct lora_struct *lrdata;
 	unsigned int mask;
 
 	pr_debug("lora: poll file\n");
 
 	lrdata = filp->private_data;
-	if(lrdata == NULL)
+	if (lrdata == NULL)
 		return -EBADFD;
 
 	/* Register the file into wait queue for multiplexing. */
@@ -258,10 +271,10 @@ static unsigned int file_poll(struct file *filp, poll_table *wait) {
 
 	/* Check ready to write / read. */
 	mask = 0;
-	if((lrdata->ops->ready2write != NULL)
+	if ((lrdata->ops->ready2write != NULL)
 		&& lrdata->ops->ready2write(lrdata))
 		mask |= POLLOUT | POLLWRNORM;
-	if((lrdata->ops->ready2read != NULL)
+	if ((lrdata->ops->ready2read != NULL)
 		&& lrdata->ops->ready2read(lrdata))
 		mask |= POLLIN | POLLRDNORM;
 
@@ -269,7 +282,9 @@ static unsigned int file_poll(struct file *filp, poll_table *wait) {
 }
 
 /* Add an lora compatible device. */
-static int lora_device_add(struct lora_struct *lrdata) {
+static int
+lora_device_add(struct lora_struct *lrdata)
+{
 	INIT_LIST_HEAD(&(lrdata->device_entry));
 
 	mutex_lock(&device_list_lock);
@@ -281,7 +296,9 @@ static int lora_device_add(struct lora_struct *lrdata) {
 EXPORT_SYMBOL(lora_device_add);
 
 /* Remove an lora compatible device. */
-static int lora_device_remove(struct lora_struct *lrdata) {
+static int
+lora_device_remove(struct lora_struct *lrdata)
+{
 	mutex_lock(&device_list_lock);
 	list_del(&(lrdata->device_entry));
 	mutex_unlock(&device_list_lock);
@@ -301,7 +318,9 @@ static struct file_operations lora_fops = {
 };
 
 /* Register there is a kind of lora driver. */
-static int lora_register_driver(struct lora_driver *driver) {
+static int
+lora_register_driver(struct lora_driver *driver)
+{
 	dev_t dev;
 	int alloc_ret, cdev_err;
 
@@ -312,7 +331,7 @@ static int lora_register_driver(struct lora_driver *driver) {
 					driver->minor_start,
 					driver->num,
 					driver->name);
-	if(alloc_ret) {
+	if (alloc_ret) {
 		pr_err("lora: Failed to allocate a character device\n");
 		return alloc_ret;
 	}
@@ -322,10 +341,10 @@ static int lora_register_driver(struct lora_driver *driver) {
 	driver->lora_cdev.owner = driver->owner;
 	/* Add the character device driver into system. */
 	cdev_err = cdev_add(&(driver->lora_cdev), dev, driver->num);
-	if(cdev_err) {
+	if (cdev_err) {
 		pr_err("lora: Failed to register a character device\n");
 		/* Release the allocated character device. */
-		if(alloc_ret == 0) {
+		if (alloc_ret == 0) {
 			unregister_chrdev_region(dev, driver->num);
 		}
 		return cdev_err;
@@ -335,13 +354,13 @@ static int lora_register_driver(struct lora_driver *driver) {
 
 	/* Create device class. */
 	driver->lora_class = class_create(driver->owner, driver->name);
-	if(IS_ERR(driver->lora_class)) {
+	if (IS_ERR(driver->lora_class)) {
 		pr_err("lora: Failed to create a class of device\n");
 		/* Release the added character device. */
-		if(cdev_err == 0)
+		if (cdev_err == 0)
 			cdev_del(&(driver->lora_cdev));
 		/* Release the allocated character device. */
-		if(alloc_ret == 0)
+		if (alloc_ret == 0)
 			unregister_chrdev_region(dev, driver->num);
 		return -1;
 	}
@@ -352,7 +371,9 @@ static int lora_register_driver(struct lora_driver *driver) {
 EXPORT_SYMBOL(lora_register_driver);
 
 /* Unregister the lora driver. */
-static int lora_unregister_driver(struct lora_driver *driver) {
+static int
+lora_unregister_driver(struct lora_driver *driver)
+{
 	dev_t dev = MKDEV(driver->major, driver->minor_start);
 	
 	pr_debug("lora: unregister %s\n", driver->name);

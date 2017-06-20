@@ -71,7 +71,8 @@ static DEFINE_MUTEX(minors_lock);
  * Return:	Read how many bytes actually, negative number for error
  */
 static ssize_t
-loraspi_read(struct lora_struct *lrdata, const char __user *buf, size_t size) {
+loraspi_read(struct lora_struct *lrdata, const char __user *buf, size_t size)
+{
 	struct spi_device *spi;
 	ssize_t status;
 	int c = 0;
@@ -88,7 +89,7 @@ loraspi_read(struct lora_struct *lrdata, const char __user *buf, size_t size) {
 	st = sx127X_getState(spi);
 
 	/*  Prepare and set the chip to RX continuous mode, if it is not. */
-	if(st != SX127X_RXCONTINUOUS_MODE) {
+	if (st != SX127X_RXCONTINUOUS_MODE) {
 		/* Set chip to standby state. */
 		dev_dbg(&(spi->dev), "Going to set standby state\n");
 		sx127X_setState(spi, SX127X_STANDBY_MODE);
@@ -105,34 +106,34 @@ loraspi_read(struct lora_struct *lrdata, const char __user *buf, size_t size) {
 	}
 
 	/* Wait and check there is any packet received ready. */
-	for(timeout = 0; timeout < 250; timeout++) {
+	for (timeout = 0; timeout < 250; timeout++) {
 		flag = sx127X_getLoRaFlag(spi,
 					SX127X_FLAG_RXTIMEOUT |
 					SX127X_FLAG_RXDONE |
 					SX127X_FLAG_PAYLOADCRCERROR);
-		if(flag == 0)
+		if (flag == 0)
 			msleep(20);
 		else
 			break;
 	}
 
 	/* If there is nothing or received timeout. */
-	if((flag == 0) || (flag & SX127X_FLAG_RXTIMEOUT)) {
+	if ((flag == 0) || (flag & SX127X_FLAG_RXTIMEOUT)) {
 		c = -1;
 	}
 	/* If there is a packet, but the payload is CRC error. */
-	if(sx127X_getLoRaFlag(spi, SX127X_FLAG_PAYLOADCRCERROR)) {
+	if (sx127X_getLoRaFlag(spi, SX127X_FLAG_PAYLOADCRCERROR)) {
 		c = -2;
 	}
 
 	/* There is a ready packet in the chip's FIFO. */
-	if(c == 0) {
+	if (c == 0) {
 		memset(lrdata->rx_buf, 0, lrdata->bufmaxlen);
 		size = (lrdata->bufmaxlen < size) ? lrdata->bufmaxlen : size;
 		/* Read from chip to LoRa data RX buffer. */
 		c = sx127X_readLoRaData(spi, lrdata->rx_buf, size);
 		/* Copy from LoRa data RX buffer to user space. */
-		if(c > 0)
+		if (c > 0)
 			status = copy_to_user((void *)buf, lrdata->rx_buf, c);
 	}
 
@@ -153,7 +154,8 @@ loraspi_read(struct lora_struct *lrdata, const char __user *buf, size_t size) {
  * Return:	Write how many bytes actually, negative number for error
  */
 static ssize_t
-loraspi_write(struct lora_struct *lrdata, const char __user *buf, size_t size) {
+loraspi_write(struct lora_struct *lrdata, const char __user *buf, size_t size)
+{
 	struct spi_device *spi;
 	ssize_t status;
 	int c;
@@ -168,7 +170,7 @@ loraspi_write(struct lora_struct *lrdata, const char __user *buf, size_t size) {
 	memset(lrdata->tx_buf, 0, lrdata->bufmaxlen);
 	status = copy_from_user(lrdata->tx_buf, buf, size);
 
-	if(status >= size)
+	if (status >= size)
 		return 0;
 
 	lrdata->tx_buflen = size - status;
@@ -188,7 +190,7 @@ loraspi_write(struct lora_struct *lrdata, const char __user *buf, size_t size) {
 	/* Clear LoRa IRQ TX flag. */
 	sx127X_clearLoRaFlag(spi, SX127X_FLAG_TXDONE);
 
-	if(c > 0) {
+	if (c > 0) {
 		/* Set chip to TX state to send the data in FIFO to RF. */
 		dev_dbg(&(spi->dev), "Set TX state\n");
 		sx127X_setState(spi, SX127X_TX_MODE);
@@ -197,14 +199,14 @@ loraspi_write(struct lora_struct *lrdata, const char __user *buf, size_t size) {
 		dev_dbg(&(spi->dev), "The time out is %u ms", timeout * 20);
 
 		/* Wait until TX is finished by checking the TX flag. */
-		for(flag = 0; timeout > 0; timeout--) {
+		for (flag = 0; timeout > 0; timeout--) {
 			flag = sx127X_getLoRaFlag(spi, SX127X_FLAG_TXDONE);
-			if(flag != 0) {
+			if (flag != 0) {
 				dev_dbg(&(spi->dev), "Wait TX is finished\n");
 				break;
 			}
 
-			if(timeout == 1) {
+			if (timeout == 1) {
 				c = 0;
 				dev_dbg(&(spi->dev), "Wait TX is time out\n");
 			}
@@ -234,7 +236,8 @@ loraspi_write(struct lora_struct *lrdata, const char __user *buf, size_t size) {
  * Return:	0 / other values for success / error
  */
 static long
-loraspi_setstate(struct lora_struct *lrdata, void __user *arg) {
+loraspi_setstate(struct lora_struct *lrdata, void __user *arg)
+{
 	struct spi_device *spi;
 	int status;
 	uint32_t st32;
@@ -242,7 +245,7 @@ loraspi_setstate(struct lora_struct *lrdata, void __user *arg) {
 
 	spi = lrdata->lora_device;
 	status = copy_from_user(&st32, arg, sizeof(uint32_t));
-	switch(st32) {
+	switch (st32) {
 	case LORA_STATE_SLEEP:
 		st = SX127X_SLEEP_MODE;		break;
 	case LORA_STATE_STANDBY:
@@ -272,7 +275,8 @@ loraspi_setstate(struct lora_struct *lrdata, void __user *arg) {
  * Return:	0 / other values for success / error
  */
 static long
-loraspi_getstate(struct lora_struct *lrdata, void __user *arg) {
+loraspi_getstate(struct lora_struct *lrdata, void __user *arg)
+{
 	struct spi_device *spi;
 	int status;
 	uint32_t st32;
@@ -285,7 +289,7 @@ loraspi_getstate(struct lora_struct *lrdata, void __user *arg) {
 	mutex_unlock(&(lrdata->buf_lock));
 
 	st32 = st;
-	switch(st) {
+	switch (st) {
 	case SX127X_SLEEP_MODE:
 		st32 = LORA_STATE_SLEEP;	break;
 	case SX127X_STANDBY_MODE:
@@ -315,7 +319,8 @@ loraspi_getstate(struct lora_struct *lrdata, void __user *arg) {
  * Return:	0 / other values for success / error
  */
 static long
-loraspi_setfreq(struct lora_struct *lrdata, void __user *arg) {
+loraspi_setfreq(struct lora_struct *lrdata, void __user *arg)
+{
 	struct spi_device *spi;
 	int status;
 	uint32_t freq;
@@ -339,7 +344,8 @@ loraspi_setfreq(struct lora_struct *lrdata, void __user *arg) {
  * Return:	0 / other values for success / error
  */
 static long
-loraspi_getfreq(struct lora_struct *lrdata, void __user *arg) {
+loraspi_getfreq(struct lora_struct *lrdata, void __user *arg)
+{
 	struct spi_device *spi;
 	int status;
 	uint32_t freq;
@@ -365,7 +371,8 @@ loraspi_getfreq(struct lora_struct *lrdata, void __user *arg) {
  * Return:	0 / other values for success / error
  */
 static long
-loraspi_setpower(struct lora_struct *lrdata, void __user *arg) {
+loraspi_setpower(struct lora_struct *lrdata, void __user *arg)
+{
 	struct spi_device *spi;
 	int status;
 	int32_t dbm;
@@ -375,8 +382,10 @@ loraspi_setpower(struct lora_struct *lrdata, void __user *arg) {
 
 #define LORA_MAX_POWER	(17)
 #define LORA_MIN_POWER	(-2)
-	if(dbm > LORA_MAX_POWER) dbm = LORA_MAX_POWER;
-	else if(dbm < LORA_MIN_POWER) dbm = LORA_MIN_POWER;
+	if (dbm > LORA_MAX_POWER)
+		dbm = LORA_MAX_POWER;
+	else if (dbm < LORA_MIN_POWER)
+		dbm = LORA_MIN_POWER;
 
 	mutex_lock(&(lrdata->buf_lock));
 	sx127X_setLoRaPower(spi, dbm);
@@ -393,7 +402,8 @@ loraspi_setpower(struct lora_struct *lrdata, void __user *arg) {
  * Return:	0 / other values for success / error
  */
 static long
-loraspi_getpower(struct lora_struct *lrdata, void __user *arg) {
+loraspi_getpower(struct lora_struct *lrdata, void __user *arg)
+{
 	struct spi_device *spi;
 	int status;
 	int32_t dbm;
@@ -417,7 +427,8 @@ loraspi_getpower(struct lora_struct *lrdata, void __user *arg) {
  * Return:	0 / other values for success / error
  */
 static long
-loraspi_setsprfactor(struct lora_struct *lrdata, void __user *arg) {
+loraspi_setsprfactor(struct lora_struct *lrdata, void __user *arg)
+{
 	struct spi_device *spi;
 	int status;
 	uint32_t sprf;
@@ -440,7 +451,8 @@ loraspi_setsprfactor(struct lora_struct *lrdata, void __user *arg) {
  * Return:	0 / other values for success / error
  */
 static long
-loraspi_getsprfactor(struct lora_struct *lrdata, void __user *arg) {
+loraspi_getsprfactor(struct lora_struct *lrdata, void __user *arg)
+{
 	struct spi_device *spi;
 	int status;
 	uint32_t sprf;
@@ -464,7 +476,8 @@ loraspi_getsprfactor(struct lora_struct *lrdata, void __user *arg) {
  * Return:	0 / other values for success / error
  */
 static long
-loraspi_setbandwidth(struct lora_struct *lrdata, void __user *arg) {
+loraspi_setbandwidth(struct lora_struct *lrdata, void __user *arg)
+{
 	struct spi_device *spi;
 	int status;
 	uint32_t bw;
@@ -487,7 +500,8 @@ loraspi_setbandwidth(struct lora_struct *lrdata, void __user *arg) {
  * Return:	0 / other values for success / error
  */
 static long
-loraspi_getbandwidth(struct lora_struct *lrdata, void __user *arg) {
+loraspi_getbandwidth(struct lora_struct *lrdata, void __user *arg)
+{
 	struct spi_device *spi;
 	int status;
 	uint32_t bw;
@@ -511,7 +525,8 @@ loraspi_getbandwidth(struct lora_struct *lrdata, void __user *arg) {
  * Return:	0 / other values for success / error
  */
 static long
-loraspi_getrssi(struct lora_struct *lrdata, void __user *arg) {
+loraspi_getrssi(struct lora_struct *lrdata, void __user *arg)
+{
 	struct spi_device *spi;
 	int status;
 	int32_t rssi;
@@ -535,7 +550,8 @@ loraspi_getrssi(struct lora_struct *lrdata, void __user *arg) {
  * Return:	0 / other values for success / error
  */
 static long
-loraspi_getsnr(struct lora_struct *lrdata, void __user *arg) {
+loraspi_getsnr(struct lora_struct *lrdata, void __user *arg)
+{
 	struct spi_device *spi;
 	int status;
 	uint32_t snr;
@@ -558,7 +574,8 @@ loraspi_getsnr(struct lora_struct *lrdata, void __user *arg) {
  * Return:	1 / 0 for ready / not ready
  */
 static long
-loraspi_ready2write(struct lora_struct *lrdata) {
+loraspi_ready2write(struct lora_struct *lrdata)
+{
 	long ret;
 
 	/* Mutex is not lock, than it is not writing. */
@@ -574,7 +591,8 @@ loraspi_ready2write(struct lora_struct *lrdata) {
  * Return:	1 / 0 for ready / not ready
  */
 static long
-loraspi_ready2read(struct lora_struct *lrdata) {
+loraspi_ready2read(struct lora_struct *lrdata)
+{
 	struct spi_device *spi;
 	long ret;
 
@@ -582,7 +600,7 @@ loraspi_ready2read(struct lora_struct *lrdata) {
 
 	ret = 0;
 	/* Mutex is not lock, than it is not in reading file operation. */
-	if(!mutex_is_locked(&(lrdata->buf_lock))) {
+	if (!mutex_is_locked(&(lrdata->buf_lock))) {
 		/* Check the chip have recieved full data. */
 		mutex_lock(&(lrdata->buf_lock));
 		ret = sx127X_getLoRaFlag(spi, SX127X_FLAG_RXDONE) != 0;
@@ -644,14 +662,14 @@ MODULE_DEVICE_TABLE(acpi, lora_acpi_ids);
 static void loraspi_probe_acpi(struct spi_device *spi) {
 	const struct acpi_device_id *id;
 
-	if(!has_acpi_companion(&(spi->dev)))
+	if (!has_acpi_companion(&(spi->dev)))
 		return;
 
 	id = acpi_match_device(lora_acpi_ids, &(spi->dev));
-	if(WARN_ON(!id))
+	if (WARN_ON(!id))
 		return;
 
-	if(id->driver_data == LORA_ACPI_DUMMY)
+	if (id->driver_data == LORA_ACPI_DUMMY)
 		dev_warn(&(spi->dev),
 			"Do not use this driver in produciton systems.\n");
 }
@@ -667,7 +685,8 @@ static const struct spi_device_id spi_ids[] = {
 MODULE_DEVICE_TABLE(spi, spi_ids);
 
 /* The SPI probe callback function. */
-static int loraspi_probe(struct spi_device *spi) {
+static int loraspi_probe(struct spi_device *spi)
+{
 	struct lora_struct *lrdata;
 	struct device *dev;
 	unsigned long minor;
@@ -676,7 +695,7 @@ static int loraspi_probe(struct spi_device *spi) {
 	dev_info(&(spi->dev), "probe a LoRa SPI device\n");
 
 #ifdef CONFIG_OF
-	if(spi->dev.of_node && !of_match_device(lora_dt_ids, &(spi->dev))) {
+	if (spi->dev.of_node && !of_match_device(lora_dt_ids, &(spi->dev))) {
 		dev_err(&(spi->dev), "buggy DT: LoRa listed directly in DT\n");
 		WARN_ON(spi->dev.of_node &&
 			!of_match_device(lora_dt_ids, (&spi->dev)));
@@ -687,7 +706,7 @@ static int loraspi_probe(struct spi_device *spi) {
 
 	/* Allocate lora device's data. */
 	lrdata = kzalloc(sizeof(struct lora_struct), GFP_KERNEL);
-	if(!lrdata)
+	if (!lrdata)
 		return -ENOMEM;
 
 	/* Initial the lora device's data. */
@@ -696,7 +715,7 @@ static int loraspi_probe(struct spi_device *spi) {
 	mutex_init(&(lrdata->buf_lock));
 	mutex_lock(&minors_lock);
 	minor = find_first_zero_bit(minors, N_LORASPI_MINORS);
-	if(minor < N_LORASPI_MINORS) {
+	if (minor < N_LORASPI_MINORS) {
 		set_bit(minor, minors);
 		lrdata->devt = MKDEV(lr_driver.major, minor);
 		dev = device_create(lr_driver.lora_class,
@@ -725,7 +744,8 @@ static int loraspi_probe(struct spi_device *spi) {
 }
 
 /* The SPI remove callback function. */
-static int loraspi_remove(struct spi_device *spi) {
+static int loraspi_remove(struct spi_device *spi)
+{
 	struct lora_struct *lrdata;
 	
 	dev_info(&(spi->dev), "remove a LoRa SPI device");
@@ -768,7 +788,8 @@ static struct spi_driver lora_spi_driver = {
 
 
 /* LoRa-SPI kernel module's initial function. */
-static int loraspi_init(void) {
+static int loraspi_init(void)
+{
 	int status;
 	
 	pr_debug("lora-spi: init SX1278 compatible kernel module\n");
@@ -783,7 +804,8 @@ static int loraspi_init(void) {
 }
 
 /* LoRa-SPI kernel module's exit function. */
-static void loraspi_exit(void) {
+static void loraspi_exit(void)
+{
 	pr_debug("lora-spi: exit\n");
 
 	/* Unregister the LoRa SPI driver. */
