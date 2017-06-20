@@ -75,7 +75,7 @@ loraspi_read(struct lora_struct *lrdata, const char __user *buf, size_t size) {
 	struct spi_device *spi;
 	ssize_t status;
 	int c = 0;
-	uint8_t base_adr;
+	uint8_t adr;
 	uint8_t flag;
 	uint8_t st;
 	uint32_t timeout;
@@ -94,15 +94,15 @@ loraspi_read(struct lora_struct *lrdata, const char __user *buf, size_t size) {
 		sx127X_setState(spi, SX127X_STANDBY_MODE);
 
 		/* Set chip FIFO RX base. */
-		base_adr = 0x00;
+		adr = 0x00;
 		dev_dbg(&(spi->dev), "Going to set RX base address\n");
-		sx127X_write_reg(spi, SX127X_REG_FIFO_RX_BASE_ADDR, &base_adr, 1);
+		sx127X_write_reg(spi, SX127X_REG_FIFO_RX_BASE_ADDR, &adr, 1);
 
 		/* Set chip wait for LoRa timeout time. */
 		sx127X_setLoRaRXTimeout(spi, 300);
 		/* Clear all of the IRQ flags. */
 		sx127X_clearLoRaAllFlag(spi);
-		/* Set chip to RX continuous state.  The chip start to wait for receiving. */
+		/* Set chip to RX continuous state waiting for receiving. */
 		sx127X_setState(spi, SX127X_RXCONTINUOUS_MODE);
 	}
 
@@ -159,7 +159,7 @@ loraspi_write(struct lora_struct *lrdata, const char __user *buf, size_t size) {
 	struct spi_device *spi;
 	ssize_t status;
 	int c;
-	uint8_t base_adr;
+	uint8_t adr;
 	uint8_t flag;
 	uint32_t timeout;
 
@@ -180,9 +180,9 @@ loraspi_write(struct lora_struct *lrdata, const char __user *buf, size_t size) {
 	sx127X_setState(spi, SX127X_STANDBY_MODE);
 
 	/* Set chip FIFO TX base. */
-	base_adr = 0x80;
+	adr = 0x80;
 	dev_dbg(&(spi->dev), "Going to set TX base address\n");
-	sx127X_write_reg(spi, SX127X_REG_FIFO_TX_BASE_ADDR, &base_adr, 1);
+	sx127X_write_reg(spi, SX127X_REG_FIFO_TX_BASE_ADDR, &adr, 1);
 
 	/* Write to SPI chip synchronously to fill the FIFO of the chip. */
 	c = sx127X_sendLoRaData(spi, lrdata->tx_buf, lrdata->tx_buflen);
