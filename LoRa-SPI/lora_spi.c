@@ -98,8 +98,6 @@ loraspi_read(struct lora_struct *lrdata, const char __user *buf, size_t size) {
 		dev_dbg(&(spi->dev), "Going to set RX base address\n");
 		sx127X_write_reg(spi, SX127X_REG_FIFO_RX_BASE_ADDR, &adr, 1);
 
-		/* Set chip wait for LoRa timeout time. */
-		sx127X_setLoRaRXTimeout(spi, 300);
 		/* Clear all of the IRQ flags. */
 		sx127X_clearLoRaAllFlag(spi);
 		/* Set chip to RX continuous state waiting for receiving. */
