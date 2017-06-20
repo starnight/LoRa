@@ -61,7 +61,7 @@ static int file_open(struct inode *inode, struct file *filp) {
 	struct lora_struct *lrdata;
 	int status = -ENXIO;
 
-	pr_debug("lora: open\n");
+	pr_debug("lora: open file\n");
 	
 	mutex_lock(&device_list_lock);
 	/* Use device_entry to find the lora date with matched dev_t in inode. */
@@ -119,7 +119,7 @@ err_find_dev:
 static int file_close(struct inode *inode, struct file *filp) {
 	struct lora_struct *lrdata;
 	
-	pr_debug("lora: close\n");
+	pr_debug("lora: close file\n");
 	
 	lrdata = filp->private_data;
 
@@ -144,7 +144,7 @@ static int file_close(struct inode *inode, struct file *filp) {
 static ssize_t file_read(struct file *filp, char __user *buf, size_t size, loff_t *f_pos) {
 	struct lora_struct *lrdata;
 
-	pr_debug("lora: read (size=%zu)\n", size);
+	pr_debug("lora: read file (size=%zu)\n", size);
 
 	lrdata = filp->private_data;
 
@@ -157,7 +157,7 @@ static ssize_t file_read(struct file *filp, char __user *buf, size_t size, loff_
 static ssize_t file_write(struct file *filp, const char __user *buf, size_t size, loff_t *f_pos) {
 	struct lora_struct *lrdata;
 
-	pr_debug(KERN_DEBUG "lora: write (size=%zu)\n", size);
+	pr_debug("lora: write file (size=%zu)\n", size);
 
 	lrdata = filp->private_data;
 
@@ -172,6 +172,8 @@ static long file_ioctl(struct file *filp, unsigned int cmd, unsigned long arg) {
 	long ret;
 	int *pval;
 	struct lora_struct *lrdata;
+
+	pr_debug("lora: ioctl file (cmd=0x%X)\n", cmd);
 
 	ret = -ENOTTY;
 	pval = (void __user *)arg;
@@ -245,7 +247,7 @@ static unsigned int file_poll(struct file *filp, poll_table *wait) {
 	struct lora_struct *lrdata;
 	unsigned int mask;
 
-	pr_debug("lora: poll\n");
+	pr_debug("lora: poll file\n");
 
 	lrdata = filp->private_data;
 	if(lrdata == NULL)

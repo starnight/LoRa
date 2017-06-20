@@ -91,7 +91,7 @@ sx127X_read_reg(struct spi_device *spi, uint8_t start_adr, uint8_t *buf, size_t 
 
 	spi_message_init(&m);
 
-	/* Read address.  The MSB must be cleared because of reading an address. */
+	/* Read address.  The MSB must be 0 because of reading an address. */
 	memset(&at, 0, sizeof(at));
 	at.tx_buf = &start_adr;
 	at.len = 1;
@@ -128,7 +128,7 @@ sx127X_write_reg(struct spi_device *spi, uint8_t start_adr, uint8_t *buf, size_t
 
 	spi_message_init(&m);
 
-	/* Write address.  The MSB must be set because of writing an address. */
+	/* Write address.  The MSB must be 1 because of writing an address. */
 	start_adr |= 0x80;
 	memset(&at, 0, sizeof(at));
 	at.tx_buf = &start_adr;
@@ -218,9 +218,9 @@ uint8_t
 sx127X_getState(struct spi_device *spi) {
 	uint8_t op_mode;
 
-	op_mode = sx127X_getMode(spi);
+	op_mode = sx127X_getMode(spi) & 0x07;
 
-	return op_mode & 0x07;
+	return op_mode;
 }
 
 /**
@@ -820,7 +820,7 @@ sx127X_startLoRaMode(struct spi_device *spi) {
 
 	/* Clear all of the IRQ flags. */
 	sx127X_clearLoRaAllFlag(spi);
-	/* Set chip to RX continuous state.  The chip start to wait for receiving. */
+	/* Set chip to RX continuous state waiting for receiving. */
 	sx127X_setState(spi, SX127X_RXCONTINUOUS_MODE);
 }
 

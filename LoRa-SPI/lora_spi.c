@@ -112,8 +112,10 @@ loraspi_read(struct lora_struct *lrdata, const char __user *buf, size_t size) {
 					SX127X_FLAG_RXTIMEOUT |
 					SX127X_FLAG_RXDONE |
 					SX127X_FLAG_PAYLOADCRCERROR);
-		if(flag == 0) msleep(20);
-		else break;
+		if(flag == 0)
+			msleep(20);
+		else
+			break;
 	}
 
 	/* If there is nothing or received timeout. */
@@ -189,28 +191,27 @@ loraspi_write(struct lora_struct *lrdata, const char __user *buf, size_t size) {
 	sx127X_clearLoRaFlag(spi, SX127X_FLAG_TXDONE);
 
 	if(c > 0) {
-		/* Set chip to transmit(TX) state to send the data in FIFO to RF. */
+		/* Set chip to TX state to send the data in FIFO to RF. */
 		dev_dbg(&(spi->dev), "Set TX state\n");
 		sx127X_setState(spi, SX127X_TX_MODE);
 
 		timeout = (c + sx127X_getLoRaPreambleLen(spi) + 1) + 2;
-		dev_dbg(&(spi->dev), "The time out is %u us", timeout * 1000);
+		dev_dbg(&(spi->dev), "The time out is %u ms", timeout * 20);
 
 		/* Wait until TX is finished by checking the TX flag. */
 		for(flag = 0; timeout > 0; timeout--) {
-			flag = sx127X_getLoRaAllFlag(spi);
-			if((flag & SX127X_FLAG_TXDONE) != 0) {
+			flag = sx127X_getLoRaFlag(spi, SX127X_FLAG_TXDONE);
+			if(flag != 0) {
 				dev_dbg(&(spi->dev), "Wait TX is finished\n");
 				break;
 			}
+
+			if(timeout == 1) {
+				c = 0;
+				dev_dbg(&(spi->dev), "Wait TX is time out\n");
+			}
 			else {
-				if(timeout == 1) {
-					c = 0;
-					dev_dbg(&(spi->dev), "Wait TX is time out\n");
-				}
-				else {
-					msleep(20);
-				}
+				msleep(20);
 			}
 		}
 	}
