@@ -281,7 +281,12 @@ file_poll(struct file *filp, poll_table *wait)
 	return mask;
 }
 
-/* Add an lora compatible device. */
+/**
+ * lora_device_add - Add a LoRa compatible device into the device list
+ * @lrdata:	the LoRa device going to be added
+ *
+ * Return:	0 / other number for success / failed
+ */
 static int
 lora_device_add(struct lora_struct *lrdata)
 {
@@ -295,7 +300,12 @@ lora_device_add(struct lora_struct *lrdata)
 }
 EXPORT_SYMBOL(lora_device_add);
 
-/* Remove an lora compatible device. */
+/**
+ * lora_device_remove - Remove a LoRa compatible device from the device list
+ * @lrdata:	the LoRa device going to be removed
+ *
+ * Return:	0 / other number for success / failed
+ */
 static int
 lora_device_remove(struct lora_struct *lrdata)
 {
@@ -317,7 +327,12 @@ static struct file_operations lora_fops = {
 	.llseek		= no_llseek,
 };
 
-/* Register there is a kind of lora driver. */
+/**
+ * lora_register_driver - Register there is a kind of LoRa driver
+ * @driver:	LoRa driver going to be registered
+ *
+ * Return:	0 / negative number for success / error number
+ */
 static int
 lora_register_driver(struct lora_driver *driver)
 {
@@ -370,7 +385,12 @@ lora_register_driver(struct lora_driver *driver)
 }
 EXPORT_SYMBOL(lora_register_driver);
 
-/* Unregister the lora driver. */
+/**
+ * lora_unregister_driver - Unregister the LoRa driver
+ * @driver:	LoRa driver going to be unregistered
+ *
+ * Return:	0 / negative number for success / error number
+ */
 static int
 lora_unregister_driver(struct lora_driver *driver)
 {
