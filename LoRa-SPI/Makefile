@@ -11,8 +11,7 @@ all:
 	make -C $(BUILDDIR) M=$(PWD) modules
 
 install:
-	gzip $(PROJ).ko
-	sudo mv $(PROJ).ko.gz $(KERNEL_LOCATION)/kernel/drivers/spi/$(PROJ).ko.gz
+	sudo make -C $(BUILDDIR) M=$(PWD) modules_install
 	# Rebuild the kernel module dependencies for modprobe
 	sudo depmod -a
 
