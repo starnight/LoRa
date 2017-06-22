@@ -17,7 +17,8 @@ install:
 	sudo depmod -a
 
 uninstall:
-	sudo rm $(KERNEL_LOCATION)/kernel/drivers/spi/$(PROJ).ko.gz
+	sudo modprobe -r $(PROJ)
+	sudo rm $(KERNEL_LOCATION)/extra/$(PROJ).ko.gz
 	# Rebuild the kernel module dependencies for modprobe
 	sudo depmod -a
 
