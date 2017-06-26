@@ -377,7 +377,7 @@ lora_register_driver(struct lora_driver *driver)
 		/* Release the allocated character device. */
 		if (alloc_ret == 0)
 			unregister_chrdev_region(dev, driver->num);
-		return -1;
+		return PTR_ERR(driver->lora_class);
 	}
 	pr_debug("lora: %s class created\n", driver->name);
 
