@@ -119,11 +119,11 @@ loraspi_read(struct lora_struct *lrdata, const char __user *buf, size_t size)
 
 	/* If there is nothing or received timeout. */
 	if ((flag == 0) || (flag & SX127X_FLAG_RXTIMEOUT)) {
-		c = -1;
+		c = -ENODATA;
 	}
 	/* If there is a packet, but the payload is CRC error. */
 	if (sx127X_getLoRaFlag(spi, SX127X_FLAG_PAYLOADCRCERROR)) {
-		c = -2;
+		c = -EBADMSG;
 	}
 
 	/* There is a ready packet in the chip's FIFO. */
