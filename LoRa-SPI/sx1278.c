@@ -160,22 +160,22 @@ sx127X_write_reg(struct spi_device *spi, uint8_t adr, void *buf, size_t len)
  * @vstr:	the buffer going to hold the chip's version string
  * @len:	the max length of the buffer
  *
- * Return:	All of the LoRa device's IRQ flags' current state in a byte
+ * Return:	Positive / negtive values for version code / failed
+ * 		Version code:	bits 7-4 full version number,
+ * 				bits 3-0 metal mask revision number
  */
 int
-sx127X_readVersion(struct spi_device *spi, char *vstr, size_t len)
+sx127X_readVersion(struct spi_device *spi)
 {
 	uint8_t v;
-	uint8_t fv, mmv;
 	int status;
 
 	status = sx127X_read_reg(spi, SX127X_REG_VERSION, &v, 1);
 
-	if (status == 1) {
-		fv = v >> 4;
-		mmv = v & 0x0F;
-		snprintf(vstr, len, "%d.%d", fv, mmv);
-	}
+	if ((status == 1) && (v > 0))
+		status = v;
+	else
+		status = -ENODEV;
 
 	return status;
 }
@@ -864,18 +864,27 @@ sx127X_startLoRaMode(struct spi_device *spi)
 /**
  * init_sx127X - Initial the SX127X device
  * @spi:	spi device to communicate with
+ *
+ * Return:	Positive / negtive values for version code / failed
+ * 		Version code:	bits 7-4 full version number,
+ * 				bits 3-0 metal mask revision number
  */
 int
 init_sx127X(struct spi_device *spi)
 {
-	char ver[5];
+	int v;
+	uint8_t fv, mmv;
+
 	dev_dbg(&(spi->dev), "init sx127X\n");
 
-	sx127X_readVersion(spi, ver, 4);
-	ver[4] = '\0';
-	dev_dbg(&(spi->dev), "chip version %s\n", ver);
+	v = sx127X_readVersion(spi);
+	if (v > 0) {
+		fv = (v >> 4) & 0xF;
+		mmv = v & 0xF;
+		dev_dbg(&(spi->dev), "chip version %d.%d\n", fv, mmv);
 
-	sx127X_startLoRaMode(spi);
+		sx127X_startLoRaMode(spi);
+	}
 
-	return 0;
+	return v;
 }

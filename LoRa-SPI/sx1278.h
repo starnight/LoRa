@@ -160,7 +160,7 @@ int32_t
 sx127X_getLoRaPower(struct spi_device *spi);
 
 int
-sx127X_readVersion(struct spi_device *spi, char *vstr, size_t len);
+sx127X_readVersion(struct spi_device *spi);
 
 uint8_t
 sx127X_getLoRaAllFlag(struct spi_device *spi);

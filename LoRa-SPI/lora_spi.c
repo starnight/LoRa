@@ -690,9 +690,10 @@ static int loraspi_probe(struct spi_device *spi)
 	struct lora_struct *lrdata;
 	struct device *dev;
 	unsigned long minor;
+	int v;
 	int status;
 
-	dev_info(&(spi->dev), "probe a LoRa SPI device\n");
+	dev_dbg(&(spi->dev), "probe a LoRa SPI device\n");
 
 #ifdef CONFIG_OF
 	if (spi->dev.of_node && !of_match_device(lora_dt_ids, &(spi->dev))) {
@@ -703,6 +704,16 @@ static int loraspi_probe(struct spi_device *spi)
 #endif
 
 	loraspi_probe_acpi(spi);
+
+	/* Initial the SX127X chip. */
+	v = init_sx127X(spi);
+	if(v < 0) {
+		dev_err(&(spi->dev), "no LoRa SPI device, error: %d\n", v);
+		return v;
+	}
+	dev_info(&(spi->dev), "probe a LoRa SPI device with chip ver. %d.%d\n",
+			(v >> 4) & 0xF,
+			v & 0xF);
 
 	/* Allocate lora device's data. */
 	lrdata = kzalloc(sizeof(struct lora_struct), GFP_KERNEL);
@@ -734,10 +745,7 @@ static int loraspi_probe(struct spi_device *spi)
 		kfree(lrdata);
 		status = -ENODEV;
 	}
-	
-	/* Initial the SX127X chip. */
-	init_sx127X(spi);
-	
+
 	mutex_unlock(&minors_lock);
 
 	return status;
