@@ -755,7 +755,7 @@ static int loraspi_probe(struct spi_device *spi)
 static int loraspi_remove(struct spi_device *spi)
 {
 	struct lora_struct *lrdata;
-	
+
 	dev_info(&(spi->dev), "remove a LoRa SPI device");
 
 	lrdata = spi_get_drvdata(spi);
@@ -773,7 +773,7 @@ static int loraspi_remove(struct spi_device *spi)
 
 	/* Free the memory of the lora device.  */
 	kfree(lrdata);
-	
+
 	return 0;
 }
 
@@ -799,9 +799,9 @@ static struct spi_driver lora_spi_driver = {
 static int loraspi_init(void)
 {
 	int status;
-	
+
 	pr_debug("lora-spi: init SX1278 compatible kernel module\n");
-	
+
 	/* Register a kind of LoRa driver. */
 	lora_register_driver(&lr_driver);
 
