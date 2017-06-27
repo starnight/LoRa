@@ -170,9 +170,8 @@ file_write(struct file *filp, const char __user *buf, size_t size, loff_t *pos)
 
 	lrdata = filp->private_data;
 
-	if (lrdata->ops->write != NULL) {
+	if (lrdata->ops->write != NULL)
 		return lrdata->ops->write(lrdata, buf, size);
-	}
 	else
 		return 0;
 }
