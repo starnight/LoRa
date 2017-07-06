@@ -1,5 +1,7 @@
-PROJ=lora
+PPROJ=lora
+PROJ=lora-spi
 obj-m := $(PROJ).o
+$(PROJ)-objs := lora.o lora_spi.o sx1278.o
 
 KERNEL_LOCATION=/lib/modules/$(shell uname -r)
 BUILDDIR=$(KERNEL_LOCATION)/build
@@ -20,7 +22,7 @@ uninstall:
 
 test:
 	make install; echo
-	cat /proc/kallsyms | grep $(PROJ); echo
+	ls -l /dev/$(PROJ)*
 	make uninstall
 
 clean:

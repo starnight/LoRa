@@ -286,7 +286,7 @@ file_poll(struct file *filp, poll_table *wait)
  *
  * Return:	0 / other number for success / failed
  */
-static int
+int
 lora_device_add(struct lora_struct *lrdata)
 {
 	INIT_LIST_HEAD(&(lrdata->device_entry));
@@ -305,7 +305,7 @@ EXPORT_SYMBOL(lora_device_add);
  *
  * Return:	0 / other number for success / failed
  */
-static int
+int
 lora_device_remove(struct lora_struct *lrdata)
 {
 	mutex_lock(&device_list_lock);
@@ -332,7 +332,7 @@ static struct file_operations lora_fops = {
  *
  * Return:	0 / negative number for success / error number
  */
-static int
+int
 lora_register_driver(struct lora_driver *driver)
 {
 	dev_t dev;
@@ -390,7 +390,7 @@ EXPORT_SYMBOL(lora_register_driver);
  *
  * Return:	0 / negative number for success / error number
  */
-static int
+int
 lora_unregister_driver(struct lora_driver *driver)
 {
 	dev_t dev = MKDEV(driver->major, driver->minor_start);
@@ -407,7 +407,3 @@ lora_unregister_driver(struct lora_driver *driver)
 	return 0;
 }
 EXPORT_SYMBOL(lora_unregister_driver);
-
-MODULE_AUTHOR("Jian-Hong Pan, <starnight@g.ncu.edu.tw>");
-MODULE_DESCRIPTION("User mode LoRa device interface");
-MODULE_LICENSE("Dual BSD/GPL");

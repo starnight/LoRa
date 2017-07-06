@@ -149,4 +149,9 @@ struct lora_driver {
 	struct module *owner;
 };
 
+int lora_device_add(struct lora_struct *);
+int lora_device_remove(struct lora_struct *);
+int lora_register_driver(struct lora_driver *);
+int lora_unregister_driver(struct lora_driver *);
+
 #endif
