@@ -297,7 +297,6 @@ lora_device_add(struct lora_struct *lrdata)
 
 	return 0;
 }
-EXPORT_SYMBOL(lora_device_add);
 
 /**
  * lora_device_remove - Remove a LoRa compatible device from the device list
@@ -314,7 +313,6 @@ lora_device_remove(struct lora_struct *lrdata)
 
 	return 0;
 }
-EXPORT_SYMBOL(lora_device_remove);
 
 static struct file_operations lora_fops = {
 	.open 		= file_open,
@@ -382,7 +380,6 @@ lora_register_driver(struct lora_driver *driver)
 
 	return 0;
 }
-EXPORT_SYMBOL(lora_register_driver);
 
 /**
  * lora_unregister_driver - Unregister the LoRa driver
@@ -406,4 +403,3 @@ lora_unregister_driver(struct lora_driver *driver)
 
 	return 0;
 }
-EXPORT_SYMBOL(lora_unregister_driver);
