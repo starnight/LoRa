@@ -183,7 +183,7 @@ sx127X_readVersion(struct spi_device *spi)
 
 	status = sx127X_read_reg(spi, SX127X_REG_VERSION, &v, 1);
 
-	if ((status == 1) && (v > 0))
+	if ((status == 1) && (0 < v) && (v < 0xFF))
 		status = v;
 	else
 		status = -ENODEV;
