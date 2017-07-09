@@ -434,6 +434,21 @@ sx127X_getLoRaLNA(struct spi_device *spi)
 }
 
 /**
+ * sx127X_setLoRaLNAAGC - Set RF LNA go with auto gain control or not
+ * @spi:	spi device to communicate with
+ * @yesno:	1 / 0 for auto gain control / manual
+ */
+void
+sx127X_setLoRaLNAAGC(struct spi_device *spi, int32_t yesno)
+{
+	uint8_t mcf3;
+
+	sx127X_read_reg(spi, SX127X_REG_MODEM_CONFIG3, &mcf3, 1);
+	mcf3 = (yesno) ? (mcf3 | 0x04) : (mcf3 & (~0x04));
+	sx127X_write_reg(spi, SX127X_REG_MODEM_CONFIG3, &mcf3, 1);
+}
+
+/**
  * sx127X_getLoRaAllFlag - Get all of the LoRa device's IRQ flags' current state
  * @spi:	spi device to communicate with
  *
@@ -1398,6 +1413,31 @@ loraspi_getLNA(struct lora_struct *lrdata, void __user *arg)
 }
 
 /**
+ * loraspi_setLNAAGC - Set the LNA be auto gain control
+ * @lrdata:	LoRa device
+ * @arg:	the buffer holding the auto gain control or not in user space
+ *
+ * Return:	0 / other values for success / error
+ */
+static long
+loraspi_setLNAAGC(struct lora_struct *lrdata, void __user *arg)
+{
+	struct spi_device *spi;
+	int status;
+	uint32_t agc;
+
+	spi = lrdata->lora_device;
+	status = copy_from_user(&agc, arg, sizeof(uint32_t));
+
+	agc = (agc == 1) ? 1 : 0;
+	mutex_lock(&(lrdata->buf_lock));
+	sx127X_setLoRaLNAAGC(spi, agc);
+	mutex_unlock(&(lrdata->buf_lock));
+
+	return 0;
+}
+
+/**
  * loraspi_setsprfactor - Set the RF spreading factor
  * @lrdata:	LoRa device
  * @arg:	the buffer holding the spreading factor in user space
@@ -1605,6 +1645,7 @@ struct lora_operations lrops = {
 	.getPower = loraspi_getpower,
 	.setLNA = loraspi_setLNA,
 	.getLNA = loraspi_getLNA,
+	.setLNAAGC = loraspi_setLNAAGC,
 	.setSPRFactor = loraspi_setsprfactor,
 	.getSPRFactor = loraspi_getsprfactor,
 	.setBW = loraspi_setbandwidth,

@@ -55,12 +55,13 @@
 #define LORA_GET_POWER		(_IOR(LORA_IOC_MAGIC,  5, int))
 #define LORA_SET_LNA		(_IOW(LORA_IOC_MAGIC,  6, int))
 #define LORA_GET_LNA		(_IOR(LORA_IOC_MAGIC,  7, int))
-#define LORA_SET_SPRFACTOR	(_IOW(LORA_IOC_MAGIC,  8, int))
-#define LORA_GET_SPRFACTOR	(_IOR(LORA_IOC_MAGIC,  9, int))
-#define LORA_SET_BANDWIDTH	(_IOW(LORA_IOC_MAGIC, 10, int))
-#define LORA_GET_BANDWIDTH	(_IOR(LORA_IOC_MAGIC, 11, int))
-#define LORA_GET_RSSI		(_IOR(LORA_IOC_MAGIC, 12, int))
-#define LORA_GET_SNR		(_IOR(LORA_IOC_MAGIC, 13, int))
+#define LORA_SET_LNAAGC		(_IOR(LORA_IOC_MAGIC,  8, int))
+#define LORA_SET_SPRFACTOR	(_IOW(LORA_IOC_MAGIC,  9, int))
+#define LORA_GET_SPRFACTOR	(_IOR(LORA_IOC_MAGIC, 10, int))
+#define LORA_SET_BANDWIDTH	(_IOW(LORA_IOC_MAGIC, 11, int))
+#define LORA_GET_BANDWIDTH	(_IOR(LORA_IOC_MAGIC, 12, int))
+#define LORA_GET_RSSI		(_IOR(LORA_IOC_MAGIC, 13, int))
+#define LORA_GET_SNR		(_IOR(LORA_IOC_MAGIC, 14, int))
 
 /* List the state of the LoRa device. */
 #define LORA_STATE_SLEEP	0
@@ -85,6 +86,8 @@ struct lora_operations {
 	/* Set & get the LNA gain. */
 	long (*setLNA)(struct lora_struct *, void __user *);
 	long (*getLNA)(struct lora_struct *, void __user *);
+	/* Set LNA be auto gain control. */
+	long (*setLNAAGC)(struct lora_struct *, void __user *);
 	/* Set & get the RF spreading factor. */
 	long (*setSPRFactor)(struct lora_struct *, void __user *);
 	long (*getSPRFactor)(struct lora_struct *, void __user *);

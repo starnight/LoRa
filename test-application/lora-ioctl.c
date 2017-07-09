@@ -142,6 +142,12 @@ int32_t get_lna(int fd)
 	return lna;
 }
 
+/* Set LNA auto gain control or not. */
+void set_lnaagc(int fd, uint32_t agc)
+{
+	ioctl(fd, LORA_SET_LNAAGC, &agc);
+}
+
 /* Set & get the RF spreading factor. */
 void set_sprfactor(int fd, uint32_t sprf)
 {
