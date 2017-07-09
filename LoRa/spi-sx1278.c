@@ -723,28 +723,6 @@ sx127X_sendLoRaData(struct spi_device *spi, uint8_t *buf, size_t len)
 }
 
 /**
- * sx127X_getLoRaLastPacketRSSI - Get last LoRa packet's SNR
- * @spi:	spi device to communicate with
- *
- * Return:	the last LoRa packet's RSSI in dbm
- */
-int32_t
-sx127X_getLoRaLastPacketRSSI(struct spi_device *spi)
-{
-	uint32_t dbm;
-	uint8_t lhf;
-	uint8_t rssi;
-
-	/* Get LoRa is in high or low frequency mode. */
-	lhf = sx127X_getMode(spi) & 0x08;
-	/* Get RSSI value. */
-	sx127X_read_reg(spi, SX127X_REG_PKT_RSSI_VALUE, &rssi, 1);
-	dbm = (lhf) ? -164 + rssi : -157 + rssi;
-
-	return dbm;
-}
-
-/**
  * sx127X_getLoRaLastPacketSNR - Get last LoRa packet's SNR
  * @spi:	spi device to communicate with
  *
@@ -763,6 +741,34 @@ sx127X_getLoRaLastPacketSNR(struct spi_device *spi)
 }
 
 /**
+ * sx127X_getLoRaLastPacketRSSI - Get last LoRa packet's SNR
+ * @spi:	spi device to communicate with
+ *
+ * Return:	the last LoRa packet's RSSI in dbm
+ */
+int32_t
+sx127X_getLoRaLastPacketRSSI(struct spi_device *spi)
+{
+	int32_t dbm;
+	uint8_t lhf;
+	uint8_t rssi;
+	int8_t snr;
+
+	/* Get LoRa is in high or low frequency mode. */
+	lhf = sx127X_getMode(spi) & 0x08;
+	/* Get RSSI value. */
+	sx127X_read_reg(spi, SX127X_REG_PKT_RSSI_VALUE, &rssi, 1);
+	dbm = (lhf) ? -164 + rssi : -157 + rssi;
+
+	/* Adjust to correct the last packet RSSI if SNR < 0. */
+	sx127X_read_reg(spi, SX127X_REG_PKT_SNR_VALUE, &snr, 1);
+	if(snr < 0)
+		dbm += snr / 4;
+
+	return dbm;
+}
+
+/**
  * sx127X_getLoRaRSSI - Get current RSSI value
  * @spi:	spi device to communicate with
  *
@@ -771,7 +777,7 @@ sx127X_getLoRaLastPacketSNR(struct spi_device *spi)
 int32_t
 sx127X_getLoRaRSSI(struct spi_device *spi)
 {
-	uint32_t dbm;
+	int32_t dbm;
 	uint8_t lhf;
 	uint8_t rssi;
 
