@@ -750,11 +750,11 @@ sx127X_getLoRaLastPacketRSSI(struct spi_device *spi)
  *
  * Return:	the last LoRa packet's SNR in db
  */
-uint32_t
+int32_t
 sx127X_getLoRaLastPacketSNR(struct spi_device *spi)
 {
-	uint32_t db;
-	uint8_t snr;
+	int32_t db;
+	int8_t snr;
 
 	sx127X_read_reg(spi, SX127X_REG_PKT_SNR_VALUE, &snr, 1);
 	db = snr / 4;
@@ -1418,7 +1418,7 @@ loraspi_getsnr(struct lora_struct *lrdata, void __user *arg)
 {
 	struct spi_device *spi;
 	int status;
-	uint32_t snr;
+	int32_t snr;
 
 	spi = lrdata->lora_device;
 

@@ -82,7 +82,7 @@ uint32_t get_freq(int fd);
 int32_t get_rssi(int fd);
 
 /* Get last packet SNR. */
-uint32_t get_snr(int fd);
+int32_t get_snr(int fd);
 
 /* Set & get output power. */
 void set_power(int fd, int32_t power);

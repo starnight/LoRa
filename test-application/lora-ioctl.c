@@ -103,9 +103,9 @@ int32_t get_rssi(int fd)
 }
 
 /* Get last packet SNR. */
-uint32_t get_snr(int fd)
+int32_t get_snr(int fd)
 {
-	uint32_t snr;
+	int32_t snr;
 
 	ioctl(fd, LORA_GET_SNR, &snr);
 

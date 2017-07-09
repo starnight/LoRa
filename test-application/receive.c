@@ -106,7 +106,7 @@ int main(int argc, char **argv)
 	if (len > 0) {
 		printf("Read %d bytes: %s\n", len, buf);
 		printf("The current RSSI is %d dbm\n", get_rssi(fd));
-		printf("The last packet SNR is %u db\n", get_snr(fd));
+		printf("The last packet SNR is %d db\n", get_snr(fd));
 
 		sleep(1);
 
