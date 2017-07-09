@@ -127,6 +127,21 @@ int32_t get_power(int fd)
 	return power;
 }
 
+/* Set & get LNA gain. */
+void set_lna(int fd, int32_t lna)
+{
+	ioctl(fd, LORA_SET_LNA, &lna);
+}
+
+int32_t get_lna(int fd)
+{
+	int32_t lna;
+
+	ioctl(fd, LORA_GET_LNA, &lna);
+
+	return lna;
+}
+
 /* Set & get the RF spreading factor. */
 void set_sprfactor(int fd, uint32_t sprf)
 {

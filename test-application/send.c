@@ -124,6 +124,7 @@ int main(int argc, char **argv)
 	printf("The current RSSI is %d dbm\n", get_rssi(fd));
 	printf("The last packet SNR is %d db\n", get_snr(fd));
 	printf("The output power is %d dbm\n", get_power(fd));
+	printf("The LNA gain is %d db\n", get_lna(fd));
 
 	/* Set the device in sleep state. */
 	set_state(fd, LORA_STATE_SLEEP);

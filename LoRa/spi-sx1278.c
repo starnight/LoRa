@@ -381,6 +381,58 @@ sx127X_getLoRaPower(struct spi_device *spi)
 	return pout;
 }
 
+int8_t lna_gain[] = {
+	 0,
+	-6,
+	-12,
+	-24,
+	-26,
+	-48
+};
+
+/**
+ * sx127X_setLoRaLNA - Set RF LNA gain
+ * @spi:	spi device to communicate with
+ * @db:		RF LNA gain going to be assigned in db
+ */
+void
+sx127X_setLoRaLNA(struct spi_device *spi, int32_t db)
+{
+	uint8_t i, g;
+	uint8_t lnacf;
+
+	for (i = 0; i < 5; i++) {
+		if (lna_gain[i] <= db)
+			break;
+	}
+	g = i + 1;
+
+	sx127X_read_reg(spi, SX127X_REG_LNA, &lnacf, 1);
+	lnacf = (lnacf & 0x1F) | (g << 5);
+	sx127X_write_reg(spi, SX127X_REG_LNA, &lnacf, 1);
+}
+
+/**
+ * sx127X_getLoRaLNA - Get RF LNA gain
+ * @spi:	spi device to communicate with
+ *
+ * Return:	RF LNA gain db
+ */
+int32_t
+sx127X_getLoRaLNA(struct spi_device *spi)
+{
+	int32_t db;
+	int8_t i, g;
+	uint8_t lnacf;
+
+	sx127X_read_reg(spi, SX127X_REG_LNA, &lnacf, 1);
+	g = (lnacf >> 5);
+	i = g - 1;
+	db = lna_gain[i];
+
+	return db;
+}
+
 /**
  * sx127X_getLoRaAllFlag - Get all of the LoRa device's IRQ flags' current state
  * @spi:	spi device to communicate with
@@ -1248,7 +1300,7 @@ loraspi_setpower(struct lora_struct *lrdata, void __user *arg)
 	int32_t dbm;
 
 	spi = lrdata->lora_device;
-	status = copy_from_user(&dbm, arg, sizeof(uint32_t));
+	status = copy_from_user(&dbm, arg, sizeof(int32_t));
 
 #define LORA_MAX_POWER	(17)
 #define LORA_MIN_POWER	(-2)
@@ -1284,7 +1336,63 @@ loraspi_getpower(struct lora_struct *lrdata, void __user *arg)
 	dbm = sx127X_getLoRaPower(spi);
 	mutex_unlock(&(lrdata->buf_lock));
 
-	status = copy_to_user(arg, &dbm, sizeof(uint32_t));
+	status = copy_to_user(arg, &dbm, sizeof(int32_t));
+
+	return 0;
+}
+
+/**
+ * loraspi_setLNA - Set the LNA gain
+ * @lrdata:	LoRa device
+ * @arg:	the buffer holding the LNA gain value in user space
+ *
+ * Return:	0 / other values for success / error
+ */
+static long
+loraspi_setLNA(struct lora_struct *lrdata, void __user *arg)
+{
+	struct spi_device *spi;
+	int status;
+	int32_t db;
+
+	spi = lrdata->lora_device;
+	status = copy_from_user(&db, arg, sizeof(int32_t));
+
+#define LORA_MAX_LNA	(0)
+#define LORA_MIN_LNA	(-48)
+	if (db > LORA_MAX_LNA)
+		db = LORA_MAX_LNA;
+	else if (db < LORA_MIN_LNA)
+		db = LORA_MIN_LNA;
+
+	mutex_lock(&(lrdata->buf_lock));
+	sx127X_setLoRaLNA(spi, db);
+	mutex_unlock(&(lrdata->buf_lock));
+
+	return 0;
+}
+
+/**
+ * loraspi_getLNA -  Get the LNA gain
+ * @lrdata:	LoRa device
+ * @arg:	the buffer going to hold the LNA gain value in user space
+ *
+ * Return:	0 / other values for success / error
+ */
+static long
+loraspi_getLNA(struct lora_struct *lrdata, void __user *arg)
+{
+	struct spi_device *spi;
+	int status;
+	int32_t db;
+
+	spi = lrdata->lora_device;
+
+	mutex_lock(&(lrdata->buf_lock));
+	db = sx127X_getLoRaLNA(spi);
+	mutex_unlock(&(lrdata->buf_lock));
+
+	status = copy_to_user(arg, &db, sizeof(int32_t));
 
 	return 0;
 }
@@ -1432,7 +1540,7 @@ loraspi_getsnr(struct lora_struct *lrdata, void __user *arg)
 	snr = sx127X_getLoRaLastPacketSNR(spi);
 	mutex_unlock(&(lrdata->buf_lock));
 
-	status = copy_to_user(arg, &snr, sizeof(uint32_t));
+	status = copy_to_user(arg, &snr, sizeof(int32_t));
 
 	return 0;
 }
@@ -1495,6 +1603,8 @@ struct lora_operations lrops = {
 	.getFreq = loraspi_getfreq,
 	.setPower = loraspi_setpower,
 	.getPower = loraspi_getpower,
+	.setLNA = loraspi_setLNA,
+	.getLNA = loraspi_getLNA,
 	.setSPRFactor = loraspi_setsprfactor,
 	.getSPRFactor = loraspi_getsprfactor,
 	.setBW = loraspi_setbandwidth,

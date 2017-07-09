@@ -130,6 +130,7 @@ int main(int argc, char **argv)
 	printf("The RF spreading factor is %u chips\n", get_sprfactor(fd));
 	printf("The RF bandwith is %u Hz\n", get_bw(fd));
 	printf("The output power is %d dbm\n", get_power(fd));
+	printf("The LNA gain is %d db\n", get_lna(fd));
 
 	/* Set the device in sleep state. */
 	set_state(fd, LORA_STATE_SLEEP);
