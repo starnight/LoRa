@@ -16,16 +16,16 @@
 				status = "disabled";
 			};
 			
-			lora-spi@0 {
-				compatible = "lora-spi";
+			sx1278@0 {
+				compatible = "sx1278";
 				reg = <0>;
 				status = "okay";
 				spi-max-frequency = <0x3b60>;
 				clock-frequency = <32000000>;
 			};
 
-			lora-spi@1 {
-				compatible = "lora-spi";
+			sx1278@1 {
+				compatible = "sx1278";
 				reg = <1>;
 				status = "okay";
 				spi-max-frequency = <0x3b60>;

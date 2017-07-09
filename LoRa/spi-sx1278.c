@@ -917,7 +917,7 @@ init_sx127X(struct spi_device *spi)
 
 /*---------------------------- LoRa SPI Functions ----------------------------*/
 
-#define __DRIVER_NAME		"lora-spi"
+#define __DRIVER_NAME		"sx1278"
 #ifndef N_LORASPI_MINORS
 #define N_LORASPI_MINORS	8
 #endif
@@ -1506,7 +1506,7 @@ static const struct of_device_id lora_dt_ids[] = {
 	{ .compatible = "semtech,sx1277" },
 	{ .compatible = "semtech,sx1278" },
 	{ .compatible = "semtech,sx1279" },
-	{ .compatible = "lora-spi" },
+	{ .compatible = "sx1278" },
 	{}, /* Should be terminated with a NULL entry. */
 };
 MODULE_DEVICE_TABLE(of, lora_dt_ids);
@@ -1517,7 +1517,7 @@ MODULE_DEVICE_TABLE(of, lora_dt_ids);
 /* The compatible ACPI device array. */
 #define LORA_ACPI_DUMMY	1
 static const struct acpi_device_id lora_acpi_ids[] = {
-	{ .id = "lora-spi" },
+	{ .id = "sx1278" },
 	{}, /* Should be terminated with a NULL entry. */
 };
 MODULE_DEVICE_TABLE(acpi, lora_acpi_ids);
@@ -1543,7 +1543,7 @@ static void loraspi_probe_acpi(struct spi_device *spi) {};
 
 /* The compatible SPI device id array. */
 static const struct spi_device_id spi_ids[] = {
-	{ .name = "lora-spi" },
+	{ .name = "sx1278" },
 	{}, /* Should be terminated with a NULL entry. */
 };
 MODULE_DEVICE_TABLE(spi, spi_ids);
@@ -1664,7 +1664,7 @@ static int loraspi_sx1278_init(void)
 {
 	int status;
 
-	pr_debug("lora-spi: init SX1278 compatible kernel module\n");
+	pr_debug("sx1278: init SX1278 compatible kernel module\n");
 
 	/* Register a kind of LoRa driver. */
 	lora_register_driver(&lr_driver);
@@ -1678,7 +1678,7 @@ static int loraspi_sx1278_init(void)
 /* LoRa-SPI kernel module's exit function. */
 static void loraspi_sx1278_exit(void)
 {
-	pr_debug("lora-spi: exit\n");
+	pr_debug("sx1278: exit\n");
 
 	/* Unregister the LoRa SPI driver. */
 	spi_unregister_driver(&lora_spi_driver);
@@ -1690,5 +1690,5 @@ module_init(loraspi_sx1278_init);
 module_exit(loraspi_sx1278_exit);
 
 MODULE_AUTHOR("Jian-Hong Pan, <starnight@g.ncu.edu.tw>");
-MODULE_DESCRIPTION("LoRa device kernel module with SPI interface");
+MODULE_DESCRIPTION("LoRa device driver with SPI interface");
 MODULE_LICENSE("Dual BSD/GPL");
