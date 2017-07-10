@@ -86,12 +86,6 @@ int main(int argc, char **argv)
 	set_power(fd, power);
 	printf("Going to set the RF power %d dbm\n", power);
 
-	/* Set the RF LNA gain. */
-	int32_t lna = -1;
-	set_lnaagc(fd, 0);
-	set_lna(fd, lna);
-	printf("Going to set the RF LNA gain %d db\n", lna);
-
 	printf("The current RSSI is %d dbm\n", get_rssi(fd));
 
 	/* Write to the file descriptor if it is ready to be written. */
