@@ -142,7 +142,7 @@ int32_t get_lna(int fd)
 	return lna;
 }
 
-/* Set LNA auto gain control or not. */
+/* Set LNA be auto gain control or manual. */
 void set_lnaagc(int fd, uint32_t agc)
 {
 	ioctl(fd, LORA_SET_LNAAGC, &agc);

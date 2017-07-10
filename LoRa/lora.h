@@ -86,7 +86,7 @@ struct lora_operations {
 	/* Set & get the LNA gain. */
 	long (*setLNA)(struct lora_struct *, void __user *);
 	long (*getLNA)(struct lora_struct *, void __user *);
-	/* Set LNA be auto gain control. */
+	/* Set LNA be auto gain control or manual. */
 	long (*setLNAAGC)(struct lora_struct *, void __user *);
 	/* Set & get the RF spreading factor. */
 	long (*setSPRFactor)(struct lora_struct *, void __user *);

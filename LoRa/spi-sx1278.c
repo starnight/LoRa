@@ -434,7 +434,7 @@ sx127X_getLoRaLNA(struct spi_device *spi)
 }
 
 /**
- * sx127X_setLoRaLNAAGC - Set RF LNA go with auto gain control or not
+ * sx127X_setLoRaLNAAGC - Set RF LNA go with auto gain control or manual
  * @spi:	spi device to communicate with
  * @yesno:	1 / 0 for auto gain control / manual
  */
@@ -1415,7 +1415,7 @@ loraspi_getLNA(struct lora_struct *lrdata, void __user *arg)
 /**
  * loraspi_setLNAAGC - Set the LNA be auto gain control
  * @lrdata:	LoRa device
- * @arg:	the buffer holding the auto gain control or not in user space
+ * @arg:	the buffer holding the auto gain control or manual in user space
  *
  * Return:	0 / other values for success / error
  */

@@ -227,7 +227,7 @@ file_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		if (lrdata->ops->getLNA != NULL)
 			ret = lrdata->ops->getLNA(lrdata, pval);
 		break;
-	/* Set the LNA be auto gain control. */
+	/* Set the LNA be auto gain control or manual. */
 	case LORA_SET_LNAAGC:
 		if (lrdata->ops->setLNAAGC != NULL)
 			ret = lrdata->ops->setLNAAGC(lrdata, pval);

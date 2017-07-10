@@ -95,7 +95,7 @@ int32_t get_power(int fd);
 void set_lna(int fd, int32_t lna);
 int32_t get_lna(int fd);
 
-/* Set LNA auto gain control or not. */
+/* Set LNA be auto gain control or manual. */
 void set_lnaagc(int fd, uint32_t agc);
 
 /* Set & get the RF spreading factor. */
