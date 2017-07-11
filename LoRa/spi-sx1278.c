@@ -45,6 +45,7 @@
 #include <linux/compat.h>
 #include <linux/acpi.h>
 #include <linux/spi/spi.h>
+#include <linux/regmap.h>
 #include <linux/of.h>
 #include <linux/of_device.h>
 #include <linux/errno.h>
@@ -53,12 +54,12 @@
 
 #include "lora.h"
 
+/*------------------------------ LoRa Functions ------------------------------*/
+
 #ifndef F_XOSC
 #define F_XOSC		32000000
 #endif
 #define	__POW_2_19	0x80000
-
-/*------------------------------ SPI Functions -------------------------------*/
 
 /* SX127X Registers addresses */
 #define SX127X_REG_FIFO				0x00
@@ -113,6 +114,7 @@
 #define SX127X_REG_AGC_THRESH2			0x63
 #define SX127X_REG_AGC_THRESH3			0x64
 #define SX127X_REG_PLL				0x70
+#define SX127X_MAX_REG				SX127X_REG_PLL
 
 /* SX127X's operating states in LoRa mode */
 #define SX127X_SLEEP_MODE			0x00
@@ -145,109 +147,6 @@
 #define SX127X_FLAGMASK_CADDETECTED		0x01
 
 /**
- * sx127X_sync - Do the SPI communication with the device
- * @spi:	spi device to communicate with
- * @m:		spi message going to be transferred
- *
- * Return:	How many bytes has been transferred, -1 for failed
- */
-ssize_t
-sx127X_sync(struct spi_device *spi, struct spi_message *m)
-{
-	DECLARE_COMPLETION_ONSTACK(done);
-	int status;
-
-	if (spi == NULL)
-		status = -ESHUTDOWN;
-	else
-		status = spi_sync(spi, m);
-
-	if (status == 0)
-		status = m->actual_length;
-
-	return status;
-}
-
-/**
- * sx127X_read_reg - Build SPI read message and read from the SPI device
- * @spi:	spi device to communicate with
- * @adr:	the register's start address which is going to be read from
- * @buf:	the buffer going to be read into, from the registers
- * @len:	the length of the buffer in bytes
- *
- * Return:	How many bytes has been read, -1 for failed
- */
-int
-sx127X_read_reg(struct spi_device *spi, uint8_t adr, void *buf, size_t len)
-{
-	int status = 0;
-	struct spi_transfer at, bt;
-	struct spi_message m;
-
-	spi_message_init(&m);
-
-	/* Read address.  The MSB must be 0 because of reading an address. */
-	memset(&at, 0, sizeof(at));
-	at.tx_buf = &adr;
-	at.len = 1;
-	spi_message_add_tail(&at, &m);
-
-	/* Read value. */
-	memset(&bt, 0, sizeof(bt));
-	bt.rx_buf = buf;
-	bt.len = len;
-	spi_message_add_tail(&bt, &m);
-
-	status = sx127X_sync(spi, &m);
-	/* Minus the start address's length. */
-	if (status > 0)
-		status -= 1;
-
-	return status;
-}
-
-/**
- * sx127X_write_reg - Build SPI write message and write into the SPI device
- * @spi:	spi device to communicate with
- * @adr:	the register's start address which is going to be written into
- * @buf:	the buffer going to be written into the registers
- * @len:	the length of the buffer in bytes
- *
- * Return:	How many bytes has been written, -1 for failed
- */
-int
-sx127X_write_reg(struct spi_device *spi, uint8_t adr, void *buf, size_t len)
-{
-	int status = 0;
-	struct spi_transfer at, bt;
-	struct spi_message m;
-
-	spi_message_init(&m);
-
-	/* Write address.  The MSB must be 1 because of writing an address. */
-	adr |= 0x80;
-	memset(&at, 0, sizeof(at));
-	at.tx_buf = &adr;
-	at.len = 1;
-	spi_message_add_tail(&at, &m);
-
-	/* Write value. */
-	memset(&bt, 0, sizeof(bt));
-	bt.tx_buf = buf;
-	bt.len = len;
-	spi_message_add_tail(&bt, &m);
-
-	status = sx127X_sync(spi, &m);
-	/* Minus the start address's length. */
-	if (status > 0)
-		status -= 1;
-
-	return status;
-}
-
-/*------------------------------ LoRa Functions ------------------------------*/
-
-/**
  * sx127X_readVersion - Get LoRa device's chip version
  * @spi:	spi device to communicate with
  * @vstr:	the buffer going to hold the chip's version string
@@ -258,7 +157,7 @@ sx127X_write_reg(struct spi_device *spi, uint8_t adr, void *buf, size_t len)
  * 				bits 3-0 metal mask revision number
  */
 int
-sx127X_readVersion(struct spi_device *spi)
+sx127X_readVersion(struct regmap *rm)
 {
 	uint8_t v;
 	int status;
@@ -280,7 +179,7 @@ sx127X_readVersion(struct spi_device *spi)
  * Return:	LoRa device's register value
  */
 uint8_t 
-sx127X_getMode(struct spi_device *spi)
+sx127X_getMode(struct regmap *rm)
 {
 	uint8_t op_mode;
 
@@ -296,7 +195,7 @@ sx127X_getMode(struct spi_device *spi)
  * @st:		LoRa device's operating state going to be assigned
  */
 void
-sx127X_setState(struct spi_device *spi, uint8_t st)
+sx127X_setState(struct regmap *rm, uint8_t st)
 {
 	uint8_t op_mode;
 
@@ -314,7 +213,7 @@ sx127X_setState(struct spi_device *spi, uint8_t st)
  * Return:	LoRa device's operating state
  */
 uint8_t
-sx127X_getState(struct spi_device *spi)
+sx127X_getState(struct regmap *rm)
 {
 	uint8_t op_mode;
 
@@ -329,7 +228,7 @@ sx127X_getState(struct spi_device *spi)
  * @fr:		RF frequency going to be assigned in Hz
  */
 void
-sx127X_setLoRaFreq(struct spi_device *spi, uint32_t fr)
+sx127X_setLoRaFreq(struct regmap *rm, uint32_t fr)
 {
 	uint64_t frt64;
 	uint32_t frt;
@@ -341,7 +240,7 @@ sx127X_setLoRaFreq(struct spi_device *spi, uint32_t fr)
 	/* Set the LoRa module's crystal oscillator's clock if OF is defined. */
 	const void *ptr;
 
-	ptr = of_get_property(spi->dev.of_node, "clock-frequency", NULL);
+	ptr = of_get_property((regmap_get_device(rm)).of_node, "clock-frequency", NULL);
 	f_xosc = (ptr != NULL) ? be32_to_cpup(ptr) : F_XOSC;
 #else
 	f_xosc = F_XOSC;
@@ -366,7 +265,7 @@ sx127X_setLoRaFreq(struct spi_device *spi, uint32_t fr)
  * Return:	RF frequency in Hz
  */
 uint32_t
-sx127X_getLoRaFreq(struct spi_device *spi)
+sx127X_getLoRaFreq(struct regmap *rm)
 {
 	uint64_t frt = 0;
 	uint8_t buf[3];
@@ -379,7 +278,7 @@ sx127X_getLoRaFreq(struct spi_device *spi)
 	/* Set the LoRa module's crystal oscillator's clock if OF is defined. */
 	const void *ptr;
 
-	ptr = of_get_property(spi->dev.of_node, "clock-frequency", NULL);
+	ptr = of_get_property((regmap_get_device(rm)).of_node, "clock-frequency", NULL);
 	f_xosc = (ptr != NULL) ? be32_to_cpup(ptr) : F_XOSC;
 #else
 	f_xosc = F_XOSC;
@@ -403,7 +302,7 @@ sx127X_getLoRaFreq(struct spi_device *spi)
  * @pout:	RF output power going to be assigned in dbm
  */
 void
-sx127X_setLoRaPower(struct spi_device *spi, int32_t pout)
+sx127X_setLoRaPower(struct regmap *rm, int32_t pout)
 {
 	uint8_t pac;
 	uint8_t boost;
@@ -440,7 +339,7 @@ sx127X_setLoRaPower(struct spi_device *spi, int32_t pout)
  * Return:	RF output power in dbm
  */
 int32_t
-sx127X_getLoRaPower(struct spi_device *spi)
+sx127X_getLoRaPower(struct regmap *rm)
 {
 	uint8_t pac;
 	uint8_t boost;
@@ -478,7 +377,7 @@ int8_t lna_gain[] = {
  * @db:		RF LNA gain going to be assigned in db
  */
 void
-sx127X_setLoRaLNA(struct spi_device *spi, int32_t db)
+sx127X_setLoRaLNA(struct regmap *rm, int32_t db)
 {
 	uint8_t i, g;
 	uint8_t lnacf;
@@ -501,7 +400,7 @@ sx127X_setLoRaLNA(struct spi_device *spi, int32_t db)
  * Return:	RF LNA gain db
  */
 int32_t
-sx127X_getLoRaLNA(struct spi_device *spi)
+sx127X_getLoRaLNA(struct regmap *rm)
 {
 	int32_t db;
 	int8_t i, g;
@@ -521,7 +420,7 @@ sx127X_getLoRaLNA(struct spi_device *spi)
  * @yesno:	1 / 0 for auto gain control / manual
  */
 void
-sx127X_setLoRaLNAAGC(struct spi_device *spi, int32_t yesno)
+sx127X_setLoRaLNAAGC(struct regmap *rm, int32_t yesno)
 {
 	uint8_t mcf3;
 
@@ -537,7 +436,7 @@ sx127X_setLoRaLNAAGC(struct spi_device *spi, int32_t yesno)
  * Return:	All of the LoRa device's IRQ flags' current state in a byte
  */
 uint8_t
-sx127X_getLoRaAllFlag(struct spi_device *spi)
+sx127X_getLoRaAllFlag(struct regmap *rm)
 {
 	uint8_t flags;
 
@@ -561,7 +460,7 @@ sx127X_getLoRaAllFlag(struct spi_device *spi)
  * @f:		flags going to be cleared
  */
 void
-sx127X_clearLoRaFlag(struct spi_device *spi, uint8_t f)
+sx127X_clearLoRaFlag(struct regmap *rm, uint8_t f)
 {
 	uint8_t flag;
 
@@ -584,7 +483,7 @@ sx127X_clearLoRaFlag(struct spi_device *spi, uint8_t f)
  * @c_s:	Spreading factor in chips / symbol
  */
 void
-sx127X_setLoRaSPRFactor(struct spi_device *spi, uint32_t c_s)
+sx127X_setLoRaSPRFactor(struct regmap *rm, uint32_t c_s)
 {
 	uint8_t sf;
 	uint8_t mcf2;
@@ -606,7 +505,7 @@ sx127X_setLoRaSPRFactor(struct spi_device *spi, uint32_t c_s)
  * Return:	Spreading factor in chips / symbol
  */
 uint32_t
-sx127X_getLoRaSPRFactor(struct spi_device *spi)
+sx127X_getLoRaSPRFactor(struct regmap *rm)
 {
 	uint8_t sf;
 	uint32_t c_s;
@@ -637,7 +536,7 @@ const uint32_t hz[] = {
  * @bw:		RF bandwidth going to be assigned in Hz
  */
 void
-sx127X_setLoRaBW(struct spi_device *spi, uint32_t bw)
+sx127X_setLoRaBW(struct regmap *rm, uint32_t bw)
 {
 	uint8_t i;
 	uint8_t mcf1;
@@ -659,7 +558,7 @@ sx127X_setLoRaBW(struct spi_device *spi, uint32_t bw)
  * Return:	RF bandwidth in Hz
  */
 uint32_t
-sx127X_getLoRaBW(struct spi_device *spi)
+sx127X_getLoRaBW(struct regmap *rm)
 {
 	uint8_t mcf1;
 	uint8_t bw;
@@ -677,7 +576,7 @@ sx127X_getLoRaBW(struct spi_device *spi)
  * 		high 4 bits / low 4 bits: numerator / denominator
  */
 void
-sx127X_setLoRaCR(struct spi_device *spi, uint8_t cr)
+sx127X_setLoRaCR(struct regmap *rm, uint8_t cr)
 {
 	uint8_t mcf1;
 
@@ -694,7 +593,7 @@ sx127X_setLoRaCR(struct spi_device *spi, uint8_t cr)
  * 		high 4 bits / low 4 bits: numerator / denominator
  */
 uint8_t
-sx127X_getLoRaCR(struct spi_device *spi)
+sx127X_getLoRaCR(struct regmap *rm)
 {
 	uint8_t mcf1;
 	uint8_t cr;	/* ex: 0x45 represents cr=4/5 */
@@ -711,7 +610,7 @@ sx127X_getLoRaCR(struct spi_device *spi)
  * @yesno:	1 / 0 for Implicit Header Mode / Explicit Header Mode
  */
 void
-sx127X_setLoRaImplicit(struct spi_device *spi, uint8_t yesno)
+sx127X_setLoRaImplicit(struct regmap *rm, uint8_t yesno)
 {
 	uint8_t mcf1;
 
@@ -726,7 +625,7 @@ sx127X_setLoRaImplicit(struct spi_device *spi, uint8_t yesno)
  * @n:		Time-out in terms of symbols (bytes) going to be assigned
  */
 void
-sx127X_setLoRaRXByteTimeout(struct spi_device *spi, uint32_t n)
+sx127X_setLoRaRXByteTimeout(struct regmap *rm, uint32_t n)
 {
 	uint8_t buf[2];
 	uint8_t mcf2;
@@ -753,7 +652,7 @@ sx127X_setLoRaRXByteTimeout(struct spi_device *spi, uint32_t n)
  * @ms:		The RX time-out time in ms
  */
 void
-sx127X_setLoRaRXTimeout(struct spi_device *spi, uint32_t ms)
+sx127X_setLoRaRXTimeout(struct regmap *rm, uint32_t ms)
 {
 	uint32_t n;
 
@@ -769,7 +668,7 @@ sx127X_setLoRaRXTimeout(struct spi_device *spi, uint32_t ms)
  * Return:	Time-out in terms of symbols (bytes)
  */
 uint32_t
-sx127X_getLoRaRXByteTimeout(struct spi_device *spi)
+sx127X_getLoRaRXByteTimeout(struct regmap *rm)
 {
 	uint32_t n;
 	uint8_t buf[2];
@@ -788,7 +687,7 @@ sx127X_getLoRaRXByteTimeout(struct spi_device *spi)
  * Return:	The RX time-out time in ms
  */
 uint32_t
-sx127X_getLoRaRXTimeout(struct spi_device *spi)
+sx127X_getLoRaRXTimeout(struct regmap *rm)
 {
 	uint32_t ms;
 
@@ -804,7 +703,7 @@ sx127X_getLoRaRXTimeout(struct spi_device *spi)
  * @len:	the max payload length going to be assigned in bytes
  */
 void
-sx127X_setLoRaMaxRXBuff(struct spi_device *spi, uint8_t len)
+sx127X_setLoRaMaxRXBuff(struct regmap *rm, uint8_t len)
 {
 	sx127X_write_reg(spi, SX127X_REG_MAX_PAYLOAD_LENGTH, &len, 1);
 }
@@ -818,7 +717,7 @@ sx127X_setLoRaMaxRXBuff(struct spi_device *spi, uint8_t len)
  * Return:	the actual data length read from the LoRa device in bytes
  */
 ssize_t
-sx127X_readLoRaData(struct spi_device *spi, uint8_t *buf, size_t len)
+sx127X_readLoRaData(struct regmap *rm, uint8_t *buf, size_t len)
 {
 	uint8_t start_adr;
 	uint8_t blen;
@@ -848,7 +747,7 @@ sx127X_readLoRaData(struct spi_device *spi, uint8_t *buf, size_t len)
  * Return:	the actual length written into the LoRa device in bytes
  */
 ssize_t
-sx127X_sendLoRaData(struct spi_device *spi, uint8_t *buf, size_t len)
+sx127X_sendLoRaData(struct regmap *rm, uint8_t *buf, size_t len)
 {
 	uint8_t base_adr;
 	uint8_t blen;
@@ -878,7 +777,7 @@ sx127X_sendLoRaData(struct spi_device *spi, uint8_t *buf, size_t len)
  * Return:	the last LoRa packet's SNR in db
  */
 int32_t
-sx127X_getLoRaLastPacketSNR(struct spi_device *spi)
+sx127X_getLoRaLastPacketSNR(struct regmap *rm)
 {
 	int32_t db;
 	int8_t snr;
@@ -896,7 +795,7 @@ sx127X_getLoRaLastPacketSNR(struct spi_device *spi)
  * Return:	the last LoRa packet's RSSI in dbm
  */
 int32_t
-sx127X_getLoRaLastPacketRSSI(struct spi_device *spi)
+sx127X_getLoRaLastPacketRSSI(struct regmap *rm)
 {
 	int32_t dbm;
 	uint8_t lhf;
@@ -924,7 +823,7 @@ sx127X_getLoRaLastPacketRSSI(struct spi_device *spi)
  * Return:	the current RSSI in dbm
  */
 int32_t
-sx127X_getLoRaRSSI(struct spi_device *spi)
+sx127X_getLoRaRSSI(struct regmap *rm)
 {
 	int32_t dbm;
 	uint8_t lhf;
@@ -945,7 +844,7 @@ sx127X_getLoRaRSSI(struct spi_device *spi)
  * @len:	the preamble length going to be assigned
  */
 void
-sx127X_setLoRaPreambleLen(struct spi_device *spi, uint32_t len)
+sx127X_setLoRaPreambleLen(struct regmap *rm, uint32_t len)
 {
 	uint8_t pl[2];
 
@@ -962,7 +861,7 @@ sx127X_setLoRaPreambleLen(struct spi_device *spi, uint32_t len)
  * Return:	length of the LoRa preamble
  */
 uint32_t
-sx127X_getLoRaPreambleLen(struct spi_device *spi)
+sx127X_getLoRaPreambleLen(struct regmap *rm)
 {
 	uint8_t pl[2];
 	uint32_t len;
@@ -979,7 +878,7 @@ sx127X_getLoRaPreambleLen(struct spi_device *spi)
  * @yesno:	1 / 0 for check / not check
  */
 void
-sx127X_setLoRaCRC(struct spi_device *spi, uint8_t yesno)
+sx127X_setLoRaCRC(struct regmap *rm, uint8_t yesno)
 {
 	uint8_t mcf2;
 
@@ -994,7 +893,7 @@ sx127X_setLoRaCRC(struct spi_device *spi, uint8_t yesno)
  * @yesno:	1 / 0 for boost / not boost
  */
 void
-sx127X_setBoost(struct spi_device *spi, uint8_t yesno)
+sx127X_setBoost(struct regmap *rm, uint8_t yesno)
 {
 	uint8_t pacf;
 
@@ -1008,14 +907,14 @@ sx127X_setBoost(struct spi_device *spi, uint8_t yesno)
  * @spi:	spi device to communicate with
  */
 void
-sx127X_startLoRaMode(struct spi_device *spi)
+sx127X_startLoRaMode(struct regmap *rm)
 {
 	uint8_t op_mode;
 	uint8_t base_adr;
 
 	/* Get original OP Mode register. */
 	op_mode = sx127X_getMode(spi);
-	dev_dbg(&(spi->dev), "the original OP mode is 0x%X\n", op_mode);
+	dev_dbg(&(regmap_get_device(rm)), "the original OP mode is 0x%X\n", op_mode);
 	/* Set device to sleep state. */
 	sx127X_setState(spi, SX127X_SLEEP_MODE);
 	/* Set device to LoRa mode. */
@@ -1025,14 +924,14 @@ sx127X_startLoRaMode(struct spi_device *spi)
 	/* Set device to standby state. */
 	sx127X_setState(spi, SX127X_STANDBY_MODE);
 	op_mode = sx127X_getMode(spi);
-	dev_dbg(&(spi->dev), "the current OP mode is 0x%X\n", op_mode);
+	dev_dbg(&(regmap_get_device(rm)), "the current OP mode is 0x%X\n", op_mode);
 
 	/* Set LoRa in explicit header mode. */
 	sx127X_setLoRaImplicit(spi, 0);
 
 	/* Set chip FIFO RX base. */
 	base_adr = 0x00;
-	dev_dbg(&(spi->dev), "going to set RX base address\n");
+	dev_dbg(&(regmap_get_device(rm)), "going to set RX base address\n");
 	sx127X_write_reg(spi, SX127X_REG_FIFO_RX_BASE_ADDR, &base_adr, 1);
 	sx127X_write_reg(spi, SX127X_REG_FIFO_ADDR_PTR, &base_adr, 1);
 
@@ -1051,18 +950,18 @@ sx127X_startLoRaMode(struct spi_device *spi)
  * 				bits 3-0 metal mask revision number
  */
 int
-init_sx127X(struct spi_device *spi)
+init_sx127X(struct regmap *rm)
 {
 	int v;
 	uint8_t fv, mmv;
 
-	dev_dbg(&(spi->dev), "init sx127X\n");
+	dev_dbg(&(regmap_get_device(rm)), "init sx127X\n");
 
 	v = sx127X_readVersion(spi);
 	if (v > 0) {
 		fv = (v >> 4) & 0xF;
 		mmv = v & 0xF;
-		dev_dbg(&(spi->dev), "chip version %d.%d\n", fv, mmv);
+		dev_dbg(&(regmap_get_device(rm)), "chip version %d.%d\n", fv, mmv);
 
 		sx127X_startLoRaMode(spi);
 	}
@@ -1092,7 +991,7 @@ static DEFINE_MUTEX(minors_lock);
 static ssize_t
 loraspi_read(struct lora_struct *lrdata, const char __user *buf, size_t size)
 {
-	struct spi_device *spi;
+	struct regmap *rm;
 	ssize_t status;
 	int c = 0;
 	uint8_t adr;
@@ -1101,7 +1000,7 @@ loraspi_read(struct lora_struct *lrdata, const char __user *buf, size_t size)
 	uint32_t timeout;
 
 	spi = lrdata->lora_device;
-	dev_dbg(&(spi->dev), "Read %zu bytes into user space\n", size);
+	dev_dbg(&(regmap_get_device(rm)), "Read %zu bytes into user space\n", size);
 
 	mutex_lock(&(lrdata->buf_lock));
 	/* Get chip's current state. */
@@ -1110,12 +1009,12 @@ loraspi_read(struct lora_struct *lrdata, const char __user *buf, size_t size)
 	/*  Prepare and set the chip to RX continuous mode, if it is not. */
 	if (st != SX127X_RXCONTINUOUS_MODE) {
 		/* Set chip to standby state. */
-		dev_dbg(&(spi->dev), "Going to set standby state\n");
+		dev_dbg(&(regmap_get_device(rm)), "Going to set standby state\n");
 		sx127X_setState(spi, SX127X_STANDBY_MODE);
 
 		/* Set chip FIFO RX base. */
 		adr = 0x00;
-		dev_dbg(&(spi->dev), "Going to set RX base address\n");
+		dev_dbg(&(regmap_get_device(rm)), "Going to set RX base address\n");
 		sx127X_write_reg(spi, SX127X_REG_FIFO_RX_BASE_ADDR, &adr, 1);
 
 		/* Clear all of the IRQ flags. */
@@ -1175,7 +1074,7 @@ loraspi_read(struct lora_struct *lrdata, const char __user *buf, size_t size)
 static ssize_t
 loraspi_write(struct lora_struct *lrdata, const char __user *buf, size_t size)
 {
-	struct spi_device *spi;
+	struct regmap *rm;
 	ssize_t status;
 	int c;
 	uint8_t adr;
@@ -1183,7 +1082,7 @@ loraspi_write(struct lora_struct *lrdata, const char __user *buf, size_t size)
 	uint32_t timeout;
 
 	spi = lrdata->lora_device;
-	dev_dbg(&(spi->dev), "Write %zu bytes from user space\n", size);
+	dev_dbg(&(regmap_get_device(rm)), "Write %zu bytes from user space\n", size);
 
 	mutex_lock(&(lrdata->buf_lock));
 	memset(lrdata->tx_buf, 0, lrdata->bufmaxlen);
@@ -1195,12 +1094,12 @@ loraspi_write(struct lora_struct *lrdata, const char __user *buf, size_t size)
 	lrdata->tx_buflen = size - status;
 
 	/* Set chip to standby state. */
-	dev_dbg(&(spi->dev), "Going to set standby state\n");
+	dev_dbg(&(regmap_get_device(rm)), "Going to set standby state\n");
 	sx127X_setState(spi, SX127X_STANDBY_MODE);
 
 	/* Set chip FIFO TX base. */
 	adr = 0x80;
-	dev_dbg(&(spi->dev), "Going to set TX base address\n");
+	dev_dbg(&(regmap_get_device(rm)), "Going to set TX base address\n");
 	sx127X_write_reg(spi, SX127X_REG_FIFO_TX_BASE_ADDR, &adr, 1);
 
 	/* Write to SPI chip synchronously to fill the FIFO of the chip. */
@@ -1211,23 +1110,23 @@ loraspi_write(struct lora_struct *lrdata, const char __user *buf, size_t size)
 
 	if (c > 0) {
 		/* Set chip to TX state to send the data in FIFO to RF. */
-		dev_dbg(&(spi->dev), "Set TX state\n");
+		dev_dbg(&(regmap_get_device(rm)), "Set TX state\n");
 		sx127X_setState(spi, SX127X_TX_MODE);
 
 		timeout = (c + sx127X_getLoRaPreambleLen(spi) + 1) + 2;
-		dev_dbg(&(spi->dev), "The time out is %u ms", timeout * 20);
+		dev_dbg(&(regmap_get_device(rm)), "The time out is %u ms", timeout * 20);
 
 		/* Wait until TX is finished by checking the TX flag. */
 		for (flag = 0; timeout > 0; timeout--) {
 			flag = sx127X_getLoRaFlag(spi, SX127X_FLAG_TXDONE);
 			if (flag != 0) {
-				dev_dbg(&(spi->dev), "Wait TX is finished\n");
+				dev_dbg(&(regmap_get_device(rm)), "Wait TX is finished\n");
 				break;
 			}
 
 			if (timeout == 1) {
 				c = 0;
-				dev_dbg(&(spi->dev), "Wait TX is time out\n");
+				dev_dbg(&(regmap_get_device(rm)), "Wait TX is time out\n");
 			}
 			else {
 				msleep(20);
@@ -1236,7 +1135,7 @@ loraspi_write(struct lora_struct *lrdata, const char __user *buf, size_t size)
 	}
 
 	/* Set chip to RX continuous state. */
-	dev_dbg(&(spi->dev), "Set back to RX continuous state\n");
+	dev_dbg(&(regmap_get_device(rm)), "Set back to RX continuous state\n");
 	sx127X_setState(spi, SX127X_STANDBY_MODE);
 	sx127X_setState(spi, SX127X_RXCONTINUOUS_MODE);
 
@@ -1257,7 +1156,7 @@ loraspi_write(struct lora_struct *lrdata, const char __user *buf, size_t size)
 static long
 loraspi_setstate(struct lora_struct *lrdata, void __user *arg)
 {
-	struct spi_device *spi;
+	struct regmap *rm;
 	int status;
 	uint32_t st32;
 	uint8_t st;
@@ -1296,7 +1195,7 @@ loraspi_setstate(struct lora_struct *lrdata, void __user *arg)
 static long
 loraspi_getstate(struct lora_struct *lrdata, void __user *arg)
 {
-	struct spi_device *spi;
+	struct regmap *rm;
 	int status;
 	uint32_t st32;
 	uint8_t st;
@@ -1340,13 +1239,13 @@ loraspi_getstate(struct lora_struct *lrdata, void __user *arg)
 static long
 loraspi_setfreq(struct lora_struct *lrdata, void __user *arg)
 {
-	struct spi_device *spi;
+	struct regmap *rm;
 	int status;
 	uint32_t freq;
 
 	spi = lrdata->lora_device;
 	status = copy_from_user(&freq, arg, sizeof(uint32_t));
-	dev_dbg(&(spi->dev), "Set frequency %u Hz from user space\n", freq);
+	dev_dbg(&(regmap_get_device(rm)), "Set frequency %u Hz from user space\n", freq);
 
 	mutex_lock(&(lrdata->buf_lock));
 	sx127X_setLoRaFreq(spi, freq);
@@ -1365,17 +1264,17 @@ loraspi_setfreq(struct lora_struct *lrdata, void __user *arg)
 static long
 loraspi_getfreq(struct lora_struct *lrdata, void __user *arg)
 {
-	struct spi_device *spi;
+	struct regmap *rm;
 	int status;
 	uint32_t freq;
 
 	spi = lrdata->lora_device;
-	dev_dbg(&(spi->dev), "Get frequency to user space\n");
+	dev_dbg(&(regmap_get_device(rm)), "Get frequency to user space\n");
 
 	mutex_lock(&(lrdata->buf_lock));
 	freq = sx127X_getLoRaFreq(spi);
 	mutex_unlock(&(lrdata->buf_lock));
-	dev_dbg(&(spi->dev), "The carrier freq is %u Hz\n", freq);
+	dev_dbg(&(regmap_get_device(rm)), "The carrier freq is %u Hz\n", freq);
 
 	status = copy_to_user(arg, &freq, sizeof(uint32_t));
 
@@ -1392,7 +1291,7 @@ loraspi_getfreq(struct lora_struct *lrdata, void __user *arg)
 static long
 loraspi_setpower(struct lora_struct *lrdata, void __user *arg)
 {
-	struct spi_device *spi;
+	struct regmap *rm;
 	int status;
 	int32_t dbm;
 
@@ -1423,7 +1322,7 @@ loraspi_setpower(struct lora_struct *lrdata, void __user *arg)
 static long
 loraspi_getpower(struct lora_struct *lrdata, void __user *arg)
 {
-	struct spi_device *spi;
+	struct regmap *rm;
 	int status;
 	int32_t dbm;
 
@@ -1448,7 +1347,7 @@ loraspi_getpower(struct lora_struct *lrdata, void __user *arg)
 static long
 loraspi_setLNA(struct lora_struct *lrdata, void __user *arg)
 {
-	struct spi_device *spi;
+	struct regmap *rm;
 	int status;
 	int32_t db;
 
@@ -1479,7 +1378,7 @@ loraspi_setLNA(struct lora_struct *lrdata, void __user *arg)
 static long
 loraspi_getLNA(struct lora_struct *lrdata, void __user *arg)
 {
-	struct spi_device *spi;
+	struct regmap *rm;
 	int status;
 	int32_t db;
 
@@ -1504,7 +1403,7 @@ loraspi_getLNA(struct lora_struct *lrdata, void __user *arg)
 static long
 loraspi_setLNAAGC(struct lora_struct *lrdata, void __user *arg)
 {
-	struct spi_device *spi;
+	struct regmap *rm;
 	int status;
 	uint32_t agc;
 
@@ -1529,7 +1428,7 @@ loraspi_setLNAAGC(struct lora_struct *lrdata, void __user *arg)
 static long
 loraspi_setsprfactor(struct lora_struct *lrdata, void __user *arg)
 {
-	struct spi_device *spi;
+	struct regmap *rm;
 	int status;
 	uint32_t sprf;
 
@@ -1553,7 +1452,7 @@ loraspi_setsprfactor(struct lora_struct *lrdata, void __user *arg)
 static long
 loraspi_getsprfactor(struct lora_struct *lrdata, void __user *arg)
 {
-	struct spi_device *spi;
+	struct regmap *rm;
 	int status;
 	uint32_t sprf;
 
@@ -1578,7 +1477,7 @@ loraspi_getsprfactor(struct lora_struct *lrdata, void __user *arg)
 static long
 loraspi_setbandwidth(struct lora_struct *lrdata, void __user *arg)
 {
-	struct spi_device *spi;
+	struct regmap *rm;
 	int status;
 	uint32_t bw;
 
@@ -1602,7 +1501,7 @@ loraspi_setbandwidth(struct lora_struct *lrdata, void __user *arg)
 static long
 loraspi_getbandwidth(struct lora_struct *lrdata, void __user *arg)
 {
-	struct spi_device *spi;
+	struct regmap *rm;
 	int status;
 	uint32_t bw;
 
@@ -1627,7 +1526,7 @@ loraspi_getbandwidth(struct lora_struct *lrdata, void __user *arg)
 static long
 loraspi_getrssi(struct lora_struct *lrdata, void __user *arg)
 {
-	struct spi_device *spi;
+	struct regmap *rm;
 	int status;
 	int32_t rssi;
 
@@ -1652,7 +1551,7 @@ loraspi_getrssi(struct lora_struct *lrdata, void __user *arg)
 static long
 loraspi_getsnr(struct lora_struct *lrdata, void __user *arg)
 {
-	struct spi_device *spi;
+	struct regmap *rm;
 	int status;
 	int32_t snr;
 
@@ -1693,7 +1592,7 @@ loraspi_ready2write(struct lora_struct *lrdata)
 static long
 loraspi_ready2read(struct lora_struct *lrdata)
 {
-	struct spi_device *spi;
+	struct regmap *rm;
 	long ret;
 
 	spi = lrdata->lora_device;
@@ -1787,6 +1686,14 @@ static const struct spi_device_id spi_ids[] = {
 };
 MODULE_DEVICE_TABLE(spi, spi_ids);
 
+/* The SX1278 regmap config. */
+struct regmap_config sx1278_regmap_config = {
+	.reg_bits = 8;
+	.val_bits = 8;
+	.max_register = SX127X_MAX_REG;
+	.write_flag_mask = 0x80;
+};
+
 /* The SPI probe callback function. */
 static int loraspi_probe(struct spi_device *spi)
 {
@@ -1799,7 +1706,7 @@ static int loraspi_probe(struct spi_device *spi)
 	dev_dbg(&(spi->dev), "probe a LoRa SPI device\n");
 
 #ifdef CONFIG_OF
-	if (spi->dev.of_node && !of_match_device(lora_dt_ids, &(spi->dev))) {
+	if ((spi->dev).of_node && !of_match_device(lora_dt_ids, &(spi->dev))) {
 		dev_err(&(spi->dev), "buggy DT: LoRa listed directly in DT\n");
 		WARN_ON(spi->dev.of_node &&
 			!of_match_device(lora_dt_ids, (&spi->dev)));
@@ -1808,24 +1715,31 @@ static int loraspi_probe(struct spi_device *spi)
 
 	loraspi_probe_acpi(spi);
 
-	/* Initial the SX127X chip. */
-	v = init_sx127X(spi);
-	if(v < 0) {
-		dev_err(&(spi->dev), "no LoRa SPI device, error: %d\n", v);
-		return v;
-	}
-	dev_info(&(spi->dev), "probe a LoRa SPI device with chip ver. %d.%d\n",
-			(v >> 4) & 0xF,
-			v & 0xF);
-
 	/* Allocate lora device's data. */
 	lrdata = kzalloc(sizeof(struct lora_struct), GFP_KERNEL);
 	if (!lrdata)
 		return -ENOMEM;
 
-	/* Initial the lora device's data. */
-	lrdata->lora_device = spi;
+	/* Initial the LoRa device's data. */
 	lrdata->ops = &lrops;
+	lrdata->lora_device = regmap_init_spi(spi, &sx1278_regmap_config);
+	if (IS_ERR(lrdata->lora_device)) {
+		status = PTR_ERR(lrdata->lora_device);
+		dev_err(&(spi->dev), "regmap_init() failed: %d\n", status);
+		return status;
+	}
+
+	/* Initial the SX127X chip. */
+	v = init_sx127X(lrdata->lora_device);
+	if(v < 0) {
+		status = v;
+		dev_err(&(spi->dev), "no LoRa SPI device, error: %d\n", status);
+		return status;
+	}
+	dev_info(&(spi->dev), "probe a LoRa SPI device with chip ver. %d.%d\n",
+			(v >> 4) & 0xF,
+			v & 0xF);
+
 	mutex_init(&(lrdata->buf_lock));
 	mutex_lock(&minors_lock);
 	minor = find_first_zero_bit(minors, N_LORASPI_MINORS);
