@@ -148,7 +148,7 @@
 
 /**
  * sx127X_readVersion - Get LoRa device's chip version
- * @rm:		the device as regmap to communicate with
+ * @rm:		the device as a regmap to communicate with
  * @vstr:	the buffer going to hold the chip's version string
  * @len:	the max length of the buffer
  *
@@ -1742,7 +1742,7 @@ static int loraspi_probe(struct spi_device *spi)
 
 	/* Initial the LoRa device's data. */
 	lrdata->ops = &lrops;
-	lrdata->lora_device = regmap_init_spi(spi, &sx1278_regmap_config);
+	lrdata->lora_device = devm_regmap_init_spi(spi, &sx1278_regmap_config);
 	if (IS_ERR(lrdata->lora_device)) {
 		status = PTR_ERR(lrdata->lora_device);
 		dev_err(&(spi->dev), "regmap_init() failed: %d\n", status);
