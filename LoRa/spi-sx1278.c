@@ -164,7 +164,7 @@ sx127X_readVersion(struct regmap *rm)
 
 	status = regmap_raw_read(rm, SX127X_REG_VERSION, &v, 1);
 
-	if ((status == 1) && (0 < v) && (v < 0xFF))
+	if ((status == 0) && (0 < v) && (v < 0xFF))
 		status = v;
 	else
 		status = -ENODEV;
@@ -289,7 +289,7 @@ sx127X_getLoRaFreq(struct regmap *rm)
 #endif
 
 	status = regmap_raw_read(rm, SX127X_REG_FRF_MSB, buf, 3);
-	if (status <= 0)
+	if (status < 0)
 		return 0.0;
 
 	for (i = 0; i <= 2; i++)
@@ -725,7 +725,6 @@ sx127X_readLoRaData(struct regmap *rm, uint8_t *buf, size_t len)
 {
 	uint8_t start_adr;
 	uint8_t blen;
-	ssize_t c;
 
 	/* Get the chip RX FIFO last packet address. */
 	regmap_raw_read(rm, SX127X_REG_FIFO_RX_CURRENT_ADDR, &start_adr, 1);
@@ -737,9 +736,9 @@ sx127X_readLoRaData(struct regmap *rm, uint8_t *buf, size_t len)
 
 	len = (blen < len) ? blen : len;
 	/* Read LoRa packet payload. */
-	c = regmap_raw_read(rm, SX127X_REG_FIFO, buf, len);
+	regmap_raw_read(rm, SX127X_REG_FIFO, buf, len);
 
-	return c;
+	return len;
 }
 
 /**
@@ -755,7 +754,6 @@ sx127X_sendLoRaData(struct regmap *rm, uint8_t *buf, size_t len)
 {
 	uint8_t base_adr;
 	uint8_t blen;
-	ssize_t c;
 
 	/* Set chip FIFO pointer to FIFO TX base. */
 	regmap_raw_read(rm, SX127X_REG_FIFO_TX_BASE_ADDR, &base_adr, 1);
@@ -765,13 +763,12 @@ sx127X_sendLoRaData(struct regmap *rm, uint8_t *buf, size_t len)
 	blen = (len < SX127X_MAX_FIFO_LENGTH) ? len : SX127X_MAX_FIFO_LENGTH;
 
 	/* Write to SPI chip synchronously to fill the FIFO of the chip. */
-	c = regmap_raw_write(rm, SX127X_REG_FIFO, buf, blen);
+	regmap_raw_write(rm, SX127X_REG_FIFO, buf, blen);
 
 	/* Set the FIFO payload length. */
-	blen = c;
 	regmap_raw_write(rm, SX127X_REG_PAYLOAD_LENGTH, &blen, 1);
 
-	return c;
+	return blen;
 }
 
 /**
@@ -961,15 +958,19 @@ int
 init_sx127X(struct regmap *rm)
 {
 	int v;
+#ifdef DEBUG
 	uint8_t fv, mmv;
+#endif
 
 	dev_dbg(regmap_get_device(rm), "init sx127X\n");
 
 	v = sx127X_readVersion(rm);
 	if (v > 0) {
+#ifdef DEBUG
 		fv = (v >> 4) & 0xF;
 		mmv = v & 0xF;
 		dev_dbg(regmap_get_device(rm), "chip version %d.%d\n", fv, mmv);
+#endif
 
 		sx127X_startLoRaMode(rm);
 	}
@@ -1706,12 +1707,19 @@ static const struct spi_device_id spi_ids[] = {
 };
 MODULE_DEVICE_TABLE(spi, spi_ids);
 
+bool sx127X_reg_volatile(struct device *dev, unsigned int reg)
+{
+	return true;
+}
+
 /* The SX1278 regmap config. */
 struct regmap_config sx1278_regmap_config = {
 	.reg_bits = 8,
 	.val_bits = 8,
 	.max_register = SX127X_MAX_REG,
+	.read_flag_mask = 0x00,
 	.write_flag_mask = 0x80,
+	.volatile_reg = sx127X_reg_volatile,
 };
 
 /* The SPI probe callback function. */
