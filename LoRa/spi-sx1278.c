@@ -733,8 +733,8 @@ sx127X_readLoRaData(struct regmap *rm, uint8_t *buf, size_t len)
 
 	/* Get the RX last packet payload length. */
 	regmap_raw_read(rm, SX127X_REG_RX_NB_BYTES, &blen, 1);
-
 	len = (blen < len) ? blen : len;
+
 	/* Read LoRa packet payload. */
 	regmap_raw_read(rm, SX127X_REG_FIFO, buf, len);
 
@@ -1060,7 +1060,7 @@ loraspi_read(struct lora_struct *lrdata, const char __user *buf, size_t size)
 	/* There is a ready packet in the chip's FIFO. */
 	if (c == 0) {
 		memset(lrdata->rx_buf, 0, lrdata->bufmaxlen);
-		size = (lrdata->bufmaxlen < size) ? lrdata->bufmaxlen : size;
+		size = (lrdata->bufmaxlen <= size) ? lrdata->bufmaxlen : size;
 		/* Read from chip to LoRa data RX buffer. */
 		c = sx127X_readLoRaData(rm, lrdata->rx_buf, size);
 		/* Copy from LoRa data RX buffer to user space. */
@@ -1101,10 +1101,13 @@ loraspi_write(struct lora_struct *lrdata, const char __user *buf, size_t size)
 
 	mutex_lock(&(lrdata->buf_lock));
 	memset(lrdata->tx_buf, 0, lrdata->bufmaxlen);
+	size = (lrdata->bufmaxlen < size) ? lrdata->bufmaxlen : size;
 	status = copy_from_user(lrdata->tx_buf, buf, size);
 
-	if (status >= size)
+	if (status != 0) {
+		mutex_unlock(&(lrdata->buf_lock));
 		return 0;
+	}
 
 	lrdata->tx_buflen = size - status;
 

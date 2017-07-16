@@ -54,7 +54,7 @@ static LIST_HEAD(device_list);
 static DEFINE_MUTEX(device_list_lock);
 
 #ifndef LORA_BUFLEN
-#define LORA_BUFLEN	123
+#define LORA_BUFLEN	127
 #endif
 
 static int
