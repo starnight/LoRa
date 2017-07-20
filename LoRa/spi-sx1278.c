@@ -978,6 +978,32 @@ init_sx127X(struct regmap *rm)
 	return v;
 }
 
+/*----------------------- LoRa IEEE 802.15.4 Functions -----------------------*/
+
+int
+lora_ieee_rx(struct lora_struct *lrdata)
+{
+	/* TODO: Do RX and IEEE 802.15.4 IRQ save */
+
+	return 0;
+}
+
+/*-------------------------- LoRa Timer for Polling --------------------------*/
+
+void
+lora_timer_polling(unsigned long arg)
+{
+	struct lora_struct *lrdata = (struct lora_struct *)arg;
+	uint8_t flag;
+
+	flag = sx127X_getLoRaFlag(lrdata->lora_device, SX127X_FLAG_RXDONE);
+	if (flag != 0)
+		lora_ieee_rx(lrdata);
+
+	lrdata->timer.expires = jiffies + HZ;
+	add_timer(&(lrdata->timer));
+}
+
 /*---------------------------- LoRa SPI Functions ----------------------------*/
 
 #define __DRIVER_NAME		"sx1278"
@@ -1794,6 +1820,12 @@ static int loraspi_probe(struct spi_device *spi)
 		status = -ENODEV;
 	}
 
+	init_timer(&(lrdata->timer));
+	lrdata->timer.expires = jiffies + HZ;
+	lrdata->timer.function = lora_timer_polling;
+	lrdata->timer.data = (unsigned long)lrdata;
+	add_timer(&(lrdata->timer));
+
 	mutex_unlock(&minors_lock);
 
 	return status;
@@ -1808,6 +1840,8 @@ static int loraspi_remove(struct spi_device *spi)
 
 	lrdata = spi_get_drvdata(spi);
 
+	/* Remove the timer. */
+	del_timer(&(lrdata->timer));
 	/* Clear the lora device's data. */
 	lrdata->lora_device = NULL;
 	/* No more operations to the lora device from user space. */
