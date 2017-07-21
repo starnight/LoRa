@@ -988,17 +988,27 @@ lora_ieee_rx(struct lora_struct *lrdata)
 	return 0;
 }
 
-/*-------------------------- LoRa Timer for Polling --------------------------*/
-
 void
-lora_timer_polling(unsigned long arg)
+rx_irqwork(struct work_struct *work)
 {
-	struct lora_struct *lrdata = (struct lora_struct *)arg;
+	struct lora_struct *lrdata;
 	uint8_t flag;
+
+	lrdata = container_of(work, struct lora_struct, irqwork);
 
 	flag = sx127X_getLoRaFlag(lrdata->lora_device, SX127X_FLAG_RXDONE);
 	if (flag != 0)
 		lora_ieee_rx(lrdata);
+}
+
+/*-------------------------- LoRa Timer for Polling --------------------------*/
+
+void
+lora_timer_isr(unsigned long arg)
+{
+	struct lora_struct *lrdata = (struct lora_struct *)arg;
+
+	schedule_work(&(lrdata->irqwork));
 
 	lrdata->timer.expires = jiffies + HZ;
 	add_timer(&(lrdata->timer));
@@ -1822,9 +1832,11 @@ static int loraspi_probe(struct spi_device *spi)
 		status = -ENODEV;
 	}
 
+	INIT_WORK(&(lrdata->irqwork), rx_irqwork);
+
 	init_timer(&(lrdata->timer));
 	lrdata->timer.expires = jiffies + HZ;
-	lrdata->timer.function = lora_timer_polling;
+	lrdata->timer.function = lora_timer_isr;
 	lrdata->timer.data = (unsigned long)lrdata;
 	add_timer(&(lrdata->timer));
 
@@ -1844,6 +1856,8 @@ static int loraspi_remove(struct spi_device *spi)
 
 	/* Remove the timer. */
 	del_timer(&(lrdata->timer));
+	/* Flush all works in work queue. */
+	flush_work(&(lrdata->irqwork));
 	/* Clear the lora device's data. */
 	lrdata->lora_device = NULL;
 	/* No more operations to the lora device from user space. */

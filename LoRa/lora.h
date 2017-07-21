@@ -44,6 +44,7 @@
 #include <linux/fs.h>
 #include <linux/mutex.h>
 #include <linux/timer.h>
+#include <linux/workqueue.h>
 
 /* I/O control by each command. */
 #define LORA_IOC_MAGIC '\x74'
@@ -123,6 +124,7 @@ struct lora_operations {
  * @buf_lock:		The lock to protect the synchroniztion of this structure
  * @waitqueue:		The queue to be hung on the wait table for multiplexing
  * @timer:		The timer for polling the status of chip's IRQ flags
+ * @irqwork:		Work queue for send RX buffer to upper level
  */
 struct lora_struct {
 	dev_t devt;
@@ -138,6 +140,7 @@ struct lora_struct {
 	struct mutex buf_lock;
 	wait_queue_head_t waitqueue;
 	struct timer_list timer;
+	struct work_struct irqwork;
 };
 
 /**
