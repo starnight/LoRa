@@ -1786,6 +1786,9 @@ static int loraspi_probe(struct spi_device *spi)
 		return status;
 	}
 
+	/* Set the SPI device's driver data for later usage. */
+	spi_set_drvdata(spi, lrdata);
+
 	/* Initial the SX127X chip. */
 	v = init_sx127X(lrdata->lora_device);
 	if(v < 0) {
@@ -1809,8 +1812,7 @@ static int loraspi_probe(struct spi_device *spi)
 				lrdata,
 				"loraSPI%d.%d",
 				spi->master->bus_num, spi->chip_select);
-		/* Set the SPI device's driver data for later usage. */
-		spi_set_drvdata(spi, lrdata);
+
 		lora_device_add(lrdata);
 		status = PTR_ERR_OR_ZERO(dev);
 	}
