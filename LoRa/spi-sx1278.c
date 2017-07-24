@@ -46,6 +46,7 @@
 #include <linux/acpi.h>
 #include <linux/spi/spi.h>
 #include <linux/regmap.h>
+#include <linux/skbuff.h>
 #include <linux/of.h>
 #include <linux/of_device.h>
 #include <linux/errno.h>
@@ -713,32 +714,45 @@ sx127X_setLoRaMaxRXBuff(struct regmap *rm, uint8_t len)
 }
 
 /**
+ * sx127X_getLoRaLastPacketPayloadLen - Get the RX last packet payload length
+ * @rm:		the device as a regmap to communicate with
+ *
+ * Return:	the actual RX last packet payload length in bytes
+ */
+uint8_t
+sx127X_getLoRaLastPacketPayloadLen(struct regmap *rm)
+{
+	uint8_t len;
+
+	regmap_raw_read(rm, SX127X_REG_RX_NB_BYTES, &len, 1);
+
+	return len;
+}
+
+/**
  * sx127X_readLoRaData - Read data from LoRa device (RX)
  * @rm:		the device as a regmap to communicate with
  * @buf:	buffer going to be read data into
  * @len:	the length of the data going to be read in bytes
  *
- * Return:	the actual data length read from the LoRa device in bytes
+ * Return:	Positive / negtive values for the actual data length read from
+ * 		the LoRa device in bytes / failed
  */
 ssize_t
 sx127X_readLoRaData(struct regmap *rm, uint8_t *buf, size_t len)
 {
 	uint8_t start_adr;
-	uint8_t blen;
+	int ret;
 
 	/* Get the chip RX FIFO last packet address. */
 	regmap_raw_read(rm, SX127X_REG_FIFO_RX_CURRENT_ADDR, &start_adr, 1);
 	/* Set chip FIFO pointer to FIFO last packet address. */
 	regmap_raw_write(rm, SX127X_REG_FIFO_ADDR_PTR, &start_adr, 1);
 
-	/* Get the RX last packet payload length. */
-	regmap_raw_read(rm, SX127X_REG_RX_NB_BYTES, &blen, 1);
-	len = (blen < len) ? blen : len;
-
 	/* Read LoRa packet payload. */
-	regmap_raw_read(rm, SX127X_REG_FIFO, buf, len);
+	ret = regmap_raw_read(rm, SX127X_REG_FIFO, buf, len);
 
-	return len;
+	return (ret >= 0) ? len : ret;
 }
 
 /**
@@ -983,13 +997,43 @@ init_sx127X(struct regmap *rm)
 int
 lora_ieee_rx(struct lora_struct *lrdata)
 {
-	/* TODO: Do RX and IEEE 802.15.4 IRQ save */
+	uint8_t len;
+	uint8_t lqi = 50;
+	struct sk_buff *skb;
+	struct regmap *rm = lrdata->lora_device;
+	int ret;
+
+	len = lrdata->bufmaxlen;
+	if (!ieee802154_is_valid_psdu_len(len)) {
+		dev_dbg(regmap_get_device(rm), "corrupted frame received\n");
+		len = IEEE802154_MTU;
+	}
+
+	skb = dev_alloc_skb(len);
+	if (!skb)
+		return -ENOMEM;
+
+	ret = sx127X_readLoRaData(rm, skb_put(skb, len), len);
+	if (ret <= 0) {
+		dev_dbg(regmap_get_device(rm), "frame reception failed\n");
+		kfree(skb);
+		return (ret == 0) ? -EINVAL : ret;
+	}
+#if 0
+	if (!promiscuous) {
+		/* TODO: not promiscuous mode work and calculate LQI */
+	}
+#endif
+	ieee802154_rx_irqsafe(lrdata->hw, skb, lqi);
+
+	dev_dbg(regmap_get_device(rm),
+		"%s: len=%u LQI=%u\n", __func__, len, lqi);
 
 	return 0;
 }
 
 void
-rx_irqwork(struct work_struct *work)
+lora_ieee_rx_irqwork(struct work_struct *work)
 {
 	struct lora_struct *lrdata;
 	uint8_t flag;
@@ -1041,6 +1085,7 @@ loraspi_read(struct lora_struct *lrdata, const char __user *buf, size_t size)
 	int c = 0;
 	uint8_t adr;
 	uint8_t flag;
+	uint8_t len;
 	uint8_t st;
 	uint32_t timeout;
 
@@ -1096,6 +1141,8 @@ loraspi_read(struct lora_struct *lrdata, const char __user *buf, size_t size)
 	/* There is a ready packet in the chip's FIFO. */
 	if (c == 0) {
 		memset(lrdata->rx_buf, 0, lrdata->bufmaxlen);
+		len = sx127X_getLoRaLastPacketPayloadLen(rm);
+		size = (len <= size) ? len : size;
 		size = (lrdata->bufmaxlen <= size) ? lrdata->bufmaxlen : size;
 		/* Read from chip to LoRa data RX buffer. */
 		c = sx127X_readLoRaData(rm, lrdata->rx_buf, size);
@@ -1832,7 +1879,7 @@ static int loraspi_probe(struct spi_device *spi)
 		status = -ENODEV;
 	}
 
-	INIT_WORK(&(lrdata->irqwork), rx_irqwork);
+	INIT_WORK(&(lrdata->irqwork), lora_ieee_rx_irqwork);
 
 	init_timer(&(lrdata->timer));
 	lrdata->timer.expires = jiffies + HZ;

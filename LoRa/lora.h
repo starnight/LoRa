@@ -45,6 +45,7 @@
 #include <linux/mutex.h>
 #include <linux/timer.h>
 #include <linux/workqueue.h>
+#include <net/mac802154.h>
 
 /* I/O control by each command. */
 #define LORA_IOC_MAGIC '\x74'
@@ -129,6 +130,7 @@ struct lora_operations {
 struct lora_struct {
 	dev_t devt;
 	void *lora_device;
+	struct ieee802154_hw *hw;
 	struct list_head device_entry;
 	struct lora_operations *ops;
 	uint8_t *tx_buf;
