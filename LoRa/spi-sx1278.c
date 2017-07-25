@@ -1040,8 +1040,10 @@ lora_ieee_rx_irqwork(struct work_struct *work)
 
 	lrdata = container_of(work, struct lora_struct, irqwork);
 
-	flag = sx127X_getLoRaFlag(lrdata->lora_device, SX127X_FLAG_RXDONE);
-	if (flag != 0)
+	flag = sx127X_getLoRaAllFlag(lrdata->lora_device);
+	if (((flag & SX127X_FLAG_RXTIMEOUT) == 0)
+		&& ((flag & SX127X_FLAG_PAYLOADCRCERROR) == 0)
+		&& (flag & SX127X_FLAG_RXDONE))
 		lora_ieee_rx(lrdata);
 }
 
