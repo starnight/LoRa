@@ -1,5 +1,5 @@
 # LoRa
-This is a LoRa device driver as a Linux kernel module with file operation interfaces.
+This is a LoRa device driver as a Linux kernel module with IEEE 802.15.4 MAC interfaces.
 
 ## Compatible Chips
 * Semtech SX1276/77/78/79
