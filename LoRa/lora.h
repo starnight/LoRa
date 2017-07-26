@@ -73,6 +73,7 @@
 #define LORA_STATE_RX		3
 #define LORA_STATE_CAD		4
 
+#ifdef LORA_DEBUG_FS
 struct lora_struct;
 
 /* The structure lists the LoRa device's operations. */
@@ -109,6 +110,7 @@ struct lora_operations {
 	long (*ready2write)(struct lora_struct *);
 	long (*ready2read)(struct lora_struct *);
 };
+#endif
 
 /**
  * struct lora_struct: Master side proxy of an LoRa slave device
@@ -116,35 +118,40 @@ struct lora_operations {
  * @lora_device:	LoRa controller used with the device
  * @device_entry:	The entry going to be added into the device list
  * @ops:		Handle of LoRa operations interfaces
+ * @users:		How many program use this LoRa device
  * @tx_buf:		Pointer of the TX buffer
  * @rx_buf:		Pointer of the RX buffer
  * @tx_buflen:		The length of the TX buffer
  * @rx_buffer:		The length of the RX buffer
  * @bufmaxlen:		The max length of the TX and RX buffer
- * @users:		How many program use this LoRa device
  * @buf_lock:		The lock to protect the synchroniztion of this structure
  * @waitqueue:		The queue to be hung on the wait table for multiplexing
  * @timer:		The timer for polling the status of chip's IRQ flags
  * @irqwork:		Work queue for send RX buffer to upper level
  */
 struct lora_struct {
+#ifdef LORA_DEBUG_FS
 	dev_t devt;
+#endif
 	void *lora_device;
 	struct ieee802154_hw *hw;
+#ifdef LORA_DEBUG_FS
 	struct list_head device_entry;
 	struct lora_operations *ops;
+	uint8_t users;
+#endif
 	uint8_t *tx_buf;
 	uint8_t *rx_buf;
 	uint8_t tx_buflen;
 	uint8_t rx_buflen;
 	uint8_t bufmaxlen;
-	uint8_t users;
 	struct mutex buf_lock;
 	wait_queue_head_t waitqueue;
 	struct timer_list timer;
 	struct work_struct irqwork;
 };
 
+#ifdef LORA_DEBUG_FS
 /**
  * struct lora_driver: Host side LoRa driver
  * @name:		Name of the driver to use with this device
@@ -169,5 +176,6 @@ int lora_device_add(struct lora_struct *);
 int lora_device_remove(struct lora_struct *);
 int lora_register_driver(struct lora_driver *);
 int lora_unregister_driver(struct lora_driver *);
+#endif
 
 #endif

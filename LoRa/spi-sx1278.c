@@ -1067,9 +1067,10 @@ lora_timer_isr(unsigned long arg)
 #define N_LORASPI_MINORS	8
 #endif
 
-static DECLARE_BITMAP(minors, N_LORASPI_MINORS);
-
 static DEFINE_MUTEX(minors_lock);
+
+#ifdef LORA_DEBUG_FS
+static DECLARE_BITMAP(minors, N_LORASPI_MINORS);
 
 /**
  * loraspi_read - Read from the LoRa device's communication
@@ -1745,6 +1746,7 @@ struct lora_operations lrops = {
 	.ready2write = loraspi_ready2write,
 	.ready2read = loraspi_ready2read,
 };
+#endif
 
 /* The compatible SoC array. */
 #ifdef CONFIG_OF
@@ -1814,10 +1816,12 @@ struct regmap_config sx1278_regmap_config = {
 static int loraspi_probe(struct spi_device *spi)
 {
 	struct lora_struct *lrdata;
+#ifdef LORA_DEBUG_FS
 	struct device *dev;
 	unsigned long minor;
+#endif
 	int v;
-	int status;
+	int status = 0;
 
 	dev_dbg(&(spi->dev), "probe a LoRa SPI device\n");
 
@@ -1837,7 +1841,9 @@ static int loraspi_probe(struct spi_device *spi)
 		return -ENOMEM;
 
 	/* Initial the LoRa device's data. */
+#ifdef LORA_DEBUG_FS
 	lrdata->ops = &lrops;
+#endif
 	lrdata->lora_device = devm_regmap_init_spi(spi, &sx1278_regmap_config);
 	if (IS_ERR(lrdata->lora_device)) {
 		status = PTR_ERR(lrdata->lora_device);
@@ -1861,6 +1867,7 @@ static int loraspi_probe(struct spi_device *spi)
 
 	mutex_init(&(lrdata->buf_lock));
 	mutex_lock(&minors_lock);
+#ifdef LORA_DEBUG_FS
 	minor = find_first_zero_bit(minors, N_LORASPI_MINORS);
 	if (minor < N_LORASPI_MINORS) {
 		set_bit(minor, minors);
@@ -1880,6 +1887,7 @@ static int loraspi_probe(struct spi_device *spi)
 		kfree(lrdata);
 		status = -ENODEV;
 	}
+#endif
 
 	INIT_WORK(&(lrdata->irqwork), lora_ieee_rx_irqwork);
 
@@ -1909,14 +1917,16 @@ static int loraspi_remove(struct spi_device *spi)
 	flush_work(&(lrdata->irqwork));
 	/* Clear the lora device's data. */
 	lrdata->lora_device = NULL;
+#ifdef LORA_DEBUG_FS
 	/* No more operations to the lora device from user space. */
 	lora_device_remove(lrdata);
 	mutex_lock(&minors_lock);
 	device_destroy(lr_driver.lora_class, lrdata->devt);
 	clear_bit(MINOR(lrdata->devt), minors);
+	mutex_unlock(&minors_lock);
+#endif
 	/* Set the SX127X chip to sleep. */
 	sx127X_setState(dev_get_regmap(&(spi->dev), NULL), SX127X_SLEEP_MODE);
-	mutex_unlock(&minors_lock);
 
 	/* Free the memory of the lora device.  */
 	kfree(lrdata);
@@ -1949,8 +1959,10 @@ static int loraspi_sx1278_init(void)
 
 	pr_debug("sx1278: init SX1278 compatible kernel module\n");
 
+#ifdef LORA_DEBUG_FS
 	/* Register a kind of LoRa driver. */
 	lora_register_driver(&lr_driver);
+#endif
 
 	/* Register LoRa SPI driver as an SPI driver. */
 	status = spi_register_driver(&lora_spi_driver);
@@ -1965,8 +1977,10 @@ static void loraspi_sx1278_exit(void)
 
 	/* Unregister the LoRa SPI driver. */
 	spi_unregister_driver(&lora_spi_driver);
+#ifdef LORA_DEBUG_FS
 	/* Unregister the lora driver. */
 	lora_unregister_driver(&lr_driver);
+#endif
 }
 
 module_init(loraspi_sx1278_init);

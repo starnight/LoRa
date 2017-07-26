@@ -50,6 +50,7 @@
 
 #include "lora.h"
 
+#ifdef LORA_DEBUG_FS
 static LIST_HEAD(device_list);
 static DEFINE_MUTEX(device_list_lock);
 
@@ -417,3 +418,4 @@ lora_unregister_driver(struct lora_driver *driver)
 
 	return 0;
 }
+#endif
