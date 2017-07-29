@@ -36,5 +36,8 @@ modprobe sx1278
 dmesg
 ```
 
+## Usage
+After build and install successfully, there is ```/dev/loraSPIX.Y``` corresponding to the LoRa chip which could be _open_, _read_, _write_, _ioctl_, _select_, _close_ ... directly.
+
 ## License
 Under Dual BSD/GPL
