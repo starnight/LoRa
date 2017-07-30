@@ -313,8 +313,8 @@ sx127X_setLoRaPower(struct regmap *rm, int32_t pout)
 	uint8_t outputPower;
 	int32_t pmax;
 
-	if (pout > 15) {
-		/* Pout > 15dbm */
+	if (pout > 14) {
+		/* Pout > 14dbm */
 		boost = 1;
 		pmax = 7;
 		outputPower = pout - 2;
@@ -326,7 +326,7 @@ sx127X_setLoRaPower(struct regmap *rm, int32_t pout)
 		outputPower = 3 + pout;
 	}
 	else {
-		/* 0dbm <= Pout <= 15dbm */
+		/* 0dbm <= Pout <= 14dbm */
 		boost = 0;
 		pmax = 7;
 		outputPower = pout;
