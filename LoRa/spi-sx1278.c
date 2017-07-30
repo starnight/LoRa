@@ -1010,11 +1010,17 @@ init_sx127X(struct regmap *rm)
 
 /*----------------------- LoRa IEEE 802.15.4 Functions -----------------------*/
 
+/**
+ * lora_ieee_rx - Read the frame from LoRa device's RX
+ *
+ * Return:	0 for success, negative number for error
+ */
 int
 lora_ieee_rx(struct lora_struct *lrdata)
 {
 	uint8_t len;
-	uint8_t lqi = 50;
+	uint8_t lqi;
+	int32_t rssi;
 	struct sk_buff *skb;
 	struct regmap *rm = lrdata->lora_device;
 	int ret;
@@ -1035,11 +1041,11 @@ lora_ieee_rx(struct lora_struct *lrdata)
 		kfree(skb);
 		return (ret == 0) ? -EINVAL : ret;
 	}
-#if 0
-	if (!promiscuous) {
-		/* TODO: not promiscuous mode work and calculate LQI */
-	}
-#endif
+
+	rssi = sx127X_getLoRaLastPacketRSSI(rm);
+	rssi = (rssi > 0) ? 0 : rssi;
+	lqi = 255 * (rssi + 170) / 170;
+
 	ieee802154_rx_irqsafe(lrdata->hw, skb, lqi);
 
 	dev_dbg(regmap_get_device(rm),
@@ -1048,6 +1054,10 @@ lora_ieee_rx(struct lora_struct *lrdata)
 	return 0;
 }
 
+/**
+ * lora_ieee_rx_irqwork - The actual work which checks RX for the timer ISR
+ * @work:	the work entry listed in the workqueue
+ */
 void
 lora_ieee_rx_irqwork(struct work_struct *work)
 {
