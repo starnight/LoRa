@@ -314,8 +314,8 @@ sx127X_setLoRaPower(struct regmap *rm, int32_t pout)
 	uint8_t outputPower;
 	int32_t pmax;
 
-	if (pout > 15) {
-		/* Pout > 15dbm */
+	if (pout > 14) {
+		/* Pout > 14dbm */
 		boost = 1;
 		pmax = 7;
 		outputPower = pout - 2;
@@ -327,7 +327,7 @@ sx127X_setLoRaPower(struct regmap *rm, int32_t pout)
 		outputPower = 3 + pout;
 	}
 	else {
-		/* 0dbm <= Pout <= 15dbm */
+		/* 0dbm <= Pout <= 14dbm */
 		boost = 0;
 		pmax = 7;
 		outputPower = pout;
@@ -366,6 +366,22 @@ sx127X_getLoRaPower(struct regmap *rm)
 
 	return pout;
 }
+
+/**
+ * sx127X_dbm2mbm - dbm to mbm unit conversion
+ * @dbm:	the value in dbm
+ *
+ * Return:	the value in mbm
+ */
+#define sx127X_dbm2mbm(dbm)	(dbm * 100)
+
+/**
+ * sx127X_mbm2dbm - mbm to dbm unit conversion
+ * @mbm:	the value in mbm
+ *
+ * Return:	the value in dbm
+ */
+#define sx127X_mbm2dbm(mbm)	(mbm / 100)
 
 int8_t lna_gain[] = {
 	 0,
@@ -1045,10 +1061,134 @@ lora_ieee_rx_irqwork(struct work_struct *work)
 		&& ((flag & SX127X_FLAG_PAYLOADCRCERROR) == 0)
 		&& (flag & SX127X_FLAG_RXDONE))
 		lora_ieee_rx(lrdata);
+
+	/* Clear all of the IRQ flags. */
+	sx127X_clearLoRaAllFlag(lrdata->lora_device);
+}
+
+/* in mbm */
+int32_t sx127X_powers[] = {
+	-200, -100, 0, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1100,
+	1200, 1300, 1400, 1500, 1600, 1700, 1800, 1900, 2000, 2100, 2200, 2300};
+
+#ifndef	LORA_IEEE_CHANNEL_MIN
+#define	LORA_IEEE_CHANNEL_MIN	11
+#endif
+#ifndef	LORA_IEEE_CHANNEL_MAX
+#define	LORA_IEEE_CHANNEL_MAX	26
+#endif
+
+/**
+ * lora_ieee_get_channel_mask - Get the available channels' mask of LoRa device
+ *
+ * Return:	The bitwise channel mask in 4 bytes
+ */
+uint32_t
+lora_ieee_get_channel_mask(void)
+{
+	uint8_t cmin;
+	uint8_t cmax;
+	uint32_t mask;
+
+#ifdef CONFIG_OF
+	/* Set the LoRa module's min & max RF channel if OF is defined. */
+	const void *ptr;
+
+	ptr = of_get_property((regmap_get_device(rm))->of_node,
+			"minimal-RF-channel",
+			NULL);
+	cmin = (ptr != NULL) ? be32_to_cpup(ptr) : LORA_IEEE_CHANNEL_MIN;
+	ptr = of_get_property((regmap_get_device(rm))->of_node,
+			"maximum-RF-channel",
+			NULL);
+	cmax = (ptr != NULL) ? be32_to_cpup(ptr) : LORA_IEEE_CHANNEL_MAX;
+#else
+	cmin = LORA_IEEE_CHANNEL_MIN;
+	cmax = LORA_IEEE_CHANNEL_MAX;
+#endif
+
+	mask = ((uint32_t)(1 << (cmax + 1)) - (uint32_t)(1 << cmin));
+
+	return mask;
+}
+
+struct ieee802154_ops lora_ieee_ops = {
+	.owner = THIS_MODULE,
+	.start = NULL,
+	.stop = NULL,
+	.xmit_sync = NULL,
+	.ed = NULL,
+	.set_channel = NULL,
+	.set_hw_addr_filt = NULL,
+	.set_txpower = NULL,
+	.set_promiscuous_mode = NULL,
+};
+
+/**
+ * lora_ieee_register - Register LoRa device's from IEEE 802.15.4
+ * @lrdata:	LoRa device
+ *
+ * Return:	0 for success, negative number for error
+ */
+int
+lora_ieee_register(struct lora_struct *lrdata)
+{
+	int ret = -ENOMEM;
+
+	lrdata->hw = ieee802154_alloc_hw(sizeof(*lrdata), &lora_ieee_ops);
+	if (!lrdata->hw)
+		return ret;
+
+	lrdata->hw->priv = lrdata;
+	lrdata->hw->parent = regmap_get_device(lrdata->lora_device);
+	lrdata->hw->extra_tx_headroom = 0;
+	ieee802154_random_extended_addr(&(lrdata->hw->phy->perm_extended_addr));
+
+	/* Define channels could be used. */
+	lrdata->hw->phy->supported.channels[0] = lora_ieee_get_channel_mask();
+	lrdata->hw->phy->current_channel = 11;
+
+	/* Set LoRa sx127X features for IEEE 802.15.4. */
+	lrdata->hw->flags = IEEE802154_HW_TX_OMIT_CKSUM;
+	lrdata->hw->phy->flags = WPAN_PHY_FLAG_TXPOWER;
+
+	/* Define RF power. */
+	lrdata->hw->phy->supported.tx_powers = sx127X_powers;
+	lrdata->hw->phy->supported.tx_powers_size = ARRAY_SIZE(sx127X_powers);
+	lrdata->hw->phy->transmit_power = sx127X_powers[12];
+
+	dev_dbg(regmap_get_device(lrdata->lora_device),
+		"registed IEEE 802.15.4 LoRa sx127X\n");
+	ret = ieee802154_register_hw(lrdata->hw);
+	if (ret)
+		ieee802154_free_hw(lrdata->hw);
+	else
+		ret = 0;
+
+	return ret;
+}
+
+/**
+ * lora_ieee_unregister - Unregister LoRa device's from IEEE 802.15.4
+ * @lrdata:	LoRa device
+ *
+ * Return:	0 for success, negative number for error
+ */
+int
+lora_ieee_unregister(struct lora_struct *lrdata)
+{
+	ieee802154_unregister_hw(lrdata->hw);
+	ieee802154_free_hw(lrdata->hw);
+
+	return 0;
 }
 
 /*-------------------------- LoRa Timer for Polling --------------------------*/
 
+/**
+ * lora_timer_isr - Callback function for the timer interrupt
+ * @arg:	the general argument for this callback function
+ */
 void
 lora_timer_isr(unsigned long arg)
 {
@@ -1848,6 +1988,7 @@ static int loraspi_probe(struct spi_device *spi)
 	if (IS_ERR(lrdata->lora_device)) {
 		status = PTR_ERR(lrdata->lora_device);
 		dev_err(&(spi->dev), "regmap_init() failed: %d\n", status);
+		kfree(lrdata);
 		return status;
 	}
 
@@ -1859,6 +2000,7 @@ static int loraspi_probe(struct spi_device *spi)
 	if(v < 0) {
 		status = v;
 		dev_err(&(spi->dev), "no LoRa SPI device, error: %d\n", status);
+		kfree(lrdata);
 		return status;
 	}
 	dev_info(&(spi->dev), "probe a LoRa SPI device with chip ver. %d.%d\n",
@@ -1866,8 +2008,8 @@ static int loraspi_probe(struct spi_device *spi)
 			v & 0xF);
 
 	mutex_init(&(lrdata->buf_lock));
-	mutex_lock(&minors_lock);
 #ifdef LORA_DEBUG_FS
+	mutex_lock(&minors_lock);
 	minor = find_first_zero_bit(minors, N_LORASPI_MINORS);
 	if (minor < N_LORASPI_MINORS) {
 		set_bit(minor, minors);
@@ -1887,7 +2029,14 @@ static int loraspi_probe(struct spi_device *spi)
 		kfree(lrdata);
 		status = -ENODEV;
 	}
+	mutex_unlock(&minors_lock);
 #endif
+
+	status = lora_ieee_register(lrdata);
+	if (status) {
+		kfree(lrdata);
+		return status;
+	}
 
 	INIT_WORK(&(lrdata->irqwork), lora_ieee_rx_irqwork);
 
@@ -1896,8 +2045,6 @@ static int loraspi_probe(struct spi_device *spi)
 	lrdata->timer.function = lora_timer_isr;
 	lrdata->timer.data = (unsigned long)lrdata;
 	add_timer(&(lrdata->timer));
-
-	mutex_unlock(&minors_lock);
 
 	return status;
 }
@@ -1925,6 +2072,8 @@ static int loraspi_remove(struct spi_device *spi)
 	clear_bit(MINOR(lrdata->devt), minors);
 	mutex_unlock(&minors_lock);
 #endif
+	/* Unregister IEEE LoRa device. */
+	lora_ieee_unregister(lrdata);
 	/* Set the SX127X chip to sleep. */
 	sx127X_setState(dev_get_regmap(&(spi->dev), NULL), SX127X_SLEEP_MODE);
 
