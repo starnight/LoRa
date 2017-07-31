@@ -1187,14 +1187,6 @@ lora_ieee_register(struct lora_struct *lrdata)
 {
 	int ret = -ENOMEM;
 
-	lrdata->hw = ieee802154_alloc_hw(sizeof(*lrdata), &lora_ieee_ops);
-	if (!lrdata->hw) {
-		dev_err(regmap_get_device(lrdata->lora_device),
-			"not enough memory\n");
-		return ret;
-	}
-
-	lrdata->hw->priv = lrdata;
 	lrdata->hw->parent = regmap_get_device(lrdata->lora_device);
 	lrdata->hw->extra_tx_headroom = 0;
 	ieee802154_random_extended_addr(&(lrdata->hw->phy->perm_extended_addr));
@@ -1215,14 +1207,11 @@ lora_ieee_register(struct lora_struct *lrdata)
 	dev_dbg(regmap_get_device(lrdata->lora_device),
 		"register IEEE 802.15.4 LoRa sx127X\n");
 	ret = ieee802154_register_hw(lrdata->hw);
-	if (ret) {
-		ieee802154_free_hw(lrdata->hw);
+	if (ret)
 		dev_err(regmap_get_device(lrdata->lora_device),
 			"register as IEEE 802.15.4 device\n");
-	}
-	else {
+	else
 		ret = 0;
-	}
 
 	return ret;
 }
@@ -1237,7 +1226,6 @@ int
 lora_ieee_unregister(struct lora_struct *lrdata)
 {
 	ieee802154_unregister_hw(lrdata->hw);
-	ieee802154_free_hw(lrdata->hw);
 
 	return 0;
 }
@@ -2015,6 +2003,7 @@ struct regmap_config sx1278_regmap_config = {
 static int loraspi_probe(struct spi_device *spi)
 {
 	struct lora_struct *lrdata;
+	struct ieee802154_hw *hw;
 #ifdef LORA_DEBUG_FS
 	struct device *dev;
 	unsigned long minor;
@@ -2028,16 +2017,20 @@ static int loraspi_probe(struct spi_device *spi)
 	if (spi->dev.of_node && !of_match_device(lora_dt_ids, &(spi->dev))) {
 		dev_err(&(spi->dev), "buggy DT: LoRa listed directly in DT\n");
 		WARN_ON(spi->dev.of_node &&
-			!of_match_device(lora_dt_ids, (&spi->dev)));
+			!of_match_device(lora_dt_ids, &(spi->dev)));
 	}
 #endif
 
 	loraspi_probe_acpi(spi);
 
-	/* Allocate lora device's data. */
-	lrdata = kzalloc(sizeof(struct lora_struct), GFP_KERNEL);
-	if (!lrdata)
+	/* Allocate IEEE 802.15.4 LoRa device's data. */
+	hw = ieee802154_alloc_hw(sizeof(*lrdata), &lora_ieee_ops);
+	if (!hw) {
+		dev_err(&(spi->dev), "not enough memory\n");
 		return -ENOMEM;
+	}
+	lrdata = hw->priv;
+	lrdata->hw = hw;
 
 	/* Initial the LoRa device's data. */
 #ifdef LORA_DEBUG_FS
@@ -2047,7 +2040,7 @@ static int loraspi_probe(struct spi_device *spi)
 	if (IS_ERR(lrdata->lora_device)) {
 		status = PTR_ERR(lrdata->lora_device);
 		dev_err(&(spi->dev), "regmap_init() failed: %d\n", status);
-		kfree(lrdata);
+		ieee802154_free_hw(lrdata->hw);
 		return status;
 	}
 
@@ -2059,7 +2052,7 @@ static int loraspi_probe(struct spi_device *spi)
 	if(v < 0) {
 		status = v;
 		dev_err(&(spi->dev), "no LoRa SPI device, error: %d\n", status);
-		kfree(lrdata);
+		ieee802154_free_hw(lrdata->hw);
 		return status;
 	}
 	dev_info(&(spi->dev), "probe a LoRa SPI device with chip ver. %d.%d\n",
@@ -2085,7 +2078,7 @@ static int loraspi_probe(struct spi_device *spi)
 	}
 	else {
 		/* No more lora device available. */
-		kfree(lrdata);
+		ieee802154_free_hw(lrdata->hw);
 		status = -ENODEV;
 	}
 	mutex_unlock(&minors_lock);
@@ -2093,7 +2086,7 @@ static int loraspi_probe(struct spi_device *spi)
 
 	status = lora_ieee_register(lrdata);
 	if (status) {
-		kfree(lrdata);
+		ieee802154_free_hw(lrdata->hw);
 		return status;
 	}
 
@@ -2136,8 +2129,8 @@ static int loraspi_remove(struct spi_device *spi)
 	/* Set the SX127X chip to sleep. */
 	sx127X_setState(dev_get_regmap(&(spi->dev), NULL), SX127X_SLEEP_MODE);
 
-	/* Free the memory of the lora device.  */
-	kfree(lrdata);
+	/* Free the memory of the IEEE 802.15.4 LoRa device.  */
+	ieee802154_free_hw(lrdata->hw);
 
 	return 0;
 }
