@@ -1105,6 +1105,17 @@ lora_ieee_filter(struct ieee802154_hw *hw, struct ieee802154_hw_addr_filt *filt,
 	return 0;
 }
 
+int
+lora_ieee_set_txpower(struct ieee802154_hw *hw, s32 mbm)
+{
+	struct lora_struct *lrdata = hw->priv;
+	int32_t dbm = sx127X_mbm2dbm(mbm);
+
+	sx127X_setLoRaPower(lrdata->lora_device, dbm);
+
+	return 0;
+}
+
 /* in mbm */
 int32_t sx127X_powers[] = {
 	-200, -100, 0, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1100,
@@ -1161,7 +1172,7 @@ struct ieee802154_ops lora_ieee_ops = {
 	.ed = NULL,
 	.set_channel = lora_ieee_set_channel,
 	.set_hw_addr_filt = lora_ieee_filter,
-	.set_txpower = NULL,
+	.set_txpower = lora_ieee_set_txpower,
 	.set_promiscuous_mode = NULL,
 };
 
