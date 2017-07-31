@@ -1148,8 +1148,11 @@ lora_ieee_register(struct lora_struct *lrdata)
 	int ret = -ENOMEM;
 
 	lrdata->hw = ieee802154_alloc_hw(sizeof(*lrdata), &lora_ieee_ops);
-	if (!lrdata->hw)
+	if (!lrdata->hw) {
+		dev_err(regmap_get_device(lrdata->lora_device),
+			"not enough memory\n");
 		return ret;
+	}
 
 	lrdata->hw->priv = lrdata;
 	lrdata->hw->parent = regmap_get_device(lrdata->lora_device);
@@ -1170,12 +1173,16 @@ lora_ieee_register(struct lora_struct *lrdata)
 	lrdata->hw->phy->transmit_power = sx127X_powers[12];
 
 	dev_dbg(regmap_get_device(lrdata->lora_device),
-		"registed IEEE 802.15.4 LoRa sx127X\n");
+		"register IEEE 802.15.4 LoRa sx127X\n");
 	ret = ieee802154_register_hw(lrdata->hw);
-	if (ret)
+	if (ret) {
 		ieee802154_free_hw(lrdata->hw);
-	else
+		dev_err(regmap_get_device(lrdata->lora_device),
+			"register as IEEE 802.15.4 device\n");
+	}
+	else {
 		ret = 0;
+	}
 
 	return ret;
 }
