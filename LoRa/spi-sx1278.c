@@ -1076,6 +1076,35 @@ lora_ieee_rx_irqwork(struct work_struct *work)
 	sx127X_clearLoRaAllFlag(lrdata->lora_device);
 }
 
+int
+lora_ieee_tx(struct ieee802154_hw *hw, struct sk_buff *skb)
+{
+	return 0;
+}
+
+int
+lora_ieee_start(struct ieee802154_hw *hw)
+{
+	return 0;
+}
+
+void
+lora_ieee_stop(struct ieee802154_hw *hw)
+{
+}
+
+int
+lora_ieee_set_channel(struct ieee802154_hw *hw, u8 page, u8 channel)
+{
+	return 0;
+}
+
+int
+lora_ieee_filter(struct ieee802154_hw *hw, struct ieee802154_hw_addr_filt *filt, unsigned long changed)
+{
+	return 0;
+}
+
 /* in mbm */
 int32_t sx127X_powers[] = {
 	-200, -100, 0, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1100,
@@ -1126,12 +1155,12 @@ lora_ieee_channel_mask(struct lora_struct *lrdata)
 
 struct ieee802154_ops lora_ieee_ops = {
 	.owner = THIS_MODULE,
-	.start = NULL,
-	.stop = NULL,
+	.start = lora_ieee_start,
+	.stop = lora_ieee_stop,
 	.xmit_sync = NULL,
 	.ed = NULL,
-	.set_channel = NULL,
-	.set_hw_addr_filt = NULL,
+	.set_channel = lora_ieee_set_channel,
+	.set_hw_addr_filt = lora_ieee_filter,
 	.set_txpower = NULL,
 	.set_promiscuous_mode = NULL,
 };
