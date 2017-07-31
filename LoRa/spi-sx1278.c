@@ -1044,7 +1044,7 @@ lora_ieee_rx(struct lora_struct *lrdata)
 
 	rssi = sx127X_getLoRaLastPacketRSSI(rm);
 	rssi = (rssi > 0) ? 0 : rssi;
-	lqi = 255 * (rssi + 170) / 170;
+	lqi = (255 * (rssi + 170) / 170) % 255;
 
 	ieee802154_rx_irqsafe(lrdata->hw, skb, lqi);
 
@@ -1089,18 +1089,20 @@ int32_t sx127X_powers[] = {
 #endif
 
 /**
- * lora_ieee_get_channel_mask - Get the available channels' mask of LoRa device
+ * lora_ieee_channel_mask - Get the available channels' mask of LoRa device
  *
  * Return:	The bitwise channel mask in 4 bytes
  */
 uint32_t
-lora_ieee_get_channel_mask(void)
+lora_ieee_channel_mask(struct lora_struct *lrdata)
 {
 	uint8_t cmin;
 	uint8_t cmax;
 	uint32_t mask;
 
 #ifdef CONFIG_OF
+	struct regmap *rm = lrdata->lora_device;
+
 	/* Set the LoRa module's min & max RF channel if OF is defined. */
 	const void *ptr;
 
@@ -1155,7 +1157,7 @@ lora_ieee_register(struct lora_struct *lrdata)
 	ieee802154_random_extended_addr(&(lrdata->hw->phy->perm_extended_addr));
 
 	/* Define channels could be used. */
-	lrdata->hw->phy->supported.channels[0] = lora_ieee_get_channel_mask();
+	lrdata->hw->phy->supported.channels[0] = lora_ieee_channel_mask(lrdata);
 	lrdata->hw->phy->current_channel = 11;
 
 	/* Set LoRa sx127X features for IEEE 802.15.4. */
