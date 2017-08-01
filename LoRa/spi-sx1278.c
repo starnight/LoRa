@@ -1077,12 +1077,6 @@ lora_ieee_rx_irqwork(struct work_struct *work)
 }
 
 int
-lora_ieee_tx(struct ieee802154_hw *hw, struct sk_buff *skb)
-{
-	return 0;
-}
-
-int
 lora_ieee_start(struct ieee802154_hw *hw)
 {
 	return 0;
@@ -1091,6 +1085,30 @@ lora_ieee_start(struct ieee802154_hw *hw)
 void
 lora_ieee_stop(struct ieee802154_hw *hw)
 {
+}
+
+int
+lora_ieee_tx(struct ieee802154_hw *hw, struct sk_buff *skb)
+{
+	struct lora_struct *lrdata = hw->priv;
+	struct regmap *rm = lrdata->lora_device;
+	int c;
+	int ret;
+
+	/* Write to SPI chip synchronously to fill the FIFO of the chip. */
+	c = sx127X_sendLoRaData(rm, skb->data, skb->len);
+
+	ret = (c > 0) ? 0 : -EBUSY;
+
+	return ret;
+}
+
+int
+lora_ieee_ed(struct ieee802154_hw *hw, u8 *level)
+{
+	*level = 50;
+
+	return 0;
 }
 
 int
@@ -1164,16 +1182,16 @@ lora_ieee_channel_mask(struct lora_struct *lrdata)
 	return mask;
 }
 
-struct ieee802154_ops lora_ieee_ops = {
+static const struct ieee802154_ops lora_ieee_ops = {
 	.owner = THIS_MODULE,
 	.start = lora_ieee_start,
 	.stop = lora_ieee_stop,
-	.xmit_sync = NULL,
-	.ed = NULL,
+	.xmit_async = lora_ieee_tx,
+	.ed = lora_ieee_ed,
 	.set_channel = lora_ieee_set_channel,
 	.set_hw_addr_filt = lora_ieee_filter,
 	.set_txpower = lora_ieee_set_txpower,
-	.set_promiscuous_mode = NULL,
+	//.set_promiscuous_mode = NULL,
 };
 
 /**
