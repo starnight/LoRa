@@ -1010,6 +1010,12 @@ init_sx127X(struct regmap *rm)
 
 /*----------------------- LoRa IEEE 802.15.4 Functions -----------------------*/
 
+/* LoRa device's sensitivity in dbm. */
+#ifndef LORA_IEEE_SENSITIVITY
+#define LORA_IEEE_SENSITIVITY	(-148)
+#endif
+#define LORA_IEEE_ENERGY_RANGE	(-LORA_IEEE_SENSITIVITY)
+
 /**
  * lora_ieee_rx - Read the frame from LoRa device's RX
  *
@@ -1018,11 +1024,11 @@ init_sx127X(struct regmap *rm)
 int
 lora_ieee_rx(struct lora_struct *lrdata)
 {
+	struct regmap *rm = lrdata->lora_device;
+	struct sk_buff *skb;
 	uint8_t len;
 	uint8_t lqi;
 	int32_t rssi;
-	struct sk_buff *skb;
-	struct regmap *rm = lrdata->lora_device;
 	int ret;
 
 	len = lrdata->bufmaxlen;
@@ -1042,9 +1048,11 @@ lora_ieee_rx(struct lora_struct *lrdata)
 		return (ret == 0) ? -EINVAL : ret;
 	}
 
+	/* LQI: IEEE  802.15.4-2011 8.2.6 Link quality indicator. */
 	rssi = sx127X_getLoRaLastPacketRSSI(rm);
 	rssi = (rssi > 0) ? 0 : rssi;
-	lqi = (255 * (rssi + 170) / 170) % 255;
+	lqi = ((int32_t)255 * (rssi + LORA_IEEE_ENERGY_RANGE)
+		       / LORA_IEEE_ENERGY_RANGE) % 255;
 
 	ieee802154_rx_irqsafe(lrdata->hw, skb, lqi);
 
@@ -1106,7 +1114,22 @@ lora_ieee_tx(struct ieee802154_hw *hw, struct sk_buff *skb)
 int
 lora_ieee_ed(struct ieee802154_hw *hw, u8 *level)
 {
-	*level = 50;
+	struct lora_struct *lrdata = hw->priv;
+	struct regmap *rm = lrdata->lora_device;
+	int32_t rssi;
+
+	/* ED: IEEE  802.15.4-2011 8.2.5 Recevier ED. */
+	rssi = sx127X_getLoRaRSSI(rm);
+	if (rssi < (LORA_IEEE_SENSITIVITY + 10)) {
+		*level = 0;
+	}
+	else if (rssi >= 0) {
+		*level = 255;
+	}
+	else {
+		*level = ((int32_t)255 * (rssi + (LORA_IEEE_ENERGY_RANGE - 10))
+				/ (LORA_IEEE_ENERGY_RANGE - 10)) % 255;
+	}
 
 	return 0;
 }
@@ -1118,7 +1141,8 @@ lora_ieee_set_channel(struct ieee802154_hw *hw, u8 page, u8 channel)
 }
 
 int
-lora_ieee_filter(struct ieee802154_hw *hw, struct ieee802154_hw_addr_filt *filt, unsigned long changed)
+lora_ieee_filter(struct ieee802154_hw *hw,
+		struct ieee802154_hw_addr_filt *filt, unsigned long changed)
 {
 	return 0;
 }
@@ -1127,9 +1151,10 @@ int
 lora_ieee_set_txpower(struct ieee802154_hw *hw, s32 mbm)
 {
 	struct lora_struct *lrdata = hw->priv;
+	struct regmap *rm = lrdata->lora_device;
 	int32_t dbm = sx127X_mbm2dbm(mbm);
 
-	sx127X_setLoRaPower(lrdata->lora_device, dbm);
+	sx127X_setLoRaPower(rm, dbm);
 
 	return 0;
 }
