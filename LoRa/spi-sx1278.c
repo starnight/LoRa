@@ -1029,9 +1029,10 @@ lora_ieee_rx(struct lora_struct *lrdata)
 	uint8_t len;
 	uint8_t lqi;
 	int32_t rssi;
+	int32_t range = LORA_IEEE_ENERGY_RANGE;
 	int ret;
 
-	len = lrdata->bufmaxlen;
+	len = sx127X_getLoRaLastPacketPayloadLen(rm);
 	if (!ieee802154_is_valid_psdu_len(len)) {
 		dev_dbg(regmap_get_device(rm), "corrupted frame received\n");
 		len = IEEE802154_MTU;
@@ -1051,8 +1052,7 @@ lora_ieee_rx(struct lora_struct *lrdata)
 	/* LQI: IEEE  802.15.4-2011 8.2.6 Link quality indicator. */
 	rssi = sx127X_getLoRaLastPacketRSSI(rm);
 	rssi = (rssi > 0) ? 0 : rssi;
-	lqi = ((int32_t)255 * (rssi + LORA_IEEE_ENERGY_RANGE)
-		       / LORA_IEEE_ENERGY_RANGE) % 255;
+	lqi = ((int32_t)255 * (rssi + range) / range) % 255;
 
 	ieee802154_rx_irqsafe(lrdata->hw, skb, lqi);
 
@@ -1117,19 +1117,16 @@ lora_ieee_ed(struct ieee802154_hw *hw, u8 *level)
 	struct lora_struct *lrdata = hw->priv;
 	struct regmap *rm = lrdata->lora_device;
 	int32_t rssi;
+	int32_t range = LORA_IEEE_ENERGY_RANGE - 10;
 
 	/* ED: IEEE  802.15.4-2011 8.2.5 Recevier ED. */
 	rssi = sx127X_getLoRaRSSI(rm);
-	if (rssi < (LORA_IEEE_SENSITIVITY + 10)) {
+	if (rssi < (LORA_IEEE_SENSITIVITY + 10))
 		*level = 0;
-	}
-	else if (rssi >= 0) {
+	else if (rssi >= 0)
 		*level = 255;
-	}
-	else {
-		*level = ((int32_t)255 * (rssi + (LORA_IEEE_ENERGY_RANGE - 10))
-				/ (LORA_IEEE_ENERGY_RANGE - 10)) % 255;
-	}
+	else
+		*level = ((int32_t)255 * (rssi + range)	/ range) % 255;
 
 	return 0;
 }
