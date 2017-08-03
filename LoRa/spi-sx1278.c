@@ -1175,7 +1175,7 @@ sx127X_ieee_get_rf_config(struct ieee802154_hw *hw, struct rf_frq *rf)
 	ptr = of_get_property((regmap_get_device(rm))->of_node,
 			"rf-bandwidth",
 			NULL);
-	rf->bandwith = (ptr != NULL) ?
+	rf->bandwidth = (ptr != NULL) ?
 			be32_to_cpup(ptr) : SX127X_IEEE_BANDWIDTH;
 
 	/* Set the LoRa chip's min & max RF channel if OF is defined. */
