@@ -1136,9 +1136,89 @@ sx127X_ieee_ed(struct ieee802154_hw *hw, u8 *level)
 	return 0;
 }
 
+#ifndef	SX127X_IEEE_CHANNEL_MIN
+#define	SX127X_IEEE_CHANNEL_MIN		11
+#endif
+#ifndef	SX127X_IEEE_CHANNEL_MAX
+#define	SX127X_IEEE_CHANNEL_MAX		26
+#endif
+#ifndef SX127X_IEEE_CENTER_CARRIER_FRQ
+#define SX127X_IEEE_CENTER_CARRIER_FRQ	434000000
+#endif
+#ifndef SX127X_IEEE_BANDWIDTH
+#define	SX127X_IEEE_BANDWIDTH		500000
+#endif
+
+struct rf_frq {
+	uint32_t carrier;
+	uint32_t bandwidth;
+	uint8_t ch_min;
+	uint8_t ch_max;
+};
+
+void
+sx127X_ieee_get_rf_config(struct ieee802154_hw *hw, struct rf_frq *rf)
+{
+#ifdef CONFIG_OF
+	struct lora_struct *lrdata = hw->priv;
+	struct regmap *rm = lrdata->lora_device;
+	const void *ptr;
+
+	/* Set the LoRa chip's center carrier frequency. */
+	ptr = of_get_property((regmap_get_device(rm))->of_node,
+			"center-carrier-frq",
+			NULL);
+	rf->carrier = (ptr != NULL) ?
+			be32_to_cpup(ptr) : SX127X_IEEE_CENTER_CARRIER_FRQ;
+
+	/* Set the LoRa chip's RF bandwidth. */
+	ptr = of_get_property((regmap_get_device(rm))->of_node,
+			"rf-bandwidth",
+			NULL);
+	rf->bandwith = (ptr != NULL) ?
+			be32_to_cpup(ptr) : SX127X_IEEE_BANDWIDTH;
+
+	/* Set the LoRa chip's min & max RF channel if OF is defined. */
+	ptr = of_get_property((regmap_get_device(rm))->of_node,
+			"minimal-RF-channel",
+			NULL);
+	rf->ch_min = (ptr != NULL) ?
+			be32_to_cpup(ptr) : SX127X_IEEE_CHANNEL_MIN;
+
+	ptr = of_get_property((regmap_get_device(rm))->of_node,
+			"maximum-RF-channel",
+			NULL);
+	rf->ch_max = (ptr != NULL) ?
+			be32_to_cpup(ptr) : SX127X_IEEE_CHANNEL_MAX;
+#else
+	rf->carrier = SX127X_IEEE_CENTER_CARRIER_FRQ;
+	rf->bandwidth = SX127X_IEEE_BANDWIDTH;
+	rf->ch_min = SX127X_IEEE_CHANNEL_MIN;
+	rf->ch_max = SX127X_IEEE_CHANNEL_MAX;
+#endif
+}
+
 int
 sx127X_ieee_set_channel(struct ieee802154_hw *hw, u8 page, u8 channel)
 {
+	struct lora_struct *lrdata = hw->priv;
+	struct regmap *rm = lrdata->lora_device;
+	struct rf_frq rf;
+	uint32_t fr;
+	int8_t d;
+
+	sx127X_ieee_get_rf_config(hw, &rf);
+
+	if (channel < rf.ch_min)
+		channel = rf.ch_min;
+	else if (channel > rf.ch_max)
+		channel = rf.ch_max;
+
+	d = channel - (rf.ch_min + rf.ch_max) / 2;
+	fr = rf.carrier + d * rf.bandwidth;
+
+	sx127X_setLoRaFreq(rm, fr);
+
 	return 0;
 }
 
@@ -1166,13 +1246,6 @@ int32_t sx127X_powers[] = {
 	-200, -100, 0, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1100,
 	1200, 1300, 1400, 1500, 1600, 1700, 1800, 1900, 2000, 2100, 2200, 2300};
 
-#ifndef	SX127X_IEEE_CHANNEL_MIN
-#define	SX127X_IEEE_CHANNEL_MIN		11
-#endif
-#ifndef	SX127X_IEEE_CHANNEL_MAX
-#define	SX127X_IEEE_CHANNEL_MAX		26
-#endif
-
 /**
  * sx127X_ieee_channel_mask - Get the available channels' mask of LoRa device
  * @hw:		LoRa IEEE 802.15.4 device
@@ -1182,31 +1255,12 @@ int32_t sx127X_powers[] = {
 uint32_t
 sx127X_ieee_channel_mask(struct ieee802154_hw *hw)
 {
-	uint8_t cmin;
-	uint8_t cmax;
+	struct rf_frq rf;
 	uint32_t mask;
 
-#ifdef CONFIG_OF
-	struct lora_struct *lrdata = hw->priv;
-	struct regmap *rm = lrdata->lora_device;
+	sx127X_ieee_get_rf_config(hw, &rf);
 
-	/* Set the LoRa module's min & max RF channel if OF is defined. */
-	const void *ptr;
-
-	ptr = of_get_property((regmap_get_device(rm))->of_node,
-			"minimal-RF-channel",
-			NULL);
-	cmin = (ptr != NULL) ? be32_to_cpup(ptr) : SX127X_IEEE_CHANNEL_MIN;
-	ptr = of_get_property((regmap_get_device(rm))->of_node,
-			"maximum-RF-channel",
-			NULL);
-	cmax = (ptr != NULL) ? be32_to_cpup(ptr) : SX127X_IEEE_CHANNEL_MAX;
-#else
-	cmin = SX127X_IEEE_CHANNEL_MIN;
-	cmax = SX127X_IEEE_CHANNEL_MAX;
-#endif
-
-	mask = ((uint32_t)(1 << (cmax + 1)) - (uint32_t)(1 << cmin));
+	mask = ((uint32_t)(1 << (rf.ch_max + 1)) - (uint32_t)(1 << rf.ch_min));
 
 	return mask;
 }
