@@ -1082,6 +1082,10 @@ lora_ieee_rx_irqwork(struct work_struct *work)
 
 	/* Clear all of the IRQ flags. */
 	sx127X_clearLoRaAllFlag(lrdata->lora_device);
+
+	/* Eanable the LoRa timer again. */
+	lrdata->timer.expires = jiffies + HZ;
+	add_timer(&(lrdata->timer));
 }
 
 int
@@ -1282,9 +1286,6 @@ lora_timer_isr(unsigned long arg)
 	struct lora_struct *lrdata = (struct lora_struct *)arg;
 
 	schedule_work(&(lrdata->irqwork));
-
-	lrdata->timer.expires = jiffies + HZ;
-	add_timer(&(lrdata->timer));
 }
 
 /*---------------------------- LoRa SPI Functions ----------------------------*/
