@@ -1092,12 +1092,21 @@ sx127X_ieee_rx_irqwork(struct work_struct *work)
 int
 sx127X_ieee_start(struct ieee802154_hw *hw)
 {
+	struct lora_struct *lrdata = hw->priv;
+	struct regmap *rm = lrdata->lora_device;
+
+	sx127X_startLoRaMode(rm);
+
 	return 0;
 }
 
 void
 sx127X_ieee_stop(struct ieee802154_hw *hw)
 {
+	struct lora_struct *lrdata = hw->priv;
+	struct regmap *rm = lrdata->lora_device;
+
+	sx127X_setState(rm, SX127X_SLEEP_MODE);
 }
 
 int
@@ -1223,13 +1232,6 @@ sx127X_ieee_set_channel(struct ieee802154_hw *hw, u8 page, u8 channel)
 }
 
 int
-sx127X_ieee_filter(struct ieee802154_hw *hw,
-		struct ieee802154_hw_addr_filt *filt, unsigned long changed)
-{
-	return 0;
-}
-
-int
 sx127X_ieee_set_txpower(struct ieee802154_hw *hw, s32 mbm)
 {
 	struct lora_struct *lrdata = hw->priv;
@@ -1272,7 +1274,6 @@ static const struct ieee802154_ops sx127X_ieee_ops = {
 	.xmit_async = sx127X_ieee_tx,
 	.ed = sx127X_ieee_ed,
 	.set_channel = sx127X_ieee_set_channel,
-	.set_hw_addr_filt = sx127X_ieee_filter,
 	.set_txpower = sx127X_ieee_set_txpower,
 	//.set_promiscuous_mode = NULL,
 };
