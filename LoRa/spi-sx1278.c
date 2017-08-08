@@ -1001,8 +1001,9 @@ init_sx127X(struct regmap *rm)
 		mmv = v & 0xF;
 		dev_dbg(regmap_get_device(rm), "chip version %d.%d\n", fv, mmv);
 #endif
-
+#ifdef LORA_DEBUG_FS
 		sx127X_startLoRaMode(rm);
+#endif
 	}
 
 	return v;
@@ -1063,32 +1064,6 @@ sx127X_ieee_rx(struct lora_struct *lrdata)
 	return 0;
 }
 
-/**
- * sx127X_ieee_rx_irqwork - The actual work which checks RX for the timer ISR
- * @work:	the work entry listed in the workqueue
- */
-void
-sx127X_ieee_rx_irqwork(struct work_struct *work)
-{
-	struct lora_struct *lrdata;
-	uint8_t flag;
-
-	lrdata = container_of(work, struct lora_struct, irqwork);
-
-	flag = sx127X_getLoRaAllFlag(lrdata->lora_device);
-	if (((flag & SX127X_FLAG_RXTIMEOUT) == 0)
-		&& ((flag & SX127X_FLAG_PAYLOADCRCERROR) == 0)
-		&& (flag & SX127X_FLAG_RXDONE))
-		sx127X_ieee_rx(lrdata);
-
-	/* Clear all of the IRQ flags. */
-	sx127X_clearLoRaAllFlag(lrdata->lora_device);
-
-	/* Eanable the LoRa timer again. */
-	lrdata->timer.expires = jiffies + HZ;
-	add_timer(&(lrdata->timer));
-}
-
 int
 sx127X_ieee_start(struct ieee802154_hw *hw)
 {
@@ -1114,15 +1089,35 @@ sx127X_ieee_tx(struct ieee802154_hw *hw, struct sk_buff *skb)
 {
 	struct lora_struct *lrdata = hw->priv;
 	struct regmap *rm = lrdata->lora_device;
-	int c;
 	int ret;
 
-	/* Write to SPI chip synchronously to fill the FIFO of the chip. */
-	c = sx127X_sendLoRaData(rm, skb->data, skb->len);
+	/* Check TX is not used or used for now. */
+	mutex_lock(&(lrdata->buf_lock));
+	if (lrdata->tx_skb == NULL) {
+		lrdata->tx_skb = skb;
+		ret = -EAGAIN;
+	}
+	else {
+		ret = -EBUSY;
+	}
+	mutex_unlock(&(lrdata->buf_lock));
 
-	ret = (c > 0) ? 0 : -EBUSY;
+	/* Write and fill the FIFO of the chip if TX is not used. */
+	if(ret == -EAGAIN)
+		sx127X_sendLoRaData(rm, skb->data, skb->len);
 
 	return ret;
+}
+
+void
+sx127X_ieee_tx_complete(struct lora_struct *lrdata)
+{
+	mutex_lock(&(lrdata->buf_lock));
+	if (lrdata->tx_skb != NULL) {
+		ieee802154_xmit_complete(lrdata->hw, lrdata->tx_skb, false);
+		lrdata->tx_skb = NULL;
+	}
+	mutex_unlock(&(lrdata->buf_lock));
 }
 
 int
@@ -1330,6 +1325,36 @@ sx127X_ieee_unregister(struct ieee802154_hw *hw)
 }
 
 /*------------------------- SX127X Timer for Polling -------------------------*/
+
+/**
+ * sx127X_timer_irqwork - The actual work which checks the IRQ flags of the chip
+ * @work:	the work entry listed in the workqueue
+ */
+void
+sx127X_timer_irqwork(struct work_struct *work)
+{
+	struct lora_struct *lrdata;
+	uint8_t flag;
+
+	lrdata = container_of(work, struct lora_struct, irqwork);
+
+	flag = sx127X_getLoRaAllFlag(lrdata->lora_device);
+	/* Check RX flags for incoming new frame. */
+	if (((flag & SX127X_FLAG_RXTIMEOUT) == 0)
+		&& ((flag & SX127X_FLAG_PAYLOADCRCERROR) == 0)
+		&& (flag & SX127X_FLAG_RXDONE))
+		sx127X_ieee_rx(lrdata);
+	/* Check TX flags for outgoing frame is done.*/
+	if (flag & SX127X_FLAG_TXDONE)
+		sx127X_ieee_tx_complete(lrdata);
+
+	/* Clear all of the IRQ flags. */
+	sx127X_clearLoRaAllFlag(lrdata->lora_device);
+
+	/* Eanable the LoRa timer again. */
+	lrdata->timer.expires = jiffies + HZ;
+	add_timer(&(lrdata->timer));
+}
 
 /**
  * sx127X_timer_isr - Callback function for the timer interrupt
@@ -2156,6 +2181,7 @@ static int loraspi_probe(struct spi_device *spi)
 			v & 0xF);
 
 	mutex_init(&(lrdata->buf_lock));
+	lrdata->tx_skb = NULL;
 #ifdef LORA_DEBUG_FS
 	mutex_lock(&minors_lock);
 	minor = find_first_zero_bit(minors, N_LORASPI_MINORS);
@@ -2186,7 +2212,7 @@ static int loraspi_probe(struct spi_device *spi)
 		return status;
 	}
 
-	INIT_WORK(&(lrdata->irqwork), sx127X_ieee_rx_irqwork);
+	INIT_WORK(&(lrdata->irqwork), sx127X_timer_irqwork);
 
 	init_timer(&(lrdata->timer));
 	lrdata->timer.expires = jiffies + HZ;

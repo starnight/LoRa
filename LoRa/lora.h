@@ -44,6 +44,7 @@
 #include <linux/fs.h>
 #include <linux/mutex.h>
 #include <linux/timer.h>
+#include <linux/skbuff.h>
 #include <linux/workqueue.h>
 #include <net/mac802154.h>
 
@@ -125,6 +126,7 @@ struct lora_operations {
  * @rx_buffer:		The length of the RX buffer
  * @bufmaxlen:		The max length of the TX and RX buffer
  * @buf_lock:		The lock to protect the synchroniztion of this structure
+ * @tx_skb:		The handler of the current sending TX sk_buff
  * @waitqueue:		The queue to be hung on the wait table for multiplexing
  * @timer:		The timer for polling the status of chip's IRQ flags
  * @irqwork:		Work queue for send RX buffer to upper level
@@ -139,13 +141,14 @@ struct lora_struct {
 	struct list_head device_entry;
 	struct lora_operations *ops;
 	uint8_t users;
-#endif
 	uint8_t *tx_buf;
 	uint8_t *rx_buf;
 	uint8_t tx_buflen;
 	uint8_t rx_buflen;
 	uint8_t bufmaxlen;
+#endif
 	struct mutex buf_lock;
+	struct sk_buff *tx_skb;
 	wait_queue_head_t waitqueue;
 	struct timer_list timer;
 	struct work_struct irqwork;
