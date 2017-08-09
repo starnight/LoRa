@@ -1106,6 +1106,9 @@ sx127X_ieee_start(struct ieee802154_hw *hw)
 
 	sx127X_startLoRaMode(rm);
 
+	lrdata->timer_enable = 1;
+	add_timer(&(lrdata->timer));
+
 	return 0;
 }
 
@@ -1115,6 +1118,7 @@ sx127X_ieee_stop(struct ieee802154_hw *hw)
 	struct lora_struct *lrdata = hw->priv;
 	struct regmap *rm = lrdata->lora_device;
 
+	lrdata->timer_enable = 0;
 	sx127X_setState(rm, SX127X_SLEEP_MODE);
 }
 
@@ -1402,8 +1406,10 @@ sx127X_timer_irqwork(struct work_struct *work)
 	}
 
 	/* Eanable the LoRa timer again. */
-	lrdata->timer.expires = jiffies + HZ;
-	add_timer(&(lrdata->timer));
+	if (lrdata->timer_enable) {
+		lrdata->timer.expires = jiffies + HZ;
+		add_timer(&(lrdata->timer));
+	}
 }
 
 /**
@@ -2268,7 +2274,6 @@ static int loraspi_probe(struct spi_device *spi)
 	lrdata->timer.expires = jiffies + HZ;
 	lrdata->timer.function = sx127X_timer_isr;
 	lrdata->timer.data = (unsigned long)lrdata;
-	add_timer(&(lrdata->timer));
 
 	return status;
 }

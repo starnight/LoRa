@@ -152,6 +152,7 @@ struct lora_struct {
 	wait_queue_head_t waitqueue;
 	struct timer_list timer;
 	struct work_struct irqwork;
+	uint8_t timer_enable;
 };
 
 #ifdef LORA_DEBUG_FS
