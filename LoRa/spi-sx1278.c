@@ -1134,7 +1134,7 @@ sx127X_ieee_tx(struct ieee802154_hw *hw, struct sk_buff *skb)
 	mutex_lock(&(lrdata->buf_lock));
 	if (lrdata->tx_skb == NULL) {
 		lrdata->tx_skb = skb;
-		ret = -EAGAIN;
+		ret = 0;
 	}
 	else {
 		ret = -EBUSY;
@@ -1142,7 +1142,7 @@ sx127X_ieee_tx(struct ieee802154_hw *hw, struct sk_buff *skb)
 	mutex_unlock(&(lrdata->buf_lock));
 
 	/* Write and fill the FIFO of the chip if TX is not used. */
-	if(ret == -EAGAIN) {
+	if(ret == 0) {
 		len = sx127X_sendLoRaData(rm, skb->data, skb->len);
 		if (len > 0)
 			sx127X_setState(rm, SX127X_TX_MODE);
