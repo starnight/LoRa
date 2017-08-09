@@ -768,6 +768,9 @@ sx127X_readLoRaData(struct regmap *rm, uint8_t *buf, size_t len)
 	/* Read LoRa packet payload. */
 	ret = regmap_raw_read(rm, SX127X_REG_FIFO, buf, len);
 
+	dev_dbg(regmap_get_device(rm),
+		"read %zu bytes from 0x%u with ret=%d\n", len, start_adr, ret);
+
 	return (ret >= 0) ? len : ret;
 }
 
@@ -968,7 +971,10 @@ sx127X_startLoRaMode(struct regmap *rm)
 	base_adr = 0x00;
 	dev_dbg(regmap_get_device(rm), "going to set RX base address\n");
 	regmap_raw_write(rm, SX127X_REG_FIFO_RX_BASE_ADDR, &base_adr, 1);
-	regmap_raw_write(rm, SX127X_REG_FIFO_ADDR_PTR, &base_adr, 1);
+	/* Set chip FIFO TX base. */
+	base_adr = 0x80;
+	dev_dbg(regmap_get_device(rm), "going to set TX base address\n");
+	regmap_raw_write(rm, SX127X_REG_FIFO_TX_BASE_ADDR, &base_adr, 1);
 
 	/* Clear all of the IRQ flags. */
 	sx127X_clearLoRaAllFlag(rm);
@@ -1041,14 +1047,19 @@ sx127X_ieee_rx(struct lora_struct *lrdata)
 	}
 
 	skb = dev_alloc_skb(len);
-	if (!skb)
-		return -ENOMEM;
+	if (!skb) {
+		dev_err(regmap_get_device(rm), "%s out of memory\n", __func__);
+		ret = -ENOMEM;
+		goto sx127x_ieee_rx_ret;
+	}
 
 	ret = sx127X_readLoRaData(rm, skb_put(skb, len), len);
 	if (ret <= 0) {
 		dev_dbg(regmap_get_device(rm), "frame reception failed\n");
 		kfree(skb);
-		return (ret == 0) ? -EINVAL : ret;
+		if (ret == 0)
+			ret = -EINVAL;
+		goto sx127x_ieee_rx_ret;
 	}
 
 	/* LQI: IEEE  802.15.4-2011 8.2.6 Link quality indicator. */
@@ -1061,7 +1072,30 @@ sx127X_ieee_rx(struct lora_struct *lrdata)
 	dev_dbg(regmap_get_device(rm),
 		"%s: len=%u LQI=%u\n", __func__, len, lqi);
 
-	return 0;
+	ret = 0;
+
+sx127x_ieee_rx_ret:
+	mutex_lock(&(lrdata->buf_lock));
+	if (lrdata->tx_skb == NULL) {
+		sx127X_setState(rm, SX127X_STANDBY_MODE);
+		sx127X_setState(rm, SX127X_RXCONTINUOUS_MODE);
+	}
+	mutex_unlock(&(lrdata->buf_lock));
+	return ret;
+}
+
+void
+sx127X_ieee_rx_error(struct lora_struct *lrdata)
+{
+	struct regmap *rm = lrdata->lora_device;
+
+	/* Drop the frame. */
+	mutex_lock(&(lrdata->buf_lock));
+	if (lrdata->tx_skb == NULL) {
+		sx127X_setState(rm, SX127X_STANDBY_MODE);
+		sx127X_setState(rm, SX127X_RXCONTINUOUS_MODE);
+	}
+	mutex_unlock(&(lrdata->buf_lock));
 }
 
 int
@@ -1089,6 +1123,7 @@ sx127X_ieee_tx(struct ieee802154_hw *hw, struct sk_buff *skb)
 {
 	struct lora_struct *lrdata = hw->priv;
 	struct regmap *rm = lrdata->lora_device;
+	int len;
 	int ret;
 
 	/* Check TX is not used or used for now. */
@@ -1103,8 +1138,13 @@ sx127X_ieee_tx(struct ieee802154_hw *hw, struct sk_buff *skb)
 	mutex_unlock(&(lrdata->buf_lock));
 
 	/* Write and fill the FIFO of the chip if TX is not used. */
-	if(ret == -EAGAIN)
-		sx127X_sendLoRaData(rm, skb->data, skb->len);
+	if(ret == -EAGAIN) {
+		len = sx127X_sendLoRaData(rm, skb->data, skb->len);
+		if (len > 0)
+			sx127X_setState(rm, SX127X_TX_MODE);
+		else
+			ret = len;
+	}
 
 	return ret;
 }
@@ -1112,12 +1152,16 @@ sx127X_ieee_tx(struct ieee802154_hw *hw, struct sk_buff *skb)
 void
 sx127X_ieee_tx_complete(struct lora_struct *lrdata)
 {
+	struct regmap *rm = lrdata->lora_device;
+
 	mutex_lock(&(lrdata->buf_lock));
 	if (lrdata->tx_skb != NULL) {
 		ieee802154_xmit_complete(lrdata->hw, lrdata->tx_skb, false);
 		lrdata->tx_skb = NULL;
 	}
 	mutex_unlock(&(lrdata->buf_lock));
+
+	sx127X_setState(rm, SX127X_RXCONTINUOUS_MODE);
 }
 
 int
@@ -1307,9 +1351,7 @@ sx127X_ieee_register(struct ieee802154_hw *hw)
 	ret = ieee802154_register_hw(hw);
 	if (ret)
 		dev_err(regmap_get_device(lrdata->lora_device),
-			"register as IEEE 802.15.4 device\n");
-	else
-		ret = 0;
+			"register as IEEE 802.15.4 device failed\n");
 
 	return ret;
 }
@@ -1339,17 +1381,25 @@ sx127X_timer_irqwork(struct work_struct *work)
 	lrdata = container_of(work, struct lora_struct, irqwork);
 
 	flag = sx127X_getLoRaAllFlag(lrdata->lora_device);
-	/* Check RX flags for incoming new frame. */
+	/* Check RX flags for an incoming new frame. */
 	if (((flag & SX127X_FLAG_RXTIMEOUT) == 0)
 		&& ((flag & SX127X_FLAG_PAYLOADCRCERROR) == 0)
-		&& (flag & SX127X_FLAG_RXDONE))
+		&& (flag & SX127X_FLAG_RXDONE)) {
 		sx127X_ieee_rx(lrdata);
+		sx127X_clearLoRaFlag(lrdata->lora_device, SX127X_FLAG_RXDONE);
+	}
+	/* Check RX error flags for an incoming frame. */
+	else if (flag & (SX127X_FLAG_RXTIMEOUT | SX127X_FLAG_PAYLOADCRCERROR)) {
+		sx127X_ieee_rx_error(lrdata);
+		sx127X_clearLoRaFlag(lrdata->lora_device,
+				SX127X_FLAG_RXTIMEOUT
+				| SX127X_FLAG_PAYLOADCRCERROR);
+	}
 	/* Check TX flags for outgoing frame is done.*/
-	if (flag & SX127X_FLAG_TXDONE)
+	if (flag & SX127X_FLAG_TXDONE) {
 		sx127X_ieee_tx_complete(lrdata);
-
-	/* Clear all of the IRQ flags. */
-	sx127X_clearLoRaAllFlag(lrdata->lora_device);
+		sx127X_clearLoRaFlag(lrdata->lora_device, SX127X_FLAG_TXDONE);
+	}
 
 	/* Eanable the LoRa timer again. */
 	lrdata->timer.expires = jiffies + HZ;
