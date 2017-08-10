@@ -1075,12 +1075,12 @@ sx127X_ieee_rx(struct lora_struct *lrdata)
 	ret = 0;
 
 sx127x_ieee_rx_ret:
-	mutex_lock(&(lrdata->buf_lock));
+	//mutex_lock(&(lrdata->buf_lock));
 	if (lrdata->tx_skb == NULL) {
 		sx127X_setState(rm, SX127X_STANDBY_MODE);
 		sx127X_setState(rm, SX127X_RXCONTINUOUS_MODE);
 	}
-	mutex_unlock(&(lrdata->buf_lock));
+	//mutex_unlock(&(lrdata->buf_lock));
 	return ret;
 }
 
@@ -1090,12 +1090,12 @@ sx127X_ieee_rx_error(struct lora_struct *lrdata)
 	struct regmap *rm = lrdata->lora_device;
 
 	/* Drop the frame. */
-	mutex_lock(&(lrdata->buf_lock));
+	//mutex_lock(&(lrdata->buf_lock));
 	if (lrdata->tx_skb == NULL) {
 		sx127X_setState(rm, SX127X_STANDBY_MODE);
 		sx127X_setState(rm, SX127X_RXCONTINUOUS_MODE);
 	}
-	mutex_unlock(&(lrdata->buf_lock));
+	//mutex_unlock(&(lrdata->buf_lock));
 }
 
 int
@@ -1122,35 +1122,21 @@ sx127X_ieee_stop(struct ieee802154_hw *hw)
 	sx127X_setState(rm, SX127X_SLEEP_MODE);
 }
 
-int
-sx127X_ieee_tx(struct ieee802154_hw *hw, struct sk_buff *skb)
+void
+sx127X_ieee_tx(struct work_struct *work)
 {
-	struct lora_struct *lrdata = hw->priv;
-	struct regmap *rm = lrdata->lora_device;
+	struct lora_struct *lrdata;
+	struct regmap *rm;
+	struct sk_buff *skb;
 	int len;
-	int ret;
 
-	/* Check TX is not used or used for now. */
-	mutex_lock(&(lrdata->buf_lock));
-	if (lrdata->tx_skb == NULL) {
-		lrdata->tx_skb = skb;
-		ret = 0;
-	}
-	else {
-		ret = -EBUSY;
-	}
-	mutex_unlock(&(lrdata->buf_lock));
+	lrdata = container_of(work, struct lora_struct, txwork);
+	rm = lrdata->lora_device;
+	skb = lrdata->tx_skb;
 
-	/* Write and fill the FIFO of the chip if TX is not used. */
-	if(ret == 0) {
-		len = sx127X_sendLoRaData(rm, skb->data, skb->len);
-		if (len > 0)
-			sx127X_setState(rm, SX127X_TX_MODE);
-		else
-			ret = len;
-	}
-
-	return ret;
+	len = sx127X_sendLoRaData(rm, skb->data, skb->len);
+	if (len > 0)
+		sx127X_setState(rm, SX127X_TX_MODE);
 }
 
 void
@@ -1158,14 +1144,47 @@ sx127X_ieee_tx_complete(struct lora_struct *lrdata)
 {
 	struct regmap *rm = lrdata->lora_device;
 
-	mutex_lock(&(lrdata->buf_lock));
+	//mutex_lock(&(lrdata->buf_lock));
 	if (lrdata->tx_skb != NULL) {
 		ieee802154_xmit_complete(lrdata->hw, lrdata->tx_skb, false);
 		lrdata->tx_skb = NULL;
 	}
-	mutex_unlock(&(lrdata->buf_lock));
+	//mutex_unlock(&(lrdata->buf_lock));
 
 	sx127X_setState(rm, SX127X_RXCONTINUOUS_MODE);
+}
+
+int
+sx127X_ieee_xmit(struct ieee802154_hw *hw, struct sk_buff *skb)
+{
+	struct lora_struct *lrdata = hw->priv;
+	struct regmap *rm = lrdata->lora_device;
+//	int len;
+	int ret = 0;
+
+	/* Check TX is not used or used for now. */
+	//mutex_lock(&(lrdata->buf_lock));
+	if (lrdata->tx_skb == NULL) {
+		lrdata->tx_skb = skb;
+		ret = 0;
+	}
+	else {
+		ret = -EBUSY;
+	}
+	dev_dbg(regmap_get_device(rm), "%s: ret=%d\n", __func__, ret);
+	//mutex_unlock(&(lrdata->buf_lock));
+
+	/* Write and fill the FIFO of the chip if TX is not used. */
+	if(ret == 0) {
+//		len = sx127X_sendLoRaData(rm, skb->data, skb->len);
+//		if (len > 0)
+//			sx127X_setState(rm, SX127X_TX_MODE);
+//		else
+//			ret = len;
+		schedule_work(&(lrdata->txwork));
+	}
+
+	return ret;
 }
 
 int
@@ -1314,7 +1333,7 @@ static const struct ieee802154_ops sx127X_ieee_ops = {
 	.owner = THIS_MODULE,
 	.start = sx127X_ieee_start,
 	.stop = sx127X_ieee_stop,
-	.xmit_async = sx127X_ieee_tx,
+	.xmit_async = sx127X_ieee_xmit,
 	.ed = sx127X_ieee_ed,
 	.set_channel = sx127X_ieee_set_channel,
 	.set_txpower = sx127X_ieee_set_txpower,
@@ -2269,6 +2288,7 @@ static int loraspi_probe(struct spi_device *spi)
 	}
 
 	INIT_WORK(&(lrdata->irqwork), sx127X_timer_irqwork);
+	INIT_WORK(&(lrdata->txwork), sx127X_ieee_tx);
 
 	init_timer(&(lrdata->timer));
 	lrdata->timer.expires = jiffies + HZ;

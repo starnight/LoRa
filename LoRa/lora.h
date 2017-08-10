@@ -152,6 +152,7 @@ struct lora_struct {
 	wait_queue_head_t waitqueue;
 	struct timer_list timer;
 	struct work_struct irqwork;
+	struct work_struct txwork;
 	uint8_t timer_enable;
 };
 
