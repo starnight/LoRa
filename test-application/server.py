@@ -16,25 +16,34 @@ class ECHOError(Exception):
         self.error = error
 
 class Message:
-    '''HTTP message class.'''
+    '''Message class.'''
     def __init__(self):
-        self.Header = []
-        self.Body = None
+        self._Len = 0
         self._Buf = None
-        self._index = 0
 
-def _HelloPage(conn, req, res):
+def fetch_ipv6_address(host, port):
+    '''Get designated IPv6 and Port socket address.'''
+    if not socket.has_ipv6:
+        raise Exception("the local machine has no IPv6 support enabled")
+
+    addrs = socket.getaddrinfo(host, port, socket.AF_INET6, 0, socket.SOL_TCP)
+    if len(addrs) == 0:
+        raise Exception("there is no IPv6 address configured for localhost")
+
+    entry0 = addrs[0]
+    sockaddr = entry0[-1]
+
+    return sockaddr
+
+def _ECHOWork(conn, req, res):
     '''Default Hello page which makes response message.'''
-    pl = conn.recv(1)
-    buf = conn.recv(int.from_bytes(pl, byteorder='big'))
-
-    res._Buf = pl + buf
+    res._Buf = bytes([req._Len]) + req._Buf.upper()
 
 class ECHOServer:
     global MES_PORT
-    global MAX_CLIENT
+    global MAX_ECHO_CLIENT
 
-    def __init__(self, host="", port=MES_PORT):
+    def __init__(self, host="::", port=MES_PORT):
         self.HOST = host
         self.PORT = port
         self.MAX_CLIENT = MAX_ECHO_CLIENT
@@ -45,8 +54,8 @@ class ECHOServer:
         # Set the socket could be reused directly after this application be closed.
         self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         # Set the socket non-blocking.
-        #self.sock.setblocking(0)
-        self.sock.bind((self.HOST, self.PORT))
+        sockaddr = fetch_ipv6_address(self.HOST, self.PORT)
+        self.sock.bind(sockaddr)
 
         # Start server socket listening.
         self.sock.listen(self.MAX_CLIENT)
@@ -78,13 +87,13 @@ class ECHOServer:
     def _Accept(self, conn):
         conn, addr = self.sock.accept()
         print("{} {} connected".format(str(datetime.datetime.now()), addr))
-        #conn.setblocking(0)
         self._insocks.append(conn)
 
     def _Request(self, conn, callback):
         request = Message()
         response = Message()
         try:
+            self._GetRequest(conn, request)
             callback(conn, request, response)
             self._SendReply(conn, response)
         except ECHOError as e:
@@ -100,8 +109,14 @@ class ECHOServer:
         del request
         del response
 
+    def _GetRequest(self, conn, req):
+        '''Read the request message.'''
+        req._Len = int.from_bytes(conn.recv(1), byteorder='big')
+        print("\tRead request with length {}".format(req._Len))
+        req._Buf = conn.recv(req._Len)
+
     def _SendReply(self, conn, res):
-        '''Send the response message body.'''
+        '''Send the response message.'''
         print("\tSend reply")
         if res._Buf is not None:
             buf = res._Buf
@@ -122,8 +137,14 @@ class ECHOServer:
             s.close()
 
 if __name__ == "__main__":
+    if len(sys.argv) > 1:
+        ip_addr = sys.argv[1]
+    else:
+        ip_addr = "::"
+
+    port=MES_PORT
+
     print("Server is starting!!!")
-    server = ECHOServer(port=8000)
-    print("Server is started!!!")
-    while True:
-        server.RunLoop(_HelloPage)
+    server = ECHOServer(ip_addr, port)
+    print("Server is started!!!  Listening on {} port {}".format(ip_addr, port))
+    server.RunLoop(_ECHOWork)
