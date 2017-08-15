@@ -2,8 +2,6 @@
 
 import sys
 import socket
-import select
-import datetime
 
 MES_PORT = 8000
 
@@ -41,32 +39,32 @@ if __name__ == "__main__":
         src_addr = "::1"
         dst_addr = "::1"
         dst_port=MES_PORT
-        data = b"test string"
+        data = "test string"
 
     req = Message()
     res = Message()
 
     # Connect to destination server with specific source IPv6.
-    conn = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
+    conn = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
     if 'src_addr' in locals():
-        sockaddr = fetch_ipv6_address(src_addr, 0)
-        conn.bind(sockaddr)
-    sockaddr = fetch_ipv6_address(dst_addr, dst_port)
-    conn.connect(sockaddr)
+        src_sockaddr = fetch_ipv6_address(src_addr, 0)
+        conn.bind(src_sockaddr)
+    dst_sockaddr = fetch_ipv6_address(dst_addr, dst_port)
 
     # Prepare the request buffer going to be sent.
     req._Len = len(data)
     if req._Len > 255:
         req._Len = 255
-    req._Buf = bytes([req._Len]) + str.encode(data)[0:req._Len]
+    req._Buf = str.encode(data)[0:req._Len]
 
     # Send the request to the server.
-    print("Send {} with in {} bytes".format(req._Buf[1:req._Len+1], req._Len))
-    conn.send(req._Buf)
+    print("Send {} with in {} bytes".format(req._Buf, req._Len))
+    conn.sendto(bytes([req._Len]) + req._Buf, dst_sockaddr)
 
     # Read and parse the response from the server.
-    res._Len = int.from_bytes(conn.recv(1), byteorder='big')
-    res._Buf = conn.recv(res._Len)
+    data, addr = conn.recvfrom(1024)
+    res._Len = int.from_bytes([data[0]], byteorder='big')
+    res._Buf = data[1:res._Len + 1]#conn.recvfrom(res._Len)
     print("Read {} with in {} bytes".format(res._Buf, res._Len))
 
     conn.close()
