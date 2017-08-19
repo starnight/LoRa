@@ -283,6 +283,29 @@ static const struct ieee802154_ops fakelb_ops = {
 	.set_promiscuous_mode = fakelb_set_promiscuous_mode,
 };
 
+struct rf_frq {
+	uint32_t carrier;
+	uint32_t bandwidth;
+	uint8_t ch_min;
+	uint8_t ch_max;
+};
+
+uint32_t
+fakelb_hw_channel_mask(struct ieee802154_hw *hw)
+{
+	struct rf_frq rf;
+	uint32_t mask;
+
+	//sx127X_ieee_get_rf_config(hw, &rf);
+	rf.ch_max = 11;
+	rf.ch_min = 11;
+
+	mask = ((uint32_t)(1 << (rf.ch_max + 1)) - (uint32_t)(1 << rf.ch_min));
+
+	return mask;
+}
+
+
 /* Number of dummy devices to be set up by this module. */
 module_param(numlbs, int, 0);
 MODULE_PARM_DESC(numlbs, " number of pseudo devices");
@@ -300,43 +323,16 @@ static int fakelb_add_one(struct device *dev)
 	phy = hw->priv;
 	phy->hw = hw;
 
-	/* 868 MHz BPSK	802.15.4-2003 */
-	hw->phy->supported.channels[0] |= 1;
-	/* 915 MHz BPSK	802.15.4-2003 */
-	hw->phy->supported.channels[0] |= 0x7fe;
-	/* 2.4 GHz O-QPSK 802.15.4-2003 */
-	hw->phy->supported.channels[0] |= 0x7FFF800;
-	/* 868 MHz ASK 802.15.4-2006 */
-	hw->phy->supported.channels[1] |= 1;
-	/* 915 MHz ASK 802.15.4-2006 */
-	hw->phy->supported.channels[1] |= 0x7fe;
-	/* 868 MHz O-QPSK 802.15.4-2006 */
-	hw->phy->supported.channels[2] |= 1;
-	/* 915 MHz O-QPSK 802.15.4-2006 */
-	hw->phy->supported.channels[2] |= 0x7fe;
-	/* 2.4 GHz CSS 802.15.4a-2007 */
-	hw->phy->supported.channels[3] |= 0x3fff;
-	/* UWB Sub-gigahertz 802.15.4a-2007 */
-	hw->phy->supported.channels[4] |= 1;
-	/* UWB Low band 802.15.4a-2007 */
-	hw->phy->supported.channels[4] |= 0x1e;
-	/* UWB High band 802.15.4a-2007 */
-	hw->phy->supported.channels[4] |= 0xffe0;
-	/* 750 MHz O-QPSK 802.15.4c-2009 */
-	hw->phy->supported.channels[5] |= 0xf;
-	/* 750 MHz MPSK 802.15.4c-2009 */
-	hw->phy->supported.channels[5] |= 0xf0;
-	/* 950 MHz BPSK 802.15.4d-2009 */
-	hw->phy->supported.channels[6] |= 0x3ff;
-	/* 950 MHz GFSK 802.15.4d-2009 */
-	hw->phy->supported.channels[6] |= 0x3ffc00;
-
-	ieee802154_random_extended_addr(&hw->phy->perm_extended_addr);
-	/* fake phy channel 13 as default */
-	hw->phy->current_channel = 13;
+	/* Define channels could be used. */
+	hw->phy->supported.channels[0] = fakelb_hw_channel_mask(hw);
+	/* fake phy channel 11 as default */
+	hw->phy->current_channel = 11;
 	phy->channel = hw->phy->current_channel;
 
-	hw->flags = IEEE802154_HW_TX_OMIT_CKSUM | IEEE802154_HW_RX_OMIT_CKSUM | IEEE802154_HW_PROMISCUOUS;
+	ieee802154_random_extended_addr(&hw->phy->perm_extended_addr);
+	hw->flags = IEEE802154_HW_TX_OMIT_CKSUM
+			| IEEE802154_HW_RX_OMIT_CKSUM
+			| IEEE802154_HW_PROMISCUOUS;
 	hw->parent = dev;
 
 	err = ieee802154_register_hw(hw);
@@ -360,6 +356,7 @@ static int fakelb_add_one(struct device *dev)
 
 err_reg:
 	ieee802154_free_hw(phy->hw);
+	dev_err(dev, "register as IEEE 802.15.4 device failed\n");
 	return err;
 }
 
