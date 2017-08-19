@@ -47,9 +47,6 @@
 #include <net/mac802154.h>
 #include <net/cfg802154.h>
 
-static LIST_HEAD(fakelb_phys);
-static DEFINE_MUTEX(fakelb_phys_lock);
-
 static LIST_HEAD(fakelb_ifup_phys);
 static DEFINE_RWLOCK(fakelb_ifup_phys_lock);
 
@@ -66,8 +63,9 @@ struct virtual_wpan_buf {
 	uint8_t len;
 };
 
-struct fakelb_phy {
+struct sx1278_phy {
 	struct ieee802154_hw *hw;
+	void *intf;
 
 	u8 page;
 	u8 channel;
@@ -79,7 +77,6 @@ struct fakelb_phy {
 	struct sk_buff *txbuf;
 	spinlock_t buf_lock;
 
-	struct list_head list;
 	struct list_head list_ifup;
 };
 
@@ -93,7 +90,7 @@ static int fakelb_hw_ed(struct ieee802154_hw *hw, u8 *level)
 
 static int fakelb_hw_channel(struct ieee802154_hw *hw, u8 page, u8 channel)
 {
-	struct fakelb_phy *phy = hw->priv;
+	struct sx1278_phy *phy = hw->priv;
 
 	write_lock_bh(&fakelb_ifup_phys_lock);
 	phy->page = page;
@@ -139,7 +136,7 @@ static int fakelb_hw_virtual_rx(struct ieee802154_hw *hw, uint8_t *buf, size_t l
 
 static int fakelb_hw_rx(struct ieee802154_hw *hw)
 {
-	struct fakelb_phy *phy = hw->priv;
+	struct sx1278_phy *phy = hw->priv;
 	struct sk_buff *skb;
 	int len;
 
@@ -165,7 +162,7 @@ static int fakelb_hw_rx(struct ieee802154_hw *hw)
 
 static int fakelb_hw_virtual_tx(struct ieee802154_hw *hw, uint8_t *buf, size_t len)
 {
-	struct fakelb_phy *current_phy = hw->priv, *phy;
+	struct sx1278_phy *current_phy = hw->priv, *phy;
 	struct virtual_wpan_buf *vbuf;
 
 	list_for_each_entry(phy, &fakelb_ifup_phys, list_ifup) {
@@ -194,7 +191,7 @@ static int fakelb_hw_virtual_tx(struct ieee802154_hw *hw, uint8_t *buf, size_t l
 
 static int fakelb_hw_tx_complete(struct ieee802154_hw *hw)
 {
-	struct fakelb_phy *phy = hw->priv;
+	struct sx1278_phy *phy = hw->priv;
 	struct sk_buff *skb = phy->txbuf;
 
 	ieee802154_xmit_complete(hw, skb, false);
@@ -209,7 +206,7 @@ static int fakelb_hw_tx_complete(struct ieee802154_hw *hw)
 
 static int fakelb_hw_xmit(struct ieee802154_hw *hw, struct sk_buff *skb)
 {
-	struct fakelb_phy *phy = hw->priv;
+	struct sx1278_phy *phy = hw->priv;
 	int ret;
 
 	read_lock_bh(&fakelb_ifup_phys_lock);
@@ -234,7 +231,7 @@ static int fakelb_hw_xmit(struct ieee802154_hw *hw, struct sk_buff *skb)
 
 static int fakelb_hw_start(struct ieee802154_hw *hw)
 {
-	struct fakelb_phy *phy = hw->priv;
+	struct sx1278_phy *phy = hw->priv;
 
 	write_lock_bh(&fakelb_ifup_phys_lock);
 	phy->suspended = false;
@@ -247,7 +244,7 @@ static int fakelb_hw_start(struct ieee802154_hw *hw)
 
 static void fakelb_hw_stop(struct ieee802154_hw *hw)
 {
-	struct fakelb_phy *phy = hw->priv;
+	struct sx1278_phy *phy = hw->priv;
 
 	write_lock_bh(&fakelb_ifup_phys_lock);
 	phy->suspended = true;
@@ -264,10 +261,10 @@ fakelb_set_promiscuous_mode(struct ieee802154_hw *hw, const bool on)
 
 static void fakelb_timer_irqwork(struct work_struct *work)
 {
-	struct fakelb_phy *phy;
+	struct sx1278_phy *phy;
 	u8 flags;
 
-	phy = container_of(work, struct fakelb_phy, irqwork);
+	phy = container_of(work, struct sx1278_phy, irqwork);
 	flags = phy->flags;
 
 	if (flags & FAKELB_RXDONE)
@@ -285,7 +282,7 @@ static void fakelb_timer_irqwork(struct work_struct *work)
 
 static void fakelb_timer_isr(unsigned long arg)
 {
-	struct fakelb_phy *phy = (struct fakelb_phy *)arg;
+	struct sx1278_phy *phy = (struct sx1278_phy *)arg;
 
 	schedule_work(&(phy->irqwork));
 }
@@ -322,18 +319,24 @@ fakelb_hw_channel_mask(struct ieee802154_hw *hw)
 	return mask;
 }
 
-static int fakelb_add_one(struct device *dev)
+static int sx1278_add_one(struct spi_device *spi)
 {
 	struct ieee802154_hw *hw;
-	struct fakelb_phy *phy;
+	struct sx1278_phy *phy;
 	int err;
 
 	hw = ieee802154_alloc_hw(sizeof(*phy), &fakelb_ops);
-	if (!hw)
+	if (!hw) {
+		dev_dbg(&(spi->dev), "not enough memory\n");
 		return -ENOMEM;
+	}
 
 	phy = hw->priv;
 	phy->hw = hw;
+	phy->intf = spi;
+
+	/* Set the SPI device's driver data for later usage. */
+	spi_set_drvdata(spi, phy);
 
 	/* Define channels could be used. */
 	hw->phy->supported.channels[0] = fakelb_hw_channel_mask(hw);
@@ -345,7 +348,7 @@ static int fakelb_add_one(struct device *dev)
 	hw->flags = IEEE802154_HW_TX_OMIT_CKSUM
 			| IEEE802154_HW_RX_OMIT_CKSUM
 			| IEEE802154_HW_PROMISCUOUS;
-	hw->parent = dev;
+	hw->parent = &(spi->dev);
 
 	err = ieee802154_register_hw(hw);
 	if (err)
@@ -360,21 +363,20 @@ static int fakelb_add_one(struct device *dev)
 
 	spin_lock_init(&(phy->buf_lock));
 
-	mutex_lock(&fakelb_phys_lock);
-	list_add_tail(&phy->list, &fakelb_phys);
-	mutex_unlock(&fakelb_phys_lock);
-
 	return 0;
 
 err_reg:
 	ieee802154_free_hw(phy->hw);
-	dev_err(dev, "register as IEEE 802.15.4 device failed\n");
+	dev_err(&(spi->dev), "register as IEEE 802.15.4 device failed\n");
 	return err;
 }
 
-static void fakelb_del(struct fakelb_phy *phy)
+static void sx1278_del(struct spi_device *spi)
 {
-	list_del(&phy->list);
+	struct sx1278_phy *phy = spi_get_drvdata(spi);
+
+	if (phy == NULL)
+		return;
 
 	del_timer(&(phy->timer));
 	flush_work(&(phy->irqwork));
@@ -433,10 +435,9 @@ MODULE_DEVICE_TABLE(spi, spi_ids);
 
 static int sx1278_spi_probe(struct spi_device *spi)
 {
-	struct fakelb_phy *phy, *tmp;
 	int err;
 
-	err = fakelb_add_one(&(spi->dev));
+	err = sx1278_add_one(spi);
 	if (err < 0)
 		goto err_slave;
 
@@ -446,21 +447,14 @@ static int sx1278_spi_probe(struct spi_device *spi)
 
 err_slave:
 	dev_err(&(spi->dev), "no SX1278 compatible device\n");
-	mutex_lock(&fakelb_phys_lock);
-	list_for_each_entry_safe(phy, tmp, &fakelb_phys, list)
-		fakelb_del(phy);
-	mutex_unlock(&fakelb_phys_lock);
+	sx1278_del(spi);
 	return err;
 }
 
 static int sx1278_spi_remove(struct spi_device *spi)
 {
-	struct fakelb_phy *phy, *tmp;
+	sx1278_del(spi);
 
-	mutex_lock(&fakelb_phys_lock);
-	list_for_each_entry_safe(phy, tmp, &fakelb_phys, list)
-		fakelb_del(phy);
-	mutex_unlock(&fakelb_phys_lock);
 	return 0;
 }
 
