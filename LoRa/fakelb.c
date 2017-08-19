@@ -1,21 +1,39 @@
-/*
- * Loopback IEEE 802.15.4 interface
+/*-
+ * Copyright (c) 2017 Jian-Hong, Pan <starnight@g.ncu.edu.tw>
  *
- * Copyright 2007-2012 Siemens AG
+ * All rights reserved.
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2
- * as published by the Free Software Foundation.
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer,
+ *    without modification.
+ * 2. Redistributions in binary form must reproduce at minimum a disclaimer
+ *    similar to the "NO WARRANTY" disclaimer below ("Disclaimer") and any
+ *    redistribution must be conditioned upon including a substantially
+ *    similar Disclaimer requirement for further binary redistribution.
+ * 3. Neither the names of the above-listed copyright holders nor the names
+ *    of any contributors may be used to endorse or promote products derived
+ *    from this software without specific prior written permission.
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * Alternatively, this software may be distributed under the terms of the
+ * GNU General Public License ("GPL") version 2 as published by the Free
+ * Software Foundation.
  *
- * Written by:
- * Sergey Lapin <slapin@ossfans.org>
- * Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
- * Alexander Smirnov <alex.bluesman.smirnov@gmail.com>
+ * NO WARRANTY
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * ''AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF NONINFRINGEMENT, MERCHANTIBILITY
+ * AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL
+ * THE COPYRIGHT HOLDERS OR CONTRIBUTORS BE LIABLE FOR SPECIAL, EXEMPLARY,
+ * OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER
+ * IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
+ * THE POSSIBILITY OF SUCH DAMAGES.
+ *
  */
 
 #include <linux/module.h>
@@ -24,11 +42,10 @@
 #include <linux/netdevice.h>
 #include <linux/device.h>
 #include <linux/spinlock.h>
+#include <linux/timer.h>
+#include <linux/spi/spi.h>
 #include <net/mac802154.h>
 #include <net/cfg802154.h>
-#include <linux/timer.h>
-
-static int numlbs = 2;
 
 static LIST_HEAD(fakelb_phys);
 static DEFINE_MUTEX(fakelb_phys_lock);
@@ -305,11 +322,6 @@ fakelb_hw_channel_mask(struct ieee802154_hw *hw)
 	return mask;
 }
 
-
-/* Number of dummy devices to be set up by this module. */
-module_param(numlbs, int, 0);
-MODULE_PARM_DESC(numlbs, " number of pseudo devices");
-
 static int fakelb_add_one(struct device *dev)
 {
 	struct ieee802154_hw *hw;
@@ -371,21 +383,69 @@ static void fakelb_del(struct fakelb_phy *phy)
 	ieee802154_free_hw(phy->hw);
 }
 
-static int fakelb_probe(struct platform_device *pdev)
+/* The compatible chip array. */
+#ifdef CONFIG_OF
+static const struct of_device_id sx1278_dt_ids[] = {
+	{ .compatible = "semtech,sx1276" },
+	{ .compatible = "semtech,sx1277" },
+	{ .compatible = "semtech,sx1278" },
+	{ .compatible = "semtech,sx1279" },
+	{ .compatible = "sx1278" },
+	{},
+};
+MODULE_DEVICE_TABLE(of, sx1278_dt_ids);
+#endif
+
+/* The compatible ACPI device array. */
+#ifdef CONFIG_ACPI
+#define SX1278_ACPI_DUMMY	1
+static const struct acpi_device_id sx1278_acpi_ids[] = {
+	{ .id = "sx1278" },
+	{},
+};
+MODULE_DEVICE_TABLE(acpi, sx1278_acpi_ids);
+
+/* The callback function of ACPI probes SX1278 SPI. */
+static void sx1278_probe_acpi(struct spi_device *spi) {
+	const struct acpi_device_id *id;
+
+	if (!has_acpi_companion(&(spi->dev)))
+		return;
+
+	id = acpi_match_device(sx1278_acpi_ids, &(spi->dev));
+	if (WARN_ON(!id))
+		return;
+
+	if (id->driver_data == SX1278_ACPI_DUMMY)
+		dev_warn(&(spi->dev),
+			"Do not use this driver in produciton systems.\n");
+}
+#else
+static void sx1278_probe_acpi(struct spi_device *spi) {};
+#endif
+
+/* The compatible SPI device id array. */
+static const struct spi_device_id spi_ids[] = {
+	{ .name = "sx1278" },
+	{},
+};
+MODULE_DEVICE_TABLE(spi, spi_ids);
+
+static int sx1278_spi_probe(struct spi_device *spi)
 {
 	struct fakelb_phy *phy, *tmp;
-	int err, i;
+	int err;
 
-	for (i = 0; i < numlbs; i++) {
-		err = fakelb_add_one(&pdev->dev);
-		if (err < 0)
-			goto err_slave;
-	}
+	err = fakelb_add_one(&(spi->dev));
+	if (err < 0)
+		goto err_slave;
 
-	dev_info(&pdev->dev, "added %i fake ieee802154 hardware devices\n", numlbs);
+	dev_info(&(spi->dev), "added a fake ieee802154 hardware devices\n");
+
 	return 0;
 
 err_slave:
+	dev_err(&(spi->dev), "no SX1278 compatible device\n");
 	mutex_lock(&fakelb_phys_lock);
 	list_for_each_entry_safe(phy, tmp, &fakelb_phys, list)
 		fakelb_del(phy);
@@ -393,7 +453,7 @@ err_slave:
 	return err;
 }
 
-static int fakelb_remove(struct platform_device *pdev)
+static int sx1278_spi_remove(struct spi_device *spi)
 {
 	struct fakelb_phy *phy, *tmp;
 
@@ -404,29 +464,28 @@ static int fakelb_remove(struct platform_device *pdev)
 	return 0;
 }
 
-static struct platform_device *ieee802154fake_dev;
+#define __DRIVER_NAME	"sx1278"
 
-static struct platform_driver ieee802154fake_driver = {
-	.probe = fakelb_probe,
-	.remove = fakelb_remove,
+/* The SPI driver which acts as a protocol driver in this kernel module. */
+static struct spi_driver sx1278_spi_driver = {
 	.driver = {
-			.name = "ieee802154fakelb",
+		.name = __DRIVER_NAME,
+		.owner = THIS_MODULE,
+#ifdef CONFIG_OF
+		.of_match_table = sx1278_dt_ids,
+#endif
+#ifdef CONFIG_ACPI
+		.acpi_match_table = ACPI_PTR(sx1278_acpi_ids),
+#endif
 	},
+	.probe = sx1278_spi_probe,
+	.remove = sx1278_spi_remove,
+	.id_table = spi_ids,
 };
 
-static __init int fakelb_init_module(void)
-{
-	ieee802154fake_dev = platform_device_register_simple(
-			     "ieee802154fakelb", -1, NULL, 0);
-	return platform_driver_register(&ieee802154fake_driver);
-}
+/* Register SX1278 kernel module. */
+module_spi_driver(sx1278_spi_driver);
 
-static __exit void fake_remove_module(void)
-{
-	platform_driver_unregister(&ieee802154fake_driver);
-	platform_device_unregister(ieee802154fake_dev);
-}
-
-module_init(fakelb_init_module);
-module_exit(fake_remove_module);
-MODULE_LICENSE("GPL");
+MODULE_AUTHOR("Jian-Hong Pan, <starnight@g.ncu.edu.tw>");
+MODULE_DESCRIPTION("LoRa device SX1278 driver with SPI interface");
+MODULE_LICENSE("Dual BSD/GPL");
