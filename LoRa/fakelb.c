@@ -27,7 +27,6 @@
 #include <net/mac802154.h>
 #include <net/cfg802154.h>
 #include <linux/timer.h>
-#include <linux/workqueue.h>
 
 static int numlbs = 2;
 
@@ -38,7 +37,6 @@ static LIST_HEAD(fakelb_ifup_phys);
 static DEFINE_RWLOCK(fakelb_ifup_phys_lock);
 
 static LIST_HEAD(fakelb_vbufs);
-//static DEFINE_RWLOCK(fakelb_vbufs_lock);
 
 #define FAKELB_RXDONE	1
 #define FAKELB_TXDONE	2
@@ -61,6 +59,8 @@ struct fakelb_phy {
 	u8 flags;
 	struct timer_list timer;
 	struct work_struct irqwork;
+	struct sk_buff *txbuf;
+	spinlock_t buf_lock;
 
 	struct list_head list;
 	struct list_head list_ifup;
@@ -82,6 +82,7 @@ static int fakelb_hw_channel(struct ieee802154_hw *hw, u8 page, u8 channel)
 	phy->page = page;
 	phy->channel = channel;
 	write_unlock_bh(&fakelb_ifup_phys_lock);
+
 	return 0;
 }
 
@@ -97,6 +98,7 @@ static int fakelb_hw_virtual_rx_len(struct ieee802154_hw *hw)
 		}
 	}
 	dev_dbg(hw->parent, "%s: return len=%d\n", __func__, len);
+
 	return len;
 }
 
@@ -110,7 +112,7 @@ static int fakelb_hw_virtual_rx(struct ieee802154_hw *hw, uint8_t *buf, size_t l
 
 			list_del(&vbuf->list_vbuf);
 			devm_kfree(hw->parent, vbuf);
-	
+
 			break;
 		}
 	}
@@ -120,6 +122,7 @@ static int fakelb_hw_virtual_rx(struct ieee802154_hw *hw, uint8_t *buf, size_t l
 
 static int fakelb_hw_rx(struct ieee802154_hw *hw)
 {
+	struct fakelb_phy *phy = hw->priv;
 	struct sk_buff *skb;
 	int len;
 
@@ -128,8 +131,9 @@ static int fakelb_hw_rx(struct ieee802154_hw *hw)
 	if (skb) {
 		len = fakelb_hw_virtual_rx_len(hw);
 		fakelb_hw_virtual_rx(hw, skb_put(skb, len), len);
-	
+
 		ieee802154_rx_irqsafe(hw, skb, 0xcc);
+		phy->flags &= ~(FAKELB_RXDONE);
 #ifdef DEBUG
 		print_hex_dump(KERN_DEBUG, "fakelb rx: ", DUMP_PREFIX_OFFSET, 16, 1,
 							skb->data, skb->len, 0);
@@ -163,25 +167,52 @@ static int fakelb_hw_virtual_tx(struct ieee802154_hw *hw, uint8_t *buf, size_t l
 								buf, len, 0);
 #endif
 			phy->flags |= FAKELB_RXDONE;
-			//fakelb_hw_rx(phy->hw);
 		}
 	}
+
+	current_phy->flags |= FAKELB_TXDONE;
+
+	return 0;
+}
+
+static int fakelb_hw_tx_complete(struct ieee802154_hw *hw)
+{
+	struct fakelb_phy *phy = hw->priv;
+	struct sk_buff *skb = phy->txbuf;
+
+	ieee802154_xmit_complete(hw, skb, false);
+
+	spin_lock(&(phy->buf_lock));
+	phy->txbuf = NULL;
+	phy->flags &= ~(FAKELB_TXDONE);
+	spin_unlock(&(phy->buf_lock));
 
 	return 0;
 }
 
 static int fakelb_hw_xmit(struct ieee802154_hw *hw, struct sk_buff *skb)
 {
-	struct fakelb_phy *current_phy = hw->priv;
+	struct fakelb_phy *phy = hw->priv;
+	int ret;
 
 	read_lock_bh(&fakelb_ifup_phys_lock);
-	WARN_ON(current_phy->suspended);
+	WARN_ON(phy->suspended);
 	read_unlock_bh(&fakelb_ifup_phys_lock);
-	fakelb_hw_virtual_tx(hw, skb->data, skb->len);
 
-	ieee802154_xmit_complete(hw, skb, false);
+	spin_lock(&(phy->buf_lock));
+	if (phy->txbuf == NULL) {
+		phy->txbuf = skb;
+		ret = 0;
+	}
+	else {
+		ret = -EBUSY;
+	}
+	spin_unlock(&(phy->buf_lock));
 
-	return 0;
+	if (ret == 0)
+		fakelb_hw_virtual_tx(hw, skb->data, skb->len);
+
+	return ret;
 }
 
 static int fakelb_hw_start(struct ieee802154_hw *hw)
@@ -222,10 +253,10 @@ static void fakelb_timer_irqwork(struct work_struct *work)
 	phy = container_of(work, struct fakelb_phy, irqwork);
 	flags = phy->flags;
 
-	if (flags & FAKELB_RXDONE) {
+	if (flags & FAKELB_RXDONE)
 		fakelb_hw_rx(phy->hw);
-		phy->flags &= ~(FAKELB_RXDONE);
-	}
+	if (flags & FAKELB_TXDONE)
+		fakelb_hw_tx_complete(phy->hw);
 
 	if (!phy->suspended) {
 		phy->timer.expires = jiffies + HZ * 20 / 1000;
@@ -318,6 +349,8 @@ static int fakelb_add_one(struct device *dev)
 	phy->timer.expires = jiffies + HZ;
 	phy->timer.function = fakelb_timer_isr;
 	phy->timer.data = (unsigned long)phy;
+
+	spin_lock_init(&(phy->buf_lock));
 
 	mutex_lock(&fakelb_phys_lock);
 	list_add_tail(&phy->list, &fakelb_phys);
