@@ -1,6 +1,5 @@
 PROJ=sx1278
 obj-m := $(PROJ).o
-$(PROJ)-objs := fakelb.o
 
 KERNEL_LOCATION=/lib/modules/$(shell uname -r)
 BUILDDIR=$(KERNEL_LOCATION)/build
