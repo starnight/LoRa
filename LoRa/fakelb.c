@@ -38,14 +38,10 @@
 
 #include <linux/module.h>
 #include <linux/timer.h>
-#include <linux/platform_device.h>
-#include <linux/netdevice.h>
 #include <linux/device.h>
 #include <linux/spinlock.h>
-#include <linux/timer.h>
 #include <linux/spi/spi.h>
 #include <net/mac802154.h>
-#include <net/cfg802154.h>
 
 static LIST_HEAD(fakelb_ifup_phys);
 static DEFINE_RWLOCK(fakelb_ifup_phys_lock);
