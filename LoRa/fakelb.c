@@ -39,6 +39,7 @@
 #include <linux/module.h>
 #include <linux/timer.h>
 #include <linux/device.h>
+#include <linux/of_device.h>
 #include <linux/spinlock.h>
 #include <linux/spi/spi.h>
 #include <net/mac802154.h>
@@ -432,6 +433,15 @@ MODULE_DEVICE_TABLE(spi, spi_ids);
 static int sx1278_spi_probe(struct spi_device *spi)
 {
 	int err;
+
+#ifdef CONFIG_OF
+	if (spi->dev.of_node && !of_match_device(sx1278_dt_ids, &(spi->dev))) {
+		dev_err(&(spi->dev), "buggy DT: SX1278 listed directly in DT\n");
+		WARN_ON(spi->dev.of_node &&
+			!of_match_device(sx1278_dt_ids, &(spi->dev)));
+	}
+#endif
+	sx1278_probe_acpi(spi);
 
 	err = sx1278_add_one(spi);
 	if (err < 0)
