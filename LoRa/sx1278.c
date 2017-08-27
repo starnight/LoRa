@@ -39,6 +39,7 @@
 #include <linux/module.h>
 #include <linux/timer.h>
 #include <linux/device.h>
+#include <linux/acpi.h>
 #include <linux/of_device.h>
 #include <linux/spinlock.h>
 #include <linux/spi/spi.h>
@@ -136,6 +137,40 @@
 #define SX127X_FLAGMASK_CADDONE			0x04
 #define SX127X_FLAGMASK_FHSSCHANGECHANNEL	0x02
 #define SX127X_FLAGMASK_CADDETECTED		0x01
+
+struct sx1278_phy {
+	struct ieee802154_hw *hw;
+	struct spi_device *spi;
+	struct regmap *rm;
+
+	u8 page;
+	u8 channel;
+
+	bool suspended;
+	u8 opmode;
+	struct timer_list timer;
+	struct work_struct irqwork;
+
+	struct spi_message tx_base_msg;
+	u8 tx_base_adr[2];
+	struct spi_transfer tx_base_t;
+
+	struct spi_message tx_buf_msg;
+	u8 tx_buf_adr;
+	struct sk_buff *tx_buf;
+	struct spi_transfer tx_buf_t[2];
+
+	struct spi_message tx_len_msg;
+	u8 tx_len[2];
+	struct spi_transfer tx_len_t;
+
+	struct spi_message tx_state_msg;
+	u8 tx_state[2];
+	struct spi_transfer tx_state_t;
+
+	spinlock_t buf_lock;
+	bool is_busy;
+};
 
 /**
  * sx127X_readVersion - Get LoRa device's chip version
@@ -764,6 +799,40 @@ sx127X_readLoRaData(struct regmap *rm, uint8_t *buf, size_t len)
 	return (ret >= 0) ? len : ret;
 }
 
+void
+sx127X_setLoRaTXState(void *context)
+{
+	struct sx1278_phy *phy = context;
+
+	spi_message_init(&(phy->tx_state_msg));
+
+	phy->tx_state[0] = SX127X_REG_OP_MODE | 0x80;
+	phy->tx_state[1] = (phy->opmode & 0xF8) | SX127X_TX_MODE;
+	phy->tx_state_t.tx_buf = phy->tx_state;
+	phy->tx_state_t.len = 2;
+	spi_message_add_tail(&(phy->tx_state_t), &(phy->tx_state_msg));
+
+	spi_async(phy->spi, &(phy->tx_state_msg));
+}
+
+void
+sx127X_setLoRaTXFIFOLen(void *context)
+{
+	struct sx1278_phy *phy = context;
+
+	spi_message_init(&(phy->tx_len_msg));
+
+	phy->tx_len[0] = SX127X_REG_PAYLOAD_LENGTH | 0x80;
+	phy->tx_len_t.tx_buf = phy->tx_len;
+	phy->tx_len_t.len = 2;
+	spi_message_add_tail(&(phy->tx_len_t), &(phy->tx_len_msg));
+
+	phy->tx_len_msg.complete = sx127X_setLoRaTXState;
+	phy->tx_len_msg.context = phy;
+
+	spi_async(phy->spi, &(phy->tx_len_msg));
+}
+
 /**
  * sx127X_sendLoRaData - Send data out through LoRa device (TX)
  * @rm:		the device as a regmap to communicate with
@@ -772,26 +841,49 @@ sx127X_readLoRaData(struct regmap *rm, uint8_t *buf, size_t len)
  *
  * Return:	the actual length written into the LoRa device in bytes
  */
-ssize_t
-sx127X_sendLoRaData(struct regmap *rm, uint8_t *buf, size_t len)
+void
+sx127X_sendLoRaData(void *context)
 {
-	uint8_t base_adr;
-	uint8_t blen;
+	struct sx1278_phy *phy = context;
 
-	/* Set chip FIFO pointer to FIFO TX base. */
-	regmap_raw_read(rm, SX127X_REG_FIFO_TX_BASE_ADDR, &base_adr, 1);
-	regmap_raw_write(rm, SX127X_REG_FIFO_ADDR_PTR, &base_adr, 1);
+	spi_message_init(&(phy->tx_buf_msg));
 
-#define SX127X_MAX_FIFO_LENGTH	0xFF
-	blen = (len < SX127X_MAX_FIFO_LENGTH) ? len : SX127X_MAX_FIFO_LENGTH;
+	phy->tx_buf_adr = SX127X_REG_FIFO | 0x80;
+	phy->tx_buf_t[0].tx_buf = &(phy->tx_buf_adr);
+	phy->tx_buf_t[0].len = 1;
+	spi_message_add_tail(&(phy->tx_buf_t[0]), &(phy->tx_buf_msg));
 
-	/* Write to SPI chip synchronously to fill the FIFO of the chip. */
-	regmap_raw_write(rm, SX127X_REG_FIFO, buf, blen);
+	if (phy->tx_buf->len <= IEEE802154_MTU)
+		phy->tx_len[1] = phy->tx_buf->len;
+	else
+		phy->tx_len[1] = IEEE802154_MTU;
+	phy->tx_buf_t[1].tx_buf = phy->tx_buf->data;
+	phy->tx_buf_t[1].len = phy->tx_len[1];
+	spi_message_add_tail(&(phy->tx_buf_t[1]), &(phy->tx_buf_msg));
 
-	/* Set the FIFO payload length. */
-	regmap_raw_write(rm, SX127X_REG_PAYLOAD_LENGTH, &blen, 1);
+	phy->tx_buf_msg.complete = sx127X_setLoRaTXFIFOLen;
+	phy->tx_buf_msg.context = phy;
 
-	return blen;
+	spi_async(phy->spi, &(phy->tx_buf_msg));
+}
+
+int
+sx127X_setLoRaTXFIFOPTR(void *context)
+{
+	struct sx1278_phy *phy = context;
+
+	spi_message_init(&(phy->tx_base_msg));
+
+	phy->tx_base_adr[0] = SX127X_REG_FIFO_ADDR_PTR | 0x80;
+	phy->tx_base_adr[1] = 0x80;
+	phy->tx_base_t.tx_buf = phy->tx_base_adr;
+	phy->tx_base_t.len = 2;
+
+	spi_message_add_tail(&(phy->tx_base_t), &(phy->tx_base_msg));
+	phy->tx_base_msg.complete = sx127X_sendLoRaData;
+	phy->tx_base_msg.context = phy;
+
+	return spi_async(phy->spi, &(phy->tx_base_msg));
 }
 
 /**
@@ -968,17 +1060,15 @@ sx127X_startLoRaMode(struct regmap *rm)
 
 	/* Clear all of the IRQ flags. */
 	sx127X_clearLoRaAllFlag(rm);
-	/* Set chip to RX continuous state waiting for receiving. */
-	sx127X_setState(rm, SX127X_RXCONTINUOUS_MODE);
+	/* Set chip to RX state waiting for receiving. */
+	sx127X_setState(rm, SX127X_RXSINGLE_MODE);
 }
 
 /**
  * init_sx127X - Initial the SX127X device
  * @rm:		the device as a regmap to communicate with
  *
- * Return:	Positive / negtive values for version code / failed
- * 		Version code:	bits 7-4 full version number,
- * 				bits 3-0 metal mask revision number
+ * Return:	0 / negtive values for success / failed
  */
 int
 init_sx127X(struct regmap *rm)
@@ -991,51 +1081,23 @@ init_sx127X(struct regmap *rm)
 	dev_dbg(regmap_get_device(rm), "init sx127X\n");
 
 	v = sx127X_readVersion(rm);
-#ifdef DEBUG
 	if (v > 0) {
+#ifdef DEBUG
 		fv = (v >> 4) & 0xF;
 		mmv = v & 0xF;
 		dev_dbg(regmap_get_device(rm), "chip version %d.%d\n", fv, mmv);
-	}
 #endif
+		return 0;
+	}
+	else {
+		return -ENODEV;
+	}
 
-	return v;
 }
 
-static LIST_HEAD(fakelb_ifup_phys);
-static DEFINE_RWLOCK(fakelb_ifup_phys_lock);
+/*---------------------- SX1278 IEEE 802.15.4 Functions ----------------------*/
 
-static LIST_HEAD(fakelb_vbufs);
-
-#define FAKELB_RXDONE	1
-#define FAKELB_TXDONE	2
-
-struct virtual_wpan_buf {
-	struct ieee802154_hw *hw;
-	struct list_head list_vbuf;
-
-	uint8_t buf[IEEE802154_MTU];
-	uint8_t len;
-};
-
-struct sx1278_phy {
-	struct ieee802154_hw *hw;
-	struct regmap *rm;
-
-	u8 page;
-	u8 channel;
-
-	bool suspended;
-	u8 flags;
-	struct timer_list timer;
-	struct work_struct irqwork;
-	struct sk_buff *txbuf;
-	spinlock_t buf_lock;
-
-	struct list_head list_ifup;
-};
-
-static int fakelb_hw_ed(struct ieee802154_hw *hw, u8 *level)
+static int sx1278_ieee_ed(struct ieee802154_hw *hw, u8 *level)
 {
 	BUG_ON(!level);
 	*level = 0xbe;
@@ -1043,134 +1105,89 @@ static int fakelb_hw_ed(struct ieee802154_hw *hw, u8 *level)
 	return 0;
 }
 
-static int fakelb_hw_channel(struct ieee802154_hw *hw, u8 page, u8 channel)
+static int sx1278_ieee_channel(struct ieee802154_hw *hw, u8 page, u8 channel)
 {
 	struct sx1278_phy *phy = hw->priv;
 
-	write_lock_bh(&fakelb_ifup_phys_lock);
+//	write_lock_bh(&sx1278_ifup_phys_lock);
 	phy->page = page;
 	phy->channel = channel;
-	write_unlock_bh(&fakelb_ifup_phys_lock);
+//	write_unlock_bh(&sx1278_ifup_phys_lock);
 
 	return 0;
 }
 
-static int fakelb_hw_virtual_rx_len(struct ieee802154_hw *hw)
-{
-	struct virtual_wpan_buf *vbuf;
-	int len = 0;
-
-	list_for_each_entry(vbuf, &fakelb_vbufs, list_vbuf) {
-		if (vbuf->hw == hw) {
-			len = vbuf->len;
-			break;
-		}
-	}
-	dev_dbg(hw->parent, "%s: return len=%d\n", __func__, len);
-
-	return len;
-}
-
-static int fakelb_hw_virtual_rx(struct ieee802154_hw *hw, uint8_t *buf, size_t len)
-{
-	struct virtual_wpan_buf *vbuf;
-
-	list_for_each_entry(vbuf, &fakelb_vbufs, list_vbuf) {
-		if (vbuf->hw == hw) {
-			memcpy(buf, vbuf->buf, len);
-
-			list_del(&vbuf->list_vbuf);
-			devm_kfree(hw->parent, vbuf);
-
-			break;
-		}
-	}
-
-	return 0;
-}
-
-static int fakelb_hw_rx(struct ieee802154_hw *hw)
+static int sx1278_ieee_rx(struct ieee802154_hw *hw)
 {
 	struct sx1278_phy *phy = hw->priv;
 	struct sk_buff *skb;
-	int len;
+	uint8_t len;
+	int err;
 
 	dev_dbg(hw->parent, "%s\n", __func__);
 	skb = dev_alloc_skb(IEEE802154_MTU);
-	if (skb) {
-		len = fakelb_hw_virtual_rx_len(hw);
-		fakelb_hw_virtual_rx(hw, skb_put(skb, len), len);
+	if (!skb) {
+		dev_err(regmap_get_device(phy->rm),
+			"not enough memory for new incoming frame\n");
+		err = -ENOMEM;
+		goto sx1278_ieee_rx_err1;
+	}
 
-		ieee802154_rx_irqsafe(hw, skb, 0xcc);
-		phy->flags &= ~(FAKELB_RXDONE);
+	spin_lock(&phy->buf_lock);
+	if (phy->tx_buf) {
+		dev_dbg(regmap_get_device(phy->rm), "transceiver is busy\n");
+		err = -EBUSY;
+		goto sx1278_ieee_rx_err2;
+	}
+	phy->tx_buf = skb;
+	spin_unlock(&phy->buf_lock);
+
+	len = sx127X_getLoRaLastPacketPayloadLen(phy->rm);
+	sx127X_readLoRaData(phy->rm, skb_put(skb, len), len);
+	ieee802154_rx_irqsafe(hw, skb, 0xcc);
+
+	spin_lock(&phy->buf_lock);
+	phy->tx_buf = NULL;
+	spin_unlock(&phy->buf_lock);
 #ifdef DEBUG
-		print_hex_dump(KERN_DEBUG, "fakelb rx: ", DUMP_PREFIX_OFFSET, 16, 1,
-							skb->data, skb->len, 0);
+	print_hex_dump(KERN_DEBUG, "sx1278 rx: ", DUMP_PREFIX_OFFSET, 16, 1,
+						skb->data, skb->len, 0);
 #endif
-		return 0;
-	}
-	else {
-		return -ENOMEM;
-	}
-
-}
-
-static int fakelb_hw_virtual_tx(struct ieee802154_hw *hw, uint8_t *buf, size_t len)
-{
-	struct sx1278_phy *current_phy = hw->priv, *phy;
-	struct virtual_wpan_buf *vbuf;
-
-	list_for_each_entry(phy, &fakelb_ifup_phys, list_ifup) {
-		if (current_phy == phy)
-			continue;
-
-		if (current_phy->page == phy->page &&
-		    current_phy->channel == phy->channel) {
-			vbuf = devm_kzalloc(phy->hw->parent, sizeof(struct virtual_wpan_buf), GFP_ATOMIC);
-			vbuf->hw = phy->hw;
-			memcpy(vbuf->buf, buf, len);
-			vbuf->len = len;
-			list_add(&vbuf->list_vbuf, &fakelb_vbufs);
-#ifdef DEBUG
-			print_hex_dump(KERN_DEBUG, "fakelb tx: ", DUMP_PREFIX_OFFSET, 16, 1,
-								buf, len, 0);
-#endif
-			phy->flags |= FAKELB_RXDONE;
-		}
-	}
-
-	current_phy->flags |= FAKELB_TXDONE;
-
 	return 0;
+
+sx1278_ieee_rx_err2:
+	spin_unlock(&phy->buf_lock);
+	kfree_skb(skb);
+sx1278_ieee_rx_err1:
+	return err;
 }
 
-static int fakelb_hw_tx_complete(struct ieee802154_hw *hw)
+static int sx1278_ieee_tx_complete(struct ieee802154_hw *hw)
 {
 	struct sx1278_phy *phy = hw->priv;
-	struct sk_buff *skb = phy->txbuf;
+	struct sk_buff *skb = phy->tx_buf;
 
 	ieee802154_xmit_complete(hw, skb, false);
 
 	spin_lock(&(phy->buf_lock));
-	phy->txbuf = NULL;
-	phy->flags &= ~(FAKELB_TXDONE);
+	phy->tx_buf = NULL;
 	spin_unlock(&(phy->buf_lock));
 
 	return 0;
 }
 
-static int fakelb_hw_xmit(struct ieee802154_hw *hw, struct sk_buff *skb)
+static int sx1278_ieee_xmit(struct ieee802154_hw *hw, struct sk_buff *skb)
 {
 	struct sx1278_phy *phy = hw->priv;
 	int ret;
 
-	read_lock_bh(&fakelb_ifup_phys_lock);
+	//read_lock_bh(&sx1278_ifup_phys_lock);
 	WARN_ON(phy->suspended);
-	read_unlock_bh(&fakelb_ifup_phys_lock);
+	//read_unlock_bh(&sx1278_ifup_phys_lock);
 
 	spin_lock(&(phy->buf_lock));
-	if (phy->txbuf == NULL) {
-		phy->txbuf = skb;
+	if (phy->tx_buf == NULL) {
+		phy->tx_buf = skb;
 		ret = 0;
 	}
 	else {
@@ -1178,54 +1195,78 @@ static int fakelb_hw_xmit(struct ieee802154_hw *hw, struct sk_buff *skb)
 	}
 	spin_unlock(&(phy->buf_lock));
 
-	if (ret == 0)
-		fakelb_hw_virtual_tx(hw, skb->data, skb->len);
+	if (ret == 0) {
+		sx127X_setLoRaTXFIFOPTR(phy);
+#ifdef DEBUG
+		print_hex_dump(KERN_DEBUG, "sx1278 tx: ",
+				DUMP_PREFIX_OFFSET, 16, 1,
+				skb->data, skb->len, 0);
+#endif
+	}
 
 	return ret;
 }
 
-static int fakelb_hw_start(struct ieee802154_hw *hw)
+static int sx1278_ieee_start(struct ieee802154_hw *hw)
 {
 	struct sx1278_phy *phy = hw->priv;
 
-	write_lock_bh(&fakelb_ifup_phys_lock);
+	//write_lock_bh(&sx1278_ifup_phys_lock);
 	phy->suspended = false;
-	list_add(&phy->list_ifup, &fakelb_ifup_phys);
+	sx127X_startLoRaMode(phy->rm);
+	phy->opmode = sx127X_getMode(phy->rm);
 	add_timer(&(phy->timer));
-	write_unlock_bh(&fakelb_ifup_phys_lock);
+	//write_unlock_bh(&sx1278_ifup_phys_lock);
 
 	return 0;
 }
 
-static void fakelb_hw_stop(struct ieee802154_hw *hw)
+static void sx1278_ieee_stop(struct ieee802154_hw *hw)
 {
 	struct sx1278_phy *phy = hw->priv;
 
-	write_lock_bh(&fakelb_ifup_phys_lock);
+	//write_lock_bh(&sx1278_ifup_phys_lock);
 	phy->suspended = true;
 	del_timer(&(phy->timer));
-	list_del(&phy->list_ifup);
-	write_unlock_bh(&fakelb_ifup_phys_lock);
+	sx127X_setState(phy->rm, SX127X_SLEEP_MODE);
+	//write_unlock_bh(&sx1278_ifup_phys_lock);
 }
 
 static int
-fakelb_set_promiscuous_mode(struct ieee802154_hw *hw, const bool on)
+sx1278_set_promiscuous_mode(struct ieee802154_hw *hw, const bool on)
 {
 	return 0;
 }
 
-static void fakelb_timer_irqwork(struct work_struct *work)
+static void sx1278_timer_irqwork(struct work_struct *work)
 {
 	struct sx1278_phy *phy;
 	u8 flags;
 
 	phy = container_of(work, struct sx1278_phy, irqwork);
-	flags = phy->flags;
+	flags = sx127X_getLoRaAllFlag(phy->rm);
 
-	if (flags & FAKELB_RXDONE)
-		fakelb_hw_rx(phy->hw);
-	if (flags & FAKELB_TXDONE)
-		fakelb_hw_tx_complete(phy->hw);
+	if (flags & (SX127X_FLAG_RXTIMEOUT | SX127X_FLAG_PAYLOADCRCERROR)) {
+		sx127X_clearLoRaFlag(phy->rm, SX127X_FLAG_RXTIMEOUT
+						| SX127X_FLAG_PAYLOADCRCERROR
+						| SX127X_FLAG_RXDONE);
+		sx127X_setState(phy->rm, SX127X_RXSINGLE_MODE);
+	}
+	else if (flags & SX127X_FLAG_RXDONE) {
+		switch(sx1278_ieee_rx(phy->hw)) {
+		case -EBUSY:
+			break;
+		case 0:
+		default:
+			sx127X_clearLoRaFlag(phy->rm, SX127X_FLAG_RXDONE);
+			sx127X_setState(phy->rm, SX127X_RXSINGLE_MODE);
+		}
+	}
+	if (flags & SX127X_FLAG_TXDONE) {
+		sx1278_ieee_tx_complete(phy->hw);
+		sx127X_clearLoRaFlag(phy->rm, SX127X_FLAG_TXDONE);
+		sx127X_setState(phy->rm, SX127X_RXSINGLE_MODE);
+	}
 
 	if (!phy->suspended) {
 		phy->timer.expires = jiffies + HZ * 20 / 1000;
@@ -1235,21 +1276,21 @@ static void fakelb_timer_irqwork(struct work_struct *work)
 	return;
 }
 
-static void fakelb_timer_isr(unsigned long arg)
+static void sx1278_timer_isr(unsigned long arg)
 {
 	struct sx1278_phy *phy = (struct sx1278_phy *)arg;
 
 	schedule_work(&(phy->irqwork));
 }
 
-static const struct ieee802154_ops fakelb_ops = {
+static const struct ieee802154_ops sx1278_ops = {
 	.owner = THIS_MODULE,
-	.xmit_async = fakelb_hw_xmit,
-	.ed = fakelb_hw_ed,
-	.set_channel = fakelb_hw_channel,
-	.start = fakelb_hw_start,
-	.stop = fakelb_hw_stop,
-	.set_promiscuous_mode = fakelb_set_promiscuous_mode,
+	.xmit_async = sx1278_ieee_xmit,
+	.ed = sx1278_ieee_ed,
+	.set_channel = sx1278_ieee_channel,
+	.start = sx1278_ieee_start,
+	.stop = sx1278_ieee_stop,
+	.set_promiscuous_mode = sx1278_set_promiscuous_mode,
 };
 
 struct rf_frq {
@@ -1260,7 +1301,7 @@ struct rf_frq {
 };
 
 uint32_t
-fakelb_hw_channel_mask(struct ieee802154_hw *hw)
+sx1278_ieee_channel_mask(struct ieee802154_hw *hw)
 {
 	struct rf_frq rf;
 	uint32_t mask;
@@ -1280,8 +1321,8 @@ static int sx1278_add_one(struct sx1278_phy *phy)
 	int err;
 
 	/* Define channels could be used. */
-	hw->phy->supported.channels[0] = fakelb_hw_channel_mask(hw);
-	/* fake phy channel 11 as default */
+	hw->phy->supported.channels[0] = sx1278_ieee_channel_mask(hw);
+	/* SX1278 phy channel 11 as default */
 	hw->phy->current_channel = 11;
 	phy->channel = hw->phy->current_channel;
 
@@ -1294,14 +1335,18 @@ static int sx1278_add_one(struct sx1278_phy *phy)
 	if (err)
 		goto err_reg;
 
-	INIT_WORK(&(phy->irqwork), fakelb_timer_irqwork);
+	INIT_WORK(&(phy->irqwork), sx1278_timer_irqwork);
 
 	init_timer(&(phy->timer));
 	phy->timer.expires = jiffies + HZ;
-	phy->timer.function = fakelb_timer_isr;
+	phy->timer.function = sx1278_timer_isr;
 	phy->timer.data = (unsigned long)phy;
 
 	spin_lock_init(&(phy->buf_lock));
+
+	err = init_sx127X(phy->rm);
+	if (err)
+		goto err_reg;
 
 	return 0;
 
@@ -1384,6 +1429,7 @@ struct regmap_config sx1278_regmap_config = {
 	.read_flag_mask = 0x00,
 	.write_flag_mask = 0x80,
 	.volatile_reg = sx127X_reg_volatile,
+	//.fast_io = true,
 };
 
 static int sx1278_spi_probe(struct spi_device *spi)
@@ -1402,7 +1448,7 @@ static int sx1278_spi_probe(struct spi_device *spi)
 #endif
 	sx1278_probe_acpi(spi);
 
-	hw = ieee802154_alloc_hw(sizeof(*phy), &fakelb_ops);
+	hw = ieee802154_alloc_hw(sizeof(*phy), &sx1278_ops);
 	if (!hw) {
 		dev_dbg(&(spi->dev), "not enough memory\n");
 		return -ENOMEM;
@@ -1410,6 +1456,7 @@ static int sx1278_spi_probe(struct spi_device *spi)
 
 	phy = hw->priv;
 	phy->hw = hw;
+	phy->spi = spi;
 	phy->rm = devm_regmap_init_spi(spi, &sx1278_regmap_config);
 	hw->parent = &(spi->dev);
 
@@ -1422,7 +1469,7 @@ static int sx1278_spi_probe(struct spi_device *spi)
 		goto err_slave;
 	}
 
-	dev_info(&(spi->dev), "added a fake ieee802154 hardware devices\n");
+	dev_info(&(spi->dev), "add an IEEE 802.15.4 over LoRa SX1278 device\n");
 
 	return 0;
 
