@@ -138,6 +138,10 @@
 #define SX127X_FLAGMASK_FHSSCHANGECHANNEL	0x02
 #define SX127X_FLAGMASK_CADDETECTED		0x01
 
+
+#define SX127X_FIFO_RX_BASE_ADDRESS		0x00
+#define SX127X_FIFO_TX_BASE_ADDRESS		0x80
+
 struct sx1278_phy {
 	struct ieee802154_hw *hw;
 	struct spi_device *spi;
@@ -151,6 +155,7 @@ struct sx1278_phy {
 	struct timer_list timer;
 	struct work_struct irqwork;
 
+	bool one_to_be_sent;
 	struct spi_message tx_base_msg;
 	u8 tx_base_adr[2];
 	struct spi_transfer tx_base_t;
@@ -167,6 +172,8 @@ struct sx1278_phy {
 	struct spi_message tx_state_msg;
 	u8 tx_state[2];
 	struct spi_transfer tx_state_t;
+
+	uint8_t tx_delay;
 
 	spinlock_t buf_lock;
 	bool is_busy;
@@ -786,12 +793,14 @@ sx127X_readLoRaData(struct regmap *rm, uint8_t *buf, size_t len)
 	int ret;
 
 	/* Get the chip RX FIFO last packet address. */
-	regmap_raw_read(rm, SX127X_REG_FIFO_RX_CURRENT_ADDR, &start_adr, 1);
+	start_adr = SX127X_FIFO_RX_BASE_ADDRESS;
 	/* Set chip FIFO pointer to FIFO last packet address. */
 	regmap_raw_write(rm, SX127X_REG_FIFO_ADDR_PTR, &start_adr, 1);
 
 	/* Read LoRa packet payload. */
 	ret = regmap_raw_read(rm, SX127X_REG_FIFO, buf, len);
+
+	regmap_raw_write(rm, SX127X_REG_FIFO_ADDR_PTR, &start_adr, 1);
 
 	dev_dbg(regmap_get_device(rm),
 		"read %zu bytes from 0x%u with ret=%d\n", len, start_adr, ret);
@@ -813,6 +822,7 @@ sx127X_setLoRaTXState(void *context)
 	spi_message_add_tail(&(phy->tx_state_t), &(phy->tx_state_msg));
 
 	spi_async(phy->spi, &(phy->tx_state_msg));
+	dev_dbg(&(phy->spi->dev), "set LoRa TX mode\n");
 }
 
 void
@@ -875,7 +885,7 @@ sx127X_setLoRaTXFIFOPTR(void *context)
 	spi_message_init(&(phy->tx_base_msg));
 
 	phy->tx_base_adr[0] = SX127X_REG_FIFO_ADDR_PTR | 0x80;
-	phy->tx_base_adr[1] = 0x80;
+	phy->tx_base_adr[1] = SX127X_FIFO_TX_BASE_ADDRESS;
 	phy->tx_base_t.tx_buf = phy->tx_base_adr;
 	phy->tx_base_t.len = 2;
 
@@ -1050,13 +1060,16 @@ sx127X_startLoRaMode(struct regmap *rm)
 	sx127X_setLoRaImplicit(rm, 0);
 
 	/* Set chip FIFO RX base. */
-	base_adr = 0x00;
+	base_adr = SX127X_FIFO_RX_BASE_ADDRESS;
 	dev_dbg(regmap_get_device(rm), "going to set RX base address\n");
 	regmap_raw_write(rm, SX127X_REG_FIFO_RX_BASE_ADDR, &base_adr, 1);
 	/* Set chip FIFO TX base. */
-	base_adr = 0x80;
+	base_adr = SX127X_FIFO_TX_BASE_ADDRESS;
 	dev_dbg(regmap_get_device(rm), "going to set TX base address\n");
 	regmap_raw_write(rm, SX127X_REG_FIFO_TX_BASE_ADDR, &base_adr, 1);
+
+	sx127X_setLoRaRXTimeout(rm, 1000);
+	sx127X_setLoRaSPRFactor(rm, 512);
 
 	/* Clear all of the IRQ flags. */
 	sx127X_clearLoRaAllFlag(rm);
@@ -1134,10 +1147,13 @@ static int sx1278_ieee_rx(struct ieee802154_hw *hw)
 	}
 
 	spin_lock(&phy->buf_lock);
-	if (phy->tx_buf) {
+	if (phy->is_busy) {
 		dev_dbg(regmap_get_device(phy->rm), "transceiver is busy\n");
 		err = -EBUSY;
 		goto sx1278_ieee_rx_err2;
+	}
+	else {
+		phy->is_busy = true;
 	}
 	phy->tx_buf = skb;
 	spin_unlock(&phy->buf_lock);
@@ -1147,6 +1163,7 @@ static int sx1278_ieee_rx(struct ieee802154_hw *hw)
 	ieee802154_rx_irqsafe(hw, skb, 0xcc);
 
 	spin_lock(&phy->buf_lock);
+	phy->is_busy = false;
 	phy->tx_buf = NULL;
 	spin_unlock(&phy->buf_lock);
 #ifdef DEBUG
@@ -1170,6 +1187,7 @@ static int sx1278_ieee_tx_complete(struct ieee802154_hw *hw)
 	ieee802154_xmit_complete(hw, skb, false);
 
 	spin_lock(&(phy->buf_lock));
+	phy->is_busy = false;
 	phy->tx_buf = NULL;
 	spin_unlock(&(phy->buf_lock));
 
@@ -1186,23 +1204,16 @@ static int sx1278_ieee_xmit(struct ieee802154_hw *hw, struct sk_buff *skb)
 	//read_unlock_bh(&sx1278_ifup_phys_lock);
 
 	spin_lock(&(phy->buf_lock));
-	if (phy->tx_buf == NULL) {
-		phy->tx_buf = skb;
-		ret = 0;
-	}
-	else {
+	if (phy->is_busy) {
 		ret = -EBUSY;
 	}
-	spin_unlock(&(phy->buf_lock));
-
-	if (ret == 0) {
-		sx127X_setLoRaTXFIFOPTR(phy);
-#ifdef DEBUG
-		print_hex_dump(KERN_DEBUG, "sx1278 tx: ",
-				DUMP_PREFIX_OFFSET, 16, 1,
-				skb->data, skb->len, 0);
-#endif
+	else {
+		phy->is_busy = true;
+		phy->tx_buf = skb;
+		phy->one_to_be_sent = true;
+		ret = 0;
 	}
+	spin_unlock(&(phy->buf_lock));
 
 	return ret;
 }
@@ -1242,14 +1253,18 @@ static void sx1278_timer_irqwork(struct work_struct *work)
 {
 	struct sx1278_phy *phy;
 	u8 flags;
+	u8 state;
+	u8 start_adr = SX127X_FIFO_RX_BASE_ADDRESS;
 
 	phy = container_of(work, struct sx1278_phy, irqwork);
 	flags = sx127X_getLoRaAllFlag(phy->rm);
+	state = sx127X_getState(phy->rm);
 
 	if (flags & (SX127X_FLAG_RXTIMEOUT | SX127X_FLAG_PAYLOADCRCERROR)) {
 		sx127X_clearLoRaFlag(phy->rm, SX127X_FLAG_RXTIMEOUT
 						| SX127X_FLAG_PAYLOADCRCERROR
 						| SX127X_FLAG_RXDONE);
+		regmap_raw_write(phy->rm, SX127X_REG_FIFO_ADDR_PTR, &start_adr, 1);
 		sx127X_setState(phy->rm, SX127X_RXSINGLE_MODE);
 	}
 	else if (flags & SX127X_FLAG_RXDONE) {
@@ -1259,13 +1274,30 @@ static void sx1278_timer_irqwork(struct work_struct *work)
 		case 0:
 		default:
 			sx127X_clearLoRaFlag(phy->rm, SX127X_FLAG_RXDONE);
+			regmap_raw_write(phy->rm, SX127X_REG_FIFO_ADDR_PTR, &start_adr, 1);
 			sx127X_setState(phy->rm, SX127X_RXSINGLE_MODE);
 		}
 	}
 	if (flags & SX127X_FLAG_TXDONE) {
 		sx1278_ieee_tx_complete(phy->hw);
 		sx127X_clearLoRaFlag(phy->rm, SX127X_FLAG_TXDONE);
+		regmap_raw_write(phy->rm, SX127X_REG_FIFO_ADDR_PTR, &start_adr, 1);
+		phy->tx_delay = 10;
 		sx127X_setState(phy->rm, SX127X_RXSINGLE_MODE);
+	}
+
+	if (phy->one_to_be_sent && (state == SX127X_STANDBY_MODE) && (phy->tx_delay == 0)) {
+		sx127X_setLoRaTXFIFOPTR(phy);
+		phy->one_to_be_sent = false;
+#ifdef DEBUG
+		print_hex_dump(KERN_DEBUG, "sx1278 tx: ",
+				DUMP_PREFIX_OFFSET, 16, 1,
+				phy->tx_buf->data, phy->tx_buf->len, 0);
+#endif
+	}
+
+	if (phy->tx_delay > 0) {
+		phy->tx_delay -= 1;
 	}
 
 	if (!phy->suspended) {
