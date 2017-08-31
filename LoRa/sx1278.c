@@ -1122,10 +1122,8 @@ static int sx1278_ieee_channel(struct ieee802154_hw *hw, u8 page, u8 channel)
 {
 	struct sx1278_phy *phy = hw->priv;
 
-//	write_lock_bh(&sx1278_ifup_phys_lock);
 	phy->page = page;
 	phy->channel = channel;
-//	write_unlock_bh(&sx1278_ifup_phys_lock);
 
 	return 0;
 }
@@ -1155,7 +1153,6 @@ static int sx1278_ieee_rx(struct ieee802154_hw *hw)
 	else {
 		phy->is_busy = true;
 	}
-	phy->tx_buf = skb;
 	spin_unlock(&phy->buf_lock);
 
 	len = sx127X_getLoRaLastPacketPayloadLen(phy->rm);
@@ -1164,7 +1161,6 @@ static int sx1278_ieee_rx(struct ieee802154_hw *hw)
 
 	spin_lock(&phy->buf_lock);
 	phy->is_busy = false;
-	phy->tx_buf = NULL;
 	spin_unlock(&phy->buf_lock);
 #ifdef DEBUG
 	print_hex_dump(KERN_DEBUG, "sx1278 rx: ", DUMP_PREFIX_OFFSET, 16, 1,
@@ -1186,6 +1182,12 @@ static int sx1278_ieee_tx_complete(struct ieee802154_hw *hw)
 
 	ieee802154_xmit_complete(hw, skb, false);
 
+#ifdef DEBUG
+	print_hex_dump(KERN_DEBUG, "sx1278 tx: ",
+			DUMP_PREFIX_OFFSET, 16, 1,
+			phy->tx_buf->data, phy->tx_buf->len, 0);
+#endif
+
 	spin_lock(&(phy->buf_lock));
 	phy->is_busy = false;
 	phy->tx_buf = NULL;
@@ -1199,16 +1201,13 @@ static int sx1278_ieee_xmit(struct ieee802154_hw *hw, struct sk_buff *skb)
 	struct sx1278_phy *phy = hw->priv;
 	int ret;
 
-	//read_lock_bh(&sx1278_ifup_phys_lock);
 	WARN_ON(phy->suspended);
-	//read_unlock_bh(&sx1278_ifup_phys_lock);
 
 	spin_lock(&(phy->buf_lock));
-	if (phy->is_busy) {
+	if (phy->tx_buf) {
 		ret = -EBUSY;
 	}
 	else {
-		phy->is_busy = true;
 		phy->tx_buf = skb;
 		phy->one_to_be_sent = true;
 		ret = 0;
@@ -1222,12 +1221,10 @@ static int sx1278_ieee_start(struct ieee802154_hw *hw)
 {
 	struct sx1278_phy *phy = hw->priv;
 
-	//write_lock_bh(&sx1278_ifup_phys_lock);
 	phy->suspended = false;
 	sx127X_startLoRaMode(phy->rm);
 	phy->opmode = sx127X_getMode(phy->rm);
 	add_timer(&(phy->timer));
-	//write_unlock_bh(&sx1278_ifup_phys_lock);
 
 	return 0;
 }
@@ -1236,11 +1233,9 @@ static void sx1278_ieee_stop(struct ieee802154_hw *hw)
 {
 	struct sx1278_phy *phy = hw->priv;
 
-	//write_lock_bh(&sx1278_ifup_phys_lock);
 	phy->suspended = true;
 	del_timer(&(phy->timer));
 	sx127X_setState(phy->rm, SX127X_SLEEP_MODE);
-	//write_unlock_bh(&sx1278_ifup_phys_lock);
 }
 
 static int
@@ -1254,7 +1249,7 @@ static void sx1278_timer_irqwork(struct work_struct *work)
 	struct sx1278_phy *phy;
 	u8 flags;
 	u8 state;
-	u8 start_adr = SX127X_FIFO_RX_BASE_ADDRESS;
+	bool do_rx = false;
 
 	phy = container_of(work, struct sx1278_phy, irqwork);
 	flags = sx127X_getLoRaAllFlag(phy->rm);
@@ -1264,8 +1259,7 @@ static void sx1278_timer_irqwork(struct work_struct *work)
 		sx127X_clearLoRaFlag(phy->rm, SX127X_FLAG_RXTIMEOUT
 						| SX127X_FLAG_PAYLOADCRCERROR
 						| SX127X_FLAG_RXDONE);
-		regmap_raw_write(phy->rm, SX127X_REG_FIFO_ADDR_PTR, &start_adr, 1);
-		sx127X_setState(phy->rm, SX127X_RXSINGLE_MODE);
+		do_rx = true;
 	}
 	else if (flags & SX127X_FLAG_RXDONE) {
 		switch(sx1278_ieee_rx(phy->hw)) {
@@ -1274,27 +1268,29 @@ static void sx1278_timer_irqwork(struct work_struct *work)
 		case 0:
 		default:
 			sx127X_clearLoRaFlag(phy->rm, SX127X_FLAG_RXDONE);
-			regmap_raw_write(phy->rm, SX127X_REG_FIFO_ADDR_PTR, &start_adr, 1);
-			sx127X_setState(phy->rm, SX127X_RXSINGLE_MODE);
+			do_rx = true;
 		}
 	}
 	if (flags & SX127X_FLAG_TXDONE) {
 		sx1278_ieee_tx_complete(phy->hw);
 		sx127X_clearLoRaFlag(phy->rm, SX127X_FLAG_TXDONE);
-		regmap_raw_write(phy->rm, SX127X_REG_FIFO_ADDR_PTR, &start_adr, 1);
 		phy->tx_delay = 10;
-		sx127X_setState(phy->rm, SX127X_RXSINGLE_MODE);
+		do_rx = true;
 	}
 
-	if (phy->one_to_be_sent && (state == SX127X_STANDBY_MODE) && (phy->tx_delay == 0)) {
-		sx127X_setLoRaTXFIFOPTR(phy);
+	if (phy->one_to_be_sent && (state == SX127X_STANDBY_MODE) && (!phy->is_busy) && (phy->tx_delay == 0)) {
+		spin_lock(&(phy->buf_lock));
+		phy->is_busy = true;
 		phy->one_to_be_sent = false;
-#ifdef DEBUG
-		print_hex_dump(KERN_DEBUG, "sx1278 tx: ",
-				DUMP_PREFIX_OFFSET, 16, 1,
-				phy->tx_buf->data, phy->tx_buf->len, 0);
-#endif
+		spin_unlock(&(phy->buf_lock));
+
+		sx127X_setLoRaTXFIFOPTR(phy);
+
+		do_rx = false;
 	}
+
+	if (do_rx)
+		sx127X_setState(phy->rm, SX127X_RXSINGLE_MODE);
 
 	if (phy->tx_delay > 0) {
 		phy->tx_delay -= 1;
@@ -1461,7 +1457,6 @@ struct regmap_config sx1278_regmap_config = {
 	.read_flag_mask = 0x00,
 	.write_flag_mask = 0x80,
 	.volatile_reg = sx127X_reg_volatile,
-	//.fast_io = true,
 };
 
 static int sx1278_spi_probe(struct spi_device *spi)
