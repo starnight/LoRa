@@ -1274,7 +1274,7 @@ static void sx1278_timer_irqwork(struct work_struct *work)
 	if (flags & SX127X_FLAG_TXDONE) {
 		sx1278_ieee_tx_complete(phy->hw);
 		sx127X_clearLoRaFlag(phy->rm, SX127X_FLAG_TXDONE);
-		phy->tx_delay = 10;
+		phy->tx_delay = 2;
 		do_rx = true;
 	}
 
