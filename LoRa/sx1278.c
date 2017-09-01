@@ -1141,19 +1141,8 @@ static int sx1278_ieee_rx(struct ieee802154_hw *hw)
 		dev_err(regmap_get_device(phy->rm),
 			"not enough memory for new incoming frame\n");
 		err = -ENOMEM;
-		goto sx1278_ieee_rx_err1;
+		goto sx1278_ieee_rx_err;
 	}
-
-	spin_lock(&phy->buf_lock);
-	if (phy->is_busy) {
-		dev_dbg(regmap_get_device(phy->rm), "transceiver is busy\n");
-		err = -EBUSY;
-		goto sx1278_ieee_rx_err2;
-	}
-	else {
-		phy->is_busy = true;
-	}
-	spin_unlock(&phy->buf_lock);
 
 	len = sx127X_getLoRaLastPacketPayloadLen(phy->rm);
 	sx127X_readLoRaData(phy->rm, skb_put(skb, len), len);
@@ -1168,10 +1157,7 @@ static int sx1278_ieee_rx(struct ieee802154_hw *hw)
 #endif
 	return 0;
 
-sx1278_ieee_rx_err2:
-	spin_unlock(&phy->buf_lock);
-	kfree_skb(skb);
-sx1278_ieee_rx_err1:
+sx1278_ieee_rx_err:
 	return err;
 }
 
@@ -1249,7 +1235,7 @@ static void sx1278_timer_irqwork(struct work_struct *work)
 	struct sx1278_phy *phy;
 	u8 flags;
 	u8 state;
-	bool do_rx = false;
+	bool do_next_rx = false;
 
 	phy = container_of(work, struct sx1278_phy, irqwork);
 	flags = sx127X_getLoRaAllFlag(phy->rm);
@@ -1259,7 +1245,10 @@ static void sx1278_timer_irqwork(struct work_struct *work)
 		sx127X_clearLoRaFlag(phy->rm, SX127X_FLAG_RXTIMEOUT
 						| SX127X_FLAG_PAYLOADCRCERROR
 						| SX127X_FLAG_RXDONE);
-		do_rx = true;
+		spin_lock(&(phy->buf_lock));
+		phy->is_busy = false;
+		spin_unlock(&(phy->buf_lock));
+		do_next_rx = true;
 	}
 	else if (flags & SX127X_FLAG_RXDONE) {
 		switch(sx1278_ieee_rx(phy->hw)) {
@@ -1268,29 +1257,45 @@ static void sx1278_timer_irqwork(struct work_struct *work)
 		case 0:
 		default:
 			sx127X_clearLoRaFlag(phy->rm, SX127X_FLAG_RXDONE);
-			do_rx = true;
+			do_next_rx = true;
 		}
 	}
 	if (flags & SX127X_FLAG_TXDONE) {
 		sx1278_ieee_tx_complete(phy->hw);
 		sx127X_clearLoRaFlag(phy->rm, SX127X_FLAG_TXDONE);
 		phy->tx_delay = 2;
-		do_rx = true;
+		do_next_rx = true;
 	}
 
-	if (phy->one_to_be_sent && (state == SX127X_STANDBY_MODE) && (!phy->is_busy) && (phy->tx_delay == 0)) {
+	if (phy->one_to_be_sent && (state == SX127X_STANDBY_MODE) && (phy->tx_delay == 0)) {
 		spin_lock(&(phy->buf_lock));
-		phy->is_busy = true;
-		phy->one_to_be_sent = false;
+		if (!phy->is_busy) {
+			phy->is_busy = true;
+			phy->one_to_be_sent = false;
+		}
 		spin_unlock(&(phy->buf_lock));
 
-		sx127X_setLoRaTXFIFOPTR(phy);
-
-		do_rx = false;
+		if (!phy->one_to_be_sent) {
+			sx127X_setLoRaTXFIFOPTR(phy);
+			do_next_rx = false;
+		}
 	}
 
-	if (do_rx)
-		sx127X_setState(phy->rm, SX127X_RXSINGLE_MODE);
+	if (do_next_rx) {
+		spin_lock(&(phy->buf_lock));
+		if (!phy->is_busy) {
+			phy->is_busy = true;
+			do_next_rx = true;
+		}
+		else {
+			do_next_rx = false;
+		}
+		spin_unlock(&(phy->buf_lock));
+
+		if (do_next_rx) {
+			sx127X_setState(phy->rm, SX127X_RXSINGLE_MODE);
+		}
+	}
 
 	if (phy->tx_delay > 0) {
 		phy->tx_delay -= 1;
