@@ -1236,6 +1236,7 @@ static void sx1278_timer_irqwork(struct work_struct *work)
 	u8 flags;
 	u8 state;
 	bool do_next_rx = false;
+	bool do_tx;
 
 	phy = container_of(work, struct sx1278_phy, irqwork);
 	flags = sx127X_getLoRaAllFlag(phy->rm);
@@ -1271,11 +1272,15 @@ static void sx1278_timer_irqwork(struct work_struct *work)
 		spin_lock(&(phy->buf_lock));
 		if (!phy->is_busy) {
 			phy->is_busy = true;
+			do_tx = true;
 			phy->one_to_be_sent = false;
+		}
+		else {
+			do_tx = false;
 		}
 		spin_unlock(&(phy->buf_lock));
 
-		if (!phy->one_to_be_sent) {
+		if (do_tx) {
 			sx127X_setLoRaTXFIFOPTR(phy);
 			do_next_rx = false;
 		}
