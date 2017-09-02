@@ -1063,7 +1063,14 @@ static int sx1278_ieee_channel(struct ieee802154_hw *hw, u8 page, u8 channel)
 	return 0;
 }
 
-static int sx1278_ieee_rx(struct ieee802154_hw *hw)
+void sx1278_ieee_rx(struct ieee802154_hw *hw)
+{
+	struct sx1278_phy *phy = hw->priv;
+
+	sx127X_setState(phy->rm, SX127X_RXSINGLE_MODE);
+}
+
+static int sx1278_ieee_rx_complete(struct ieee802154_hw *hw)
 {
 	struct sx1278_phy *phy = hw->priv;
 	struct sk_buff *skb;
@@ -1187,14 +1194,9 @@ static void sx1278_timer_irqwork(struct work_struct *work)
 		do_next_rx = true;
 	}
 	else if (flags & SX127X_FLAG_RXDONE) {
-		switch(sx1278_ieee_rx(phy->hw)) {
-		case -EBUSY:
-			break;
-		case 0:
-		default:
-			sx127X_clearLoRaFlag(phy->rm, SX127X_FLAG_RXDONE);
-			do_next_rx = true;
-		}
+		sx1278_ieee_rx_complete(phy->hw);
+		sx127X_clearLoRaFlag(phy->rm, SX127X_FLAG_RXDONE);
+		do_next_rx = true;
 	}
 
 	if (flags & SX127X_FLAG_TXDONE) {
@@ -1221,7 +1223,7 @@ static void sx1278_timer_irqwork(struct work_struct *work)
 		spin_unlock(&(phy->buf_lock));
 
 		if (do_next_rx) {
-			sx127X_setState(phy->rm, SX127X_RXSINGLE_MODE);
+			sx1278_ieee_rx(phy->hw);
 		}
 	}
 
