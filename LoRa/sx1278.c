@@ -158,6 +158,7 @@ struct sx1278_phy {
 	struct sk_buff *tx_buf;
 	uint8_t tx_delay;
 	bool one_to_be_sent;
+	bool post_tx_done;
 	bool is_busy;
 };
 
@@ -795,22 +796,39 @@ sx127X_sendLoRaData(struct ieee802154_hw *hw, uint8_t *buf, size_t len)
 	struct regmap *rm = phy->rm;
 	uint8_t base_adr = SX127X_FIFO_TX_BASE_ADDRESS;
 	uint8_t blen;
+	bool do_tx = false;
 
-	/* Set chip FIFO pointer to FIFO TX base. */
-	regmap_raw_write(rm, SX127X_REG_FIFO_ADDR_PTR, &base_adr, 1);
+	if (!phy->post_tx_done) {
+		/* Set chip FIFO pointer to FIFO TX base. */
+		regmap_raw_write(rm, SX127X_REG_FIFO_ADDR_PTR, &base_adr, 1);
 
-	/* Write to SPI chip synchronously to fill the FIFO of the chip. */
-	blen = (len < IEEE802154_MTU) ? len : IEEE802154_MTU;
-	regmap_raw_write(rm, SX127X_REG_FIFO, buf, blen);
+		/* Write payload synchronously to fill the FIFO of the chip. */
+		blen = (len < IEEE802154_MTU) ? len : IEEE802154_MTU;
+		regmap_raw_write(rm, SX127X_REG_FIFO, buf, blen);
 
-	/* Set the FIFO payload length. */
-	regmap_raw_write(rm, SX127X_REG_PAYLOAD_LENGTH, &blen, 1);
+		/* Set the FIFO payload length. */
+		regmap_raw_write(rm, SX127X_REG_PAYLOAD_LENGTH, &blen, 1);
 
-	/* Set chip as TX state and transfer the data in FIFO. */
-	phy->opmode = (phy->opmode & 0xF8) | SX127X_TX_MODE;
-	regmap_raw_write_async(rm, SX127X_REG_OP_MODE, &(phy->opmode), 1);
+		phy->post_tx_done = true;
+	}
 
-	return 0;
+	spin_lock(&(phy->buf_lock));
+	if (!phy->is_busy) {
+		phy->is_busy = true;
+		do_tx = true;
+		phy->one_to_be_sent = false;
+	}
+	spin_unlock(&(phy->buf_lock));
+
+	if (do_tx) {
+		/* Set chip as TX state and transfer the data in FIFO. */
+		phy->opmode = (phy->opmode & 0xF8) | SX127X_TX_MODE;
+		regmap_raw_write_async(rm, SX127X_REG_OP_MODE, &(phy->opmode), 1);
+		return 0;
+	}
+	else {
+		return -EBUSY;
+	}
 }
 
 /**
@@ -1113,6 +1131,7 @@ static int sx1278_ieee_xmit(struct ieee802154_hw *hw, struct sk_buff *skb)
 	else {
 		phy->tx_buf = skb;
 		phy->one_to_be_sent = true;
+		phy->post_tx_done = false;
 		ret = 0;
 	}
 	spin_unlock(&(phy->buf_lock));
@@ -1153,7 +1172,6 @@ static void sx1278_timer_irqwork(struct work_struct *work)
 	u8 flags;
 	u8 state;
 	bool do_next_rx = false;
-	bool do_tx;
 
 	phy = container_of(work, struct sx1278_phy, irqwork);
 	flags = sx127X_getLoRaAllFlag(phy->rm);
@@ -1187,21 +1205,8 @@ static void sx1278_timer_irqwork(struct work_struct *work)
 	}
 
 	if (phy->one_to_be_sent && (state == SX127X_STANDBY_MODE) && (phy->tx_delay == 0)) {
-		spin_lock(&(phy->buf_lock));
-		if (!phy->is_busy) {
-			phy->is_busy = true;
-			do_tx = true;
-			phy->one_to_be_sent = false;
-		}
-		else {
-			do_tx = false;
-		}
-		spin_unlock(&(phy->buf_lock));
-
-		if (do_tx) {
-			sx127X_sendLoRaData(phy->hw, phy->tx_buf->data, phy->tx_buf->len);
+		if(!sx127X_sendLoRaData(phy->hw, phy->tx_buf->data, phy->tx_buf->len))
 			do_next_rx = false;
-		}
 	}
 
 	if (do_next_rx) {
