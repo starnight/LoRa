@@ -144,38 +144,20 @@
 
 struct sx1278_phy {
 	struct ieee802154_hw *hw;
-	struct spi_device *spi;
 	struct regmap *rm;
 
 	u8 page;
 	u8 channel;
 
 	bool suspended;
-	u8 opmode;
+	uint8_t opmode;
 	struct timer_list timer;
 	struct work_struct irqwork;
 
-	bool one_to_be_sent;
-	struct spi_message tx_base_msg;
-	u8 tx_base_adr[2];
-	struct spi_transfer tx_base_t;
-
-	struct spi_message tx_buf_msg;
-	u8 tx_buf_adr;
-	struct sk_buff *tx_buf;
-	struct spi_transfer tx_buf_t[2];
-
-	struct spi_message tx_len_msg;
-	u8 tx_len[2];
-	struct spi_transfer tx_len_t;
-
-	struct spi_message tx_state_msg;
-	u8 tx_state[2];
-	struct spi_transfer tx_state_t;
-
-	uint8_t tx_delay;
-
 	spinlock_t buf_lock;
+	struct sk_buff *tx_buf;
+	uint8_t tx_delay;
+	bool one_to_be_sent;
 	bool is_busy;
 };
 
@@ -800,100 +782,35 @@ sx127X_readLoRaData(struct regmap *rm, uint8_t *buf, size_t len)
 	/* Read LoRa packet payload. */
 	ret = regmap_raw_read(rm, SX127X_REG_FIFO, buf, len);
 
-	regmap_raw_write(rm, SX127X_REG_FIFO_ADDR_PTR, &start_adr, 1);
-
 	dev_dbg(regmap_get_device(rm),
 		"read %zu bytes from 0x%u with ret=%d\n", len, start_adr, ret);
 
 	return (ret >= 0) ? len : ret;
 }
 
-void
-sx127X_setLoRaTXState(void *context)
-{
-	struct sx1278_phy *phy = context;
-
-	spi_message_init(&(phy->tx_state_msg));
-
-	phy->tx_state[0] = SX127X_REG_OP_MODE | 0x80;
-	phy->tx_state[1] = (phy->opmode & 0xF8) | SX127X_TX_MODE;
-	phy->tx_state_t.tx_buf = phy->tx_state;
-	phy->tx_state_t.len = 2;
-	spi_message_add_tail(&(phy->tx_state_t), &(phy->tx_state_msg));
-
-	spi_async(phy->spi, &(phy->tx_state_msg));
-	dev_dbg(&(phy->spi->dev), "set LoRa TX mode\n");
-}
-
-void
-sx127X_setLoRaTXFIFOLen(void *context)
-{
-	struct sx1278_phy *phy = context;
-
-	spi_message_init(&(phy->tx_len_msg));
-
-	phy->tx_len[0] = SX127X_REG_PAYLOAD_LENGTH | 0x80;
-	phy->tx_len_t.tx_buf = phy->tx_len;
-	phy->tx_len_t.len = 2;
-	spi_message_add_tail(&(phy->tx_len_t), &(phy->tx_len_msg));
-
-	phy->tx_len_msg.complete = sx127X_setLoRaTXState;
-	phy->tx_len_msg.context = phy;
-
-	spi_async(phy->spi, &(phy->tx_len_msg));
-}
-
-/**
- * sx127X_sendLoRaData - Send data out through LoRa device (TX)
- * @rm:		the device as a regmap to communicate with
- * @buf:	buffer going to be send
- * @len:	the length of the buffer in bytes
- *
- * Return:	the actual length written into the LoRa device in bytes
- */
-void
-sx127X_sendLoRaData(void *context)
-{
-	struct sx1278_phy *phy = context;
-
-	spi_message_init(&(phy->tx_buf_msg));
-
-	phy->tx_buf_adr = SX127X_REG_FIFO | 0x80;
-	phy->tx_buf_t[0].tx_buf = &(phy->tx_buf_adr);
-	phy->tx_buf_t[0].len = 1;
-	spi_message_add_tail(&(phy->tx_buf_t[0]), &(phy->tx_buf_msg));
-
-	if (phy->tx_buf->len <= IEEE802154_MTU)
-		phy->tx_len[1] = phy->tx_buf->len;
-	else
-		phy->tx_len[1] = IEEE802154_MTU;
-	phy->tx_buf_t[1].tx_buf = phy->tx_buf->data;
-	phy->tx_buf_t[1].len = phy->tx_len[1];
-	spi_message_add_tail(&(phy->tx_buf_t[1]), &(phy->tx_buf_msg));
-
-	phy->tx_buf_msg.complete = sx127X_setLoRaTXFIFOLen;
-	phy->tx_buf_msg.context = phy;
-
-	spi_async(phy->spi, &(phy->tx_buf_msg));
-}
-
 int
-sx127X_setLoRaTXFIFOPTR(void *context)
+sx127X_sendLoRaData(struct ieee802154_hw *hw, uint8_t *buf, size_t len)
 {
-	struct sx1278_phy *phy = context;
+	struct sx1278_phy *phy = hw->priv;
+	struct regmap *rm = phy->rm;
+	uint8_t base_adr = SX127X_FIFO_TX_BASE_ADDRESS;
+	uint8_t blen;
 
-	spi_message_init(&(phy->tx_base_msg));
+	/* Set chip FIFO pointer to FIFO TX base. */
+	regmap_raw_write(rm, SX127X_REG_FIFO_ADDR_PTR, &base_adr, 1);
 
-	phy->tx_base_adr[0] = SX127X_REG_FIFO_ADDR_PTR | 0x80;
-	phy->tx_base_adr[1] = SX127X_FIFO_TX_BASE_ADDRESS;
-	phy->tx_base_t.tx_buf = phy->tx_base_adr;
-	phy->tx_base_t.len = 2;
+	/* Write to SPI chip synchronously to fill the FIFO of the chip. */
+	blen = (len < IEEE802154_MTU) ? len : IEEE802154_MTU;
+	regmap_raw_write(rm, SX127X_REG_FIFO, buf, blen);
 
-	spi_message_add_tail(&(phy->tx_base_t), &(phy->tx_base_msg));
-	phy->tx_base_msg.complete = sx127X_sendLoRaData;
-	phy->tx_base_msg.context = phy;
+	/* Set the FIFO payload length. */
+	regmap_raw_write(rm, SX127X_REG_PAYLOAD_LENGTH, &blen, 1);
 
-	return spi_async(phy->spi, &(phy->tx_base_msg));
+	/* Set chip as TX state and transfer the data in FIFO. */
+	phy->opmode = (phy->opmode & 0xF8) | SX127X_TX_MODE;
+	regmap_raw_write_async(rm, SX127X_REG_OP_MODE, &(phy->opmode), 1);
+
+	return 0;
 }
 
 /**
@@ -1261,6 +1178,7 @@ static void sx1278_timer_irqwork(struct work_struct *work)
 			do_next_rx = true;
 		}
 	}
+
 	if (flags & SX127X_FLAG_TXDONE) {
 		sx1278_ieee_tx_complete(phy->hw);
 		sx127X_clearLoRaFlag(phy->rm, SX127X_FLAG_TXDONE);
@@ -1281,7 +1199,7 @@ static void sx1278_timer_irqwork(struct work_struct *work)
 		spin_unlock(&(phy->buf_lock));
 
 		if (do_tx) {
-			sx127X_setLoRaTXFIFOPTR(phy);
+			sx127X_sendLoRaData(phy->hw, phy->tx_buf->data, phy->tx_buf->len);
 			do_next_rx = false;
 		}
 	}
@@ -1307,7 +1225,7 @@ static void sx1278_timer_irqwork(struct work_struct *work)
 	}
 
 	if (!phy->suspended) {
-		phy->timer.expires = jiffies + HZ * 20 / 1000;
+		phy->timer.expires = jiffies + HZ * 10 / 1000;
 		add_timer(&(phy->timer));
 	}
 
@@ -1493,9 +1411,8 @@ static int sx1278_spi_probe(struct spi_device *spi)
 
 	phy = hw->priv;
 	phy->hw = hw;
-	phy->spi = spi;
-	phy->rm = devm_regmap_init_spi(spi, &sx1278_regmap_config);
 	hw->parent = &(spi->dev);
+	phy->rm = devm_regmap_init_spi(spi, &sx1278_regmap_config);
 
 	/* Set the SPI device's driver data for later usage. */
 	spi_set_drvdata(spi, phy);
