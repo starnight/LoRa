@@ -1126,6 +1126,21 @@ static int sx1278_ieee_channel(struct ieee802154_hw *hw, u8 page, u8 channel)
 	return 0;
 }
 
+/* in mbm */
+int32_t sx1278_powers[] = {
+	-200, -100, 0, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1100,
+	1200, 1300, 1400, 1500, 1600, 1700, 1800, 1900, 2000, 2100, 2200, 2300};
+
+static int sx127X_ieee_set_txpower(struct ieee802154_hw *hw, s32 mbm)
+{
+	struct sx1278_phy *phy = hw->priv;
+	int32_t dbm = sx127X_mbm2dbm(mbm);
+
+	sx127X_setLoRaPower(phy->rm, dbm);
+
+	return 0;
+}
+
 void sx1278_ieee_rx(struct ieee802154_hw *hw)
 {
 	struct sx1278_phy *phy = hw->priv;
@@ -1358,6 +1373,7 @@ static const struct ieee802154_ops sx1278_ops = {
 	.xmit_async = sx1278_ieee_xmit,
 	.ed = sx1278_ieee_ed,
 	.set_channel = sx1278_ieee_channel,
+	.set_txpower = sx127X_ieee_set_txpower,
 	.start = sx1278_ieee_start,
 	.stop = sx1278_ieee_stop,
 	.set_promiscuous_mode = sx1278_set_promiscuous_mode,
@@ -1385,6 +1401,11 @@ static int sx1278_add_one(struct sx1278_phy *phy)
 	hw->phy->supported.channels[0] = sx1278_ieee_channel_mask(hw);
 	/* SX1278 phy channel 11 as default */
 	hw->phy->current_channel = 11;
+
+	/* Define RF power. */
+	hw->phy->supported.tx_powers = sx1278_powers;
+	hw->phy->supported.tx_powers_size = ARRAY_SIZE(sx1278_powers);
+	hw->phy->transmit_power = sx1278_powers[12];
 
 	ieee802154_random_extended_addr(&hw->phy->perm_extended_addr);
 	hw->flags = IEEE802154_HW_TX_OMIT_CKSUM \
