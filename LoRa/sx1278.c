@@ -1025,7 +1025,8 @@ init_sx127X(struct regmap *rm)
 #endif
 #define SX127X_IEEE_ENERGY_RANGE	(-SX127X_IEEE_SENSITIVITY)
 
-static int sx1278_ieee_ed(struct ieee802154_hw *hw, u8 *level)
+static int
+sx1278_ieee_ed(struct ieee802154_hw *hw, u8 *level)
 {
 	struct sx1278_phy *phy = hw->priv;
 	int32_t rssi;
@@ -1104,7 +1105,8 @@ sx1278_ieee_get_rf_config(struct ieee802154_hw *hw, struct rf_frq *rf)
 #endif
 }
 
-static int sx1278_ieee_channel(struct ieee802154_hw *hw, u8 page, u8 channel)
+static int
+sx1278_ieee_set_channel(struct ieee802154_hw *hw, u8 page, u8 channel)
 {
 	struct sx1278_phy *phy = hw->priv;
 	struct rf_frq rf;
@@ -1131,7 +1133,8 @@ int32_t sx1278_powers[] = {
 	-200, -100, 0, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1100,
 	1200, 1300, 1400, 1500, 1600, 1700, 1800, 1900, 2000, 2100, 2200, 2300};
 
-static int sx127X_ieee_set_txpower(struct ieee802154_hw *hw, s32 mbm)
+static int
+sx1278_ieee_set_txpower(struct ieee802154_hw *hw, s32 mbm)
 {
 	struct sx1278_phy *phy = hw->priv;
 	int32_t dbm = sx127X_mbm2dbm(mbm);
@@ -1141,7 +1144,8 @@ static int sx127X_ieee_set_txpower(struct ieee802154_hw *hw, s32 mbm)
 	return 0;
 }
 
-void sx1278_ieee_rx(struct ieee802154_hw *hw)
+int
+sx1278_ieee_rx(struct ieee802154_hw *hw)
 {
 	struct sx1278_phy *phy = hw->priv;
 	bool do_rx;
@@ -1156,11 +1160,17 @@ void sx1278_ieee_rx(struct ieee802154_hw *hw)
 	}
 	spin_unlock(&(phy->buf_lock));
 
-	if (do_rx)
+	if (do_rx) {
 		sx127X_setState(phy->rm, SX127X_RXSINGLE_MODE);
+		return 0;
+	}
+	else {
+		return -EBUSY;
+	}
 }
 
-static int sx1278_ieee_rx_complete(struct ieee802154_hw *hw)
+static int
+sx1278_ieee_rx_complete(struct ieee802154_hw *hw)
 {
 	struct sx1278_phy *phy = hw->priv;
 	struct sk_buff *skb;
@@ -1205,7 +1215,8 @@ sx1278_ieee_rx_err:
 	return err;
 }
 
-int sx1278_ieee_tx(struct ieee802154_hw *hw)
+int
+sx1278_ieee_tx(struct ieee802154_hw *hw)
 {
 	struct sx1278_phy *phy = hw->priv;
 	struct sk_buff *tx_buf = phy->tx_buf;
@@ -1235,7 +1246,8 @@ int sx1278_ieee_tx(struct ieee802154_hw *hw)
 	}
 }
 
-static int sx1278_ieee_tx_complete(struct ieee802154_hw *hw)
+static int
+sx1278_ieee_tx_complete(struct ieee802154_hw *hw)
 {
 	struct sx1278_phy *phy = hw->priv;
 	struct sk_buff *skb = phy->tx_buf;
@@ -1256,7 +1268,8 @@ static int sx1278_ieee_tx_complete(struct ieee802154_hw *hw)
 	return 0;
 }
 
-static int sx1278_ieee_xmit(struct ieee802154_hw *hw, struct sk_buff *skb)
+static int
+sx1278_ieee_xmit(struct ieee802154_hw *hw, struct sk_buff *skb)
 {
 	struct sx1278_phy *phy = hw->priv;
 	int ret;
@@ -1278,7 +1291,8 @@ static int sx1278_ieee_xmit(struct ieee802154_hw *hw, struct sk_buff *skb)
 	return ret;
 }
 
-static int sx1278_ieee_start(struct ieee802154_hw *hw)
+static int
+sx1278_ieee_start(struct ieee802154_hw *hw)
 {
 	struct sx1278_phy *phy = hw->priv;
 
@@ -1290,7 +1304,8 @@ static int sx1278_ieee_start(struct ieee802154_hw *hw)
 	return 0;
 }
 
-static void sx1278_ieee_stop(struct ieee802154_hw *hw)
+static void
+sx1278_ieee_stop(struct ieee802154_hw *hw)
 {
 	struct sx1278_phy *phy = hw->priv;
 
@@ -1305,7 +1320,8 @@ sx1278_set_promiscuous_mode(struct ieee802154_hw *hw, const bool on)
 	return 0;
 }
 
-static void sx1278_timer_irqwork(struct work_struct *work)
+static void
+sx1278_timer_irqwork(struct work_struct *work)
 {
 	struct sx1278_phy *phy;
 	u8 flags;
@@ -1361,7 +1377,8 @@ static void sx1278_timer_irqwork(struct work_struct *work)
 	return;
 }
 
-static void sx1278_timer_isr(unsigned long arg)
+static void
+sx1278_timer_isr(unsigned long arg)
 {
 	struct sx1278_phy *phy = (struct sx1278_phy *)arg;
 
@@ -1372,8 +1389,8 @@ static const struct ieee802154_ops sx1278_ops = {
 	.owner = THIS_MODULE,
 	.xmit_async = sx1278_ieee_xmit,
 	.ed = sx1278_ieee_ed,
-	.set_channel = sx1278_ieee_channel,
-	.set_txpower = sx127X_ieee_set_txpower,
+	.set_channel = sx1278_ieee_set_channel,
+	.set_txpower = sx1278_ieee_set_txpower,
 	.start = sx1278_ieee_start,
 	.stop = sx1278_ieee_stop,
 	.set_promiscuous_mode = sx1278_set_promiscuous_mode,
@@ -1392,7 +1409,8 @@ sx1278_ieee_channel_mask(struct ieee802154_hw *hw)
 	return mask;
 }
 
-static int sx1278_add_one(struct sx1278_phy *phy)
+static int
+sx1278_ieee_add_one(struct sx1278_phy *phy)
 {
 	struct ieee802154_hw *hw = phy->hw;
 	int err;
@@ -1437,7 +1455,8 @@ err_reg:
 	return err;
 }
 
-static void sx1278_del(struct sx1278_phy *phy)
+static void
+sx1278_ieee_del(struct sx1278_phy *phy)
 {
 	if (phy == NULL)
 		return;
@@ -1542,7 +1561,7 @@ static int sx1278_spi_probe(struct spi_device *spi)
 	/* Set the SPI device's driver data for later usage. */
 	spi_set_drvdata(spi, phy);
 
-	err = sx1278_add_one(phy);
+	err = sx1278_ieee_add_one(phy);
 	if (err < 0) {
 		dev_err(&(spi->dev), "no SX1278 compatible device\n");
 		goto err_slave;
@@ -1553,7 +1572,7 @@ static int sx1278_spi_probe(struct spi_device *spi)
 	return 0;
 
 err_slave:
-	sx1278_del(phy);
+	sx1278_ieee_del(phy);
 	return err;
 }
 
@@ -1561,7 +1580,7 @@ static int sx1278_spi_remove(struct spi_device *spi)
 {
 	struct sx1278_phy *phy = spi_get_drvdata(spi);
 
-	sx1278_del(phy);
+	sx1278_ieee_del(phy);
 
 	return 0;
 }
