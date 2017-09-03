@@ -1022,10 +1022,26 @@ init_sx127X(struct regmap *rm)
 
 /*---------------------- SX1278 IEEE 802.15.4 Functions ----------------------*/
 
+/* LoRa device's sensitivity in dbm. */
+#ifndef SX127X_IEEE_SENSITIVITY
+#define SX127X_IEEE_SENSITIVITY	(-148)
+#endif
+#define SX127X_IEEE_ENERGY_RANGE	(-SX127X_IEEE_SENSITIVITY)
+
 static int sx1278_ieee_ed(struct ieee802154_hw *hw, u8 *level)
 {
-	BUG_ON(!level);
-	*level = 0xbe;
+	struct sx1278_phy *phy = hw->priv;
+	int32_t rssi;
+	int32_t range = SX127X_IEEE_ENERGY_RANGE - 10;
+
+	/* ED: IEEE  802.15.4-2011 8.2.5 Recevier ED. */
+	rssi = sx127X_getLoRaRSSI(phy->rm);
+	if (rssi < (SX127X_IEEE_SENSITIVITY + 10))
+		*level = 0;
+	else if (rssi >= 0)
+		*level = 255;
+	else
+		*level = ((int32_t)255 * (rssi + range)	/ range) % 255;
 
 	return 0;
 }
@@ -1064,6 +1080,9 @@ static int sx1278_ieee_rx_complete(struct ieee802154_hw *hw)
 	struct sx1278_phy *phy = hw->priv;
 	struct sk_buff *skb;
 	uint8_t len;
+	uint8_t lqi;
+	int32_t rssi;
+	int32_t range = SX127X_IEEE_ENERGY_RANGE;
 	int err;
 
 	dev_dbg(hw->parent, "%s\n", __func__);
@@ -1077,11 +1096,20 @@ static int sx1278_ieee_rx_complete(struct ieee802154_hw *hw)
 
 	len = sx127X_getLoRaLastPacketPayloadLen(phy->rm);
 	sx127X_readLoRaData(phy->rm, skb_put(skb, len), len);
+
+	/* LQI: IEEE  802.15.4-2011 8.2.6 Link quality indicator. */
+	rssi = sx127X_getLoRaLastPacketRSSI(phy->rm);
+	rssi = (rssi > 0) ? 0 : rssi;
+	lqi = ((int32_t)255 * (rssi + range) / range) % 255;
+
 	ieee802154_rx_irqsafe(hw, skb, 0xcc);
 
 	spin_lock(&phy->buf_lock);
 	phy->is_busy = false;
 	spin_unlock(&phy->buf_lock);
+
+	dev_dbg(regmap_get_device(phy->rm),
+		"%s: len=%u LQI=%u\n", __func__, len, lqi);
 #ifdef DEBUG
 	print_hex_dump(KERN_DEBUG, "sx1278 rx: ", DUMP_PREFIX_OFFSET, 16, 1, \
 						skb->data, skb->len, 0);
