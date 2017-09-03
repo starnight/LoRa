@@ -1043,8 +1043,20 @@ static int sx1278_ieee_channel(struct ieee802154_hw *hw, u8 page, u8 channel)
 void sx1278_ieee_rx(struct ieee802154_hw *hw)
 {
 	struct sx1278_phy *phy = hw->priv;
+	bool do_rx;
 
-	sx127X_setState(phy->rm, SX127X_RXSINGLE_MODE);
+	spin_lock(&(phy->buf_lock));
+	if (!phy->is_busy) {
+		phy->is_busy = true;
+		do_rx = true;
+	}
+	else {
+		do_rx = false;
+	}
+	spin_unlock(&(phy->buf_lock));
+
+	if (do_rx)
+		sx127X_setState(phy->rm, SX127X_RXSINGLE_MODE);
 }
 
 static int sx1278_ieee_rx_complete(struct ieee802154_hw *hw)
@@ -1071,7 +1083,7 @@ static int sx1278_ieee_rx_complete(struct ieee802154_hw *hw)
 	phy->is_busy = false;
 	spin_unlock(&phy->buf_lock);
 #ifdef DEBUG
-	print_hex_dump(KERN_DEBUG, "sx1278 rx: ", DUMP_PREFIX_OFFSET, 16, 1,
+	print_hex_dump(KERN_DEBUG, "sx1278 rx: ", DUMP_PREFIX_OFFSET, 16, 1, \
 						skb->data, skb->len, 0);
 #endif
 	return 0;
@@ -1102,7 +1114,7 @@ int sx1278_ieee_tx(struct ieee802154_hw *hw)
 	if (do_tx) {
 		/* Set chip as TX state and transfer the data in FIFO. */
 		phy->opmode = (phy->opmode & 0xF8) | SX127X_TX_MODE;
-		regmap_raw_write_async(phy->rm, SX127X_REG_OP_MODE, &(phy->opmode), 1);
+		regmap_write_async(phy->rm, SX127X_REG_OP_MODE, phy->opmode);
 		return 0;
 	}
 	else {
@@ -1118,8 +1130,8 @@ static int sx1278_ieee_tx_complete(struct ieee802154_hw *hw)
 	ieee802154_xmit_complete(hw, skb, false);
 
 #ifdef DEBUG
-	print_hex_dump(KERN_DEBUG, "sx1278 tx: ",
-			DUMP_PREFIX_OFFSET, 16, 1,
+	print_hex_dump(KERN_DEBUG, "sx1278 tx: ", \
+			DUMP_PREFIX_OFFSET, 16, 1, \
 			phy->tx_buf->data, phy->tx_buf->len, 0);
 #endif
 
@@ -1192,8 +1204,8 @@ static void sx1278_timer_irqwork(struct work_struct *work)
 	state = sx127X_getState(phy->rm);
 
 	if (flags & (SX127X_FLAG_RXTIMEOUT | SX127X_FLAG_PAYLOADCRCERROR)) {
-		sx127X_clearLoRaFlag(phy->rm, SX127X_FLAG_RXTIMEOUT
-						| SX127X_FLAG_PAYLOADCRCERROR
+		sx127X_clearLoRaFlag(phy->rm, SX127X_FLAG_RXTIMEOUT \
+						| SX127X_FLAG_PAYLOADCRCERROR \
 						| SX127X_FLAG_RXDONE);
 		spin_lock(&(phy->buf_lock));
 		phy->is_busy = false;
@@ -1213,25 +1225,15 @@ static void sx1278_timer_irqwork(struct work_struct *work)
 		do_next_rx = true;
 	}
 
-	if (phy->one_to_be_sent && (state == SX127X_STANDBY_MODE) && (phy->tx_delay == 0)) {
+	if (phy->one_to_be_sent \
+		&& (state == SX127X_STANDBY_MODE) \
+		&& (phy->tx_delay == 0)) {
 		if(!sx1278_ieee_tx(phy->hw))
 			do_next_rx = false;
 	}
 
 	if (do_next_rx) {
-		spin_lock(&(phy->buf_lock));
-		if (!phy->is_busy) {
-			phy->is_busy = true;
-			do_next_rx = true;
-		}
-		else {
-			do_next_rx = false;
-		}
-		spin_unlock(&(phy->buf_lock));
-
-		if (do_next_rx) {
-			sx1278_ieee_rx(phy->hw);
-		}
+		sx1278_ieee_rx(phy->hw);
 	}
 
 	if (phy->tx_delay > 0) {
@@ -1239,7 +1241,7 @@ static void sx1278_timer_irqwork(struct work_struct *work)
 	}
 
 	if (!phy->suspended) {
-		phy->timer.expires = jiffies + HZ * 10 / 1000;
+		phy->timer.expires = jiffies + HZ * 20 / 1000;
 		add_timer(&(phy->timer));
 	}
 
@@ -1297,8 +1299,8 @@ static int sx1278_add_one(struct sx1278_phy *phy)
 	phy->channel = hw->phy->current_channel;
 
 	ieee802154_random_extended_addr(&hw->phy->perm_extended_addr);
-	hw->flags = IEEE802154_HW_TX_OMIT_CKSUM
-			| IEEE802154_HW_RX_OMIT_CKSUM
+	hw->flags = IEEE802154_HW_TX_OMIT_CKSUM \
+			| IEEE802154_HW_RX_OMIT_CKSUM \
 			| IEEE802154_HW_PROMISCUOUS;
 
 	err = ieee802154_register_hw(hw);
