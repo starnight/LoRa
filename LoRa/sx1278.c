@@ -1411,6 +1411,12 @@ static const struct ieee802154_ops sx1278_ops = {
 	.set_promiscuous_mode = sx1278_set_promiscuous_mode,
 };
 
+/**
+ * sx1278X_ieee_channel_mask - Get the available channels' mask of LoRa device
+ * @hw:		LoRa IEEE 802.15.4 device
+ *
+ * Return:	The bitwise channel mask in 4 bytes
+ */
 uint32_t
 sx1278_ieee_channel_mask(struct ieee802154_hw *hw)
 {
