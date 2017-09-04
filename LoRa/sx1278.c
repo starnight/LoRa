@@ -1554,6 +1554,7 @@ struct regmap_config sx1278_regmap_config = {
 	.volatile_reg = sx1278_reg_volatile,
 };
 
+/* The SPI probe callback function. */
 static int sx1278_spi_probe(struct spi_device *spi)
 {
 	struct ieee802154_hw *hw;
@@ -1599,6 +1600,7 @@ err_slave:
 	return err;
 }
 
+/* The SPI remove callback function. */
 static int sx1278_spi_remove(struct spi_device *spi)
 {
 	struct sx1278_phy *phy = spi_get_drvdata(spi);
