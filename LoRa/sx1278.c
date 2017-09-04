@@ -161,9 +161,7 @@ struct sx1278_phy {
 
 /**
  * sx127X_readVersion - Get LoRa device's chip version
- * @map:		the device as a regmap to communicate with
- * @vstr:	the buffer going to hold the chip's version string
- * @len:	the max length of the buffer
+ * @map:	the device as a regmap to communicate with
  *
  * Return:	Positive / negtive values for version code / failed
  * 		Version code:	bits 7-4 full version number,
@@ -187,7 +185,7 @@ sx127X_readVersion(struct regmap *map)
 
 /**
  * sx127X_getMode - Get LoRa device's mode register
- * @map:		the device as a regmap to communicate with
+ * @map:	the device as a regmap to communicate with
  *
  * Return:	LoRa device's register value
  */
@@ -203,8 +201,8 @@ sx127X_getMode(struct regmap *map)
 }
 
 /**
- * sx127X_getState - Set LoRa device's operating state
- * @map:		the device as a regmap to communicate with
+ * sx127X_setState - Set LoRa device's operating state
+ * @map:	the device as a regmap to communicate with
  * @st:		LoRa device's operating state going to be assigned
  */
 void
@@ -221,7 +219,7 @@ sx127X_setState(struct regmap *map, uint8_t st)
 
 /**
  * sx127X_getState - Get LoRa device's operating state
- * @map:		the device as a regmap to communicate with
+ * @map:	the device as a regmap to communicate with
  *
  * Return:	LoRa device's operating state
  */
@@ -236,8 +234,8 @@ sx127X_getState(struct regmap *map)
 }
 
 /**
- * sx127X_getLoRaFreq - Set RF frequency
- * @map:		the device as a regmap to communicate with
+ * sx127X_setLoRaFreq - Set RF frequency
+ * @map:	the device as a regmap to communicate with
  * @fr:		RF frequency going to be assigned in Hz
  */
 void
@@ -246,16 +244,16 @@ sx127X_setLoRaFreq(struct regmap *map, uint32_t fr)
 	uint64_t frt64;
 	uint32_t frt;
 	uint8_t buf[3];
-	int i;
+	uint8_t i;
 	uint32_t f_xosc;
 
 #ifdef CONFIG_OF
 	/* Set the LoRa module's crystal oscillator's clock if OF is defined. */
 	const void *ptr;
 
-	ptr = of_get_property((regmap_get_device(map))->of_node,
-			"clock-frequency",
-			NULL);
+	ptr = of_get_property((regmap_get_device(map))->of_node, \
+				"clock-frequency", \
+				NULL);
 	f_xosc = (ptr != NULL) ? be32_to_cpup(ptr) : F_XOSC;
 #else
 	f_xosc = F_XOSC;
@@ -275,7 +273,7 @@ sx127X_setLoRaFreq(struct regmap *map, uint32_t fr)
 
 /**
  * sx127X_getLoRaFreq - Get RF frequency
- * @map:		the device as a regmap to communicate with
+ * @map:	the device as a regmap to communicate with
  *
  * Return:	RF frequency in Hz
  */
@@ -284,8 +282,8 @@ sx127X_getLoRaFreq(struct regmap *map)
 {
 	uint64_t frt = 0;
 	uint8_t buf[3];
+	uint8_t i;
 	int status;
-	int i;
 	uint32_t fr;
 	uint32_t f_xosc;
 
@@ -315,7 +313,7 @@ sx127X_getLoRaFreq(struct regmap *map)
 
 /**
  * sx127X_setLoRaPower - Set RF output power
- * @map:		the device as a regmap to communicate with
+ * @map:	the device as a regmap to communicate with
  * @pout:	RF output power going to be assigned in dbm
  */
 void
@@ -351,7 +349,7 @@ sx127X_setLoRaPower(struct regmap *map, int32_t pout)
 
 /**
  * sx127X_getLoRaPower - Get RF output power
- * @map:		the device as a regmap to communicate with
+ * @map:	the device as a regmap to communicate with
  *
  * Return:	RF output power in dbm
  */
@@ -406,7 +404,7 @@ int8_t lna_gain[] = {
 
 /**
  * sx127X_setLoRaLNA - Set RF LNA gain
- * @map:		the device as a regmap to communicate with
+ * @map:	the device as a regmap to communicate with
  * @db:		RF LNA gain going to be assigned in db
  */
 void
@@ -428,7 +426,7 @@ sx127X_setLoRaLNA(struct regmap *map, int32_t db)
 
 /**
  * sx127X_getLoRaLNA - Get RF LNA gain
- * @map:		the device as a regmap to communicate with
+ * @map:	the device as a regmap to communicate with
  *
  * Return:	RF LNA gain db
  */
@@ -449,7 +447,7 @@ sx127X_getLoRaLNA(struct regmap *map)
 
 /**
  * sx127X_setLoRaLNAAGC - Set RF LNA go with auto gain control or manual
- * @map:		the device as a regmap to communicate with
+ * @map:	the device as a regmap to communicate with
  * @yesno:	1 / 0 for auto gain control / manual
  */
 void
@@ -464,7 +462,7 @@ sx127X_setLoRaLNAAGC(struct regmap *map, int32_t yesno)
 
 /**
  * sx127X_getLoRaAllFlag - Get all of the LoRa device's IRQ flags' current state
- * @map:		the device as a regmap to communicate with
+ * @map:	the device as a regmap to communicate with
  *
  * Return:	All of the LoRa device's IRQ flags' current state in a byte
  */
@@ -480,7 +478,7 @@ sx127X_getLoRaAllFlag(struct regmap *map)
 
 /**
  * sx127X_getLoRaAllFlag - Get interested LoRa device's IRQ flag's current state
- * @map:		the device as a regmap to communicate with
+ * @map:	the device as a regmap to communicate with
  * @f:		the interested LoRa device's IRQ flag
  *
  * Return:	The interested LoRa device's IRQ flag's current state in a byte
@@ -489,7 +487,7 @@ sx127X_getLoRaAllFlag(struct regmap *map)
 
 /**
  * sx127X_clearLoRaFlag - Clear designated LoRa device's IRQ flag
- * @map:		the device as a regmap to communicate with
+ * @map:	the device as a regmap to communicate with
  * @f:		flags going to be cleared
  */
 void
@@ -506,13 +504,13 @@ sx127X_clearLoRaFlag(struct regmap *map, uint8_t f)
 
 /**
  * sx127X_clearLoRaAllFlag - Clear designated LoRa device's all IRQ flags
- * @map:		the device as a regmap to communicate with
+ * @map:	the device as a regmap to communicate with
  */
 #define sx127X_clearLoRaAllFlag(spi)	sx127X_clearLoRaFlag(spi, 0xFF)
 
 /**
- * sx127X_getLoRaSPRFactor - Get the RF modulation's spreading factor
- * @map:		the device as a regmap to communicate with
+ * sx127X_setLoRaSPRFactor - Set the RF modulation's spreading factor
+ * @map:	the device as a regmap to communicate with
  * @c_s:	Spreading factor in chips / symbol
  */
 void
@@ -533,7 +531,7 @@ sx127X_setLoRaSPRFactor(struct regmap *map, uint32_t c_s)
 
 /**
  * sx127X_getLoRaSPRFactor - Get the RF modulation's spreading factor
- * @map:		the device as a regmap to communicate with
+ * @map:	the device as a regmap to communicate with
  *
  * Return:	Spreading factor in chips / symbol
  */
@@ -564,8 +562,8 @@ const uint32_t hz[] = {
 };
 
 /**
- * sx127X_getLoRaBW - Set RF bandwidth
- * @map:		the device as a regmap to communicate with
+ * sx127X_setLoRaBW - Set RF bandwidth
+ * @map:	the device as a regmap to communicate with
  * @bw:		RF bandwidth going to be assigned in Hz
  */
 void
@@ -586,7 +584,7 @@ sx127X_setLoRaBW(struct regmap *map, uint32_t bw)
 
 /**
  * sx127X_getLoRaBW - Get RF bandwidth
- * @map:		the device as a regmap to communicate with
+ * @map:	the device as a regmap to communicate with
  *
  * Return:	RF bandwidth in Hz
  */
@@ -603,8 +601,8 @@ sx127X_getLoRaBW(struct regmap *map)
 }
 
 /**
- * sx127X_setLoRaCR  - Get LoRa package's coding rate
- * @map:		the device as a regmap to communicate with
+ * sx127X_setLoRaCR  - Set LoRa package's coding rate
+ * @map:	the device as a regmap to communicate with
  * @cr:		Coding rate going to be assigned in a byte
  * 		high 4 bits / low 4 bits: numerator / denominator
  */
@@ -620,7 +618,7 @@ sx127X_setLoRaCR(struct regmap *map, uint8_t cr)
 
 /**
  * sx127X_getLoRaCR - Get LoRa package's coding rate
- * @map:		the device as a regmap to communicate with
+ * @map:	the device as a regmap to communicate with
  *
  * Return:	Coding rate in a byte
  * 		high 4 bits / low 4 bits: numerator / denominator
@@ -639,7 +637,7 @@ sx127X_getLoRaCR(struct regmap *map)
 
 /**
  * sx127X_setLoRaImplicit - Set LoRa packages in Explicit / Implicit Header Mode
- * @map:		the device as a regmap to communicate with
+ * @map:	the device as a regmap to communicate with
  * @yesno:	1 / 0 for Implicit Header Mode / Explicit Header Mode
  */
 void
@@ -653,8 +651,8 @@ sx127X_setLoRaImplicit(struct regmap *map, uint8_t yesno)
 }
 
 /**
- * sx127X_setLoRaRXByteTimeout - Get RX operation time-out in terms of symbols
- * @map:		the device as a regmap to communicate with
+ * sx127X_setLoRaRXByteTimeout - Set RX operation time-out in terms of symbols
+ * @map:	the device as a regmap to communicate with
  * @n:		Time-out in terms of symbols (bytes) going to be assigned
  */
 void
@@ -681,7 +679,7 @@ sx127X_setLoRaRXByteTimeout(struct regmap *map, uint32_t n)
 
 /**
  * sx127X_setLoRaRXTimeout - Set RX operation time-out seconds
- * @map:		the device as a regmap to communicate with
+ * @map:	the device as a regmap to communicate with
  * @ms:		The RX time-out time in ms
  */
 void
@@ -696,7 +694,7 @@ sx127X_setLoRaRXTimeout(struct regmap *map, uint32_t ms)
 
 /**
  * sx127X_getLoRaRXByteTimeout - Get RX operation time-out in terms of symbols
- * @map:		the device as a regmap to communicate with
+ * @map:	the device as a regmap to communicate with
  *
  * Return:	Time-out in terms of symbols (bytes)
  */
@@ -715,7 +713,7 @@ sx127X_getLoRaRXByteTimeout(struct regmap *map)
 
 /**
  * sx127X_getLoRaRXTimeout - Get RX operation time-out seconds
- * @map:		the device as a regmap to communicate with
+ * @map:	the device as a regmap to communicate with
  *
  * Return:	The RX time-out time in ms
  */
@@ -732,7 +730,7 @@ sx127X_getLoRaRXTimeout(struct regmap *map)
 
 /**
  * sx127X_setLoRaMaxRXBuff - Maximum payload length in LoRa packet
- * @map:		the device as a regmap to communicate with
+ * @map:	the device as a regmap to communicate with
  * @len:	the max payload length going to be assigned in bytes
  */
 void
@@ -743,7 +741,7 @@ sx127X_setLoRaMaxRXBuff(struct regmap *map, uint8_t len)
 
 /**
  * sx127X_getLoRaLastPacketPayloadLen - Get the RX last packet payload length
- * @map:		the device as a regmap to communicate with
+ * @map:	the device as a regmap to communicate with
  *
  * Return:	the actual RX last packet payload length in bytes
  */
@@ -758,8 +756,8 @@ sx127X_getLoRaLastPacketPayloadLen(struct regmap *map)
 }
 
 /**
- * sx127X_readLoRaData - Read data from LoRa device (RX)
- * @map:		the device as a regmap to communicate with
+ * sx127X_readLoRaData - Read data from LoRa device (read RX FIFO)
+ * @map:	the device as a regmap to communicate with
  * @buf:	buffer going to be read data into
  * @len:	the length of the data going to be read in bytes
  *
@@ -772,12 +770,12 @@ sx127X_readLoRaData(struct regmap *map, uint8_t *buf, size_t len)
 	uint8_t start_adr;
 	int ret;
 
-	/* Get the chip RX FIFO last packet address. */
-	start_adr = SX127X_FIFO_RX_BASE_ADDRESS;
 	/* Set chip FIFO pointer to FIFO last packet address. */
+	start_adr = SX127X_FIFO_RX_BASE_ADDRESS;
 	regmap_raw_write(map, SX127X_REG_FIFO_ADDR_PTR, &start_adr, 1);
 
 	/* Read LoRa packet payload. */
+	len = (len <= IEEE802154_MTU) ? len : IEEE802154_MTU;
 	ret = regmap_raw_read(map, SX127X_REG_FIFO, buf, len);
 
 	dev_dbg(regmap_get_device(map),
@@ -786,17 +784,26 @@ sx127X_readLoRaData(struct regmap *map, uint8_t *buf, size_t len)
 	return (ret >= 0) ? len : ret;
 }
 
+/**
+ * sx127X_sendLoRaData - Send data through LoRa device (write TX FIFO)
+ * @rm:		the device as a regmap to communicate with
+ * @buf:	buffer going to be send
+ * @len:	the length of the buffer in bytes
+ *
+ * Return:	the actual length written into the LoRa device in bytes
+ */
 size_t
 sx127X_sendLoRaData(struct regmap *map, uint8_t *buf, size_t len)
 {
-	uint8_t base_adr = SX127X_FIFO_TX_BASE_ADDRESS;
+	uint8_t base_adr;
 	uint8_t blen;
 
 	/* Set chip FIFO pointer to FIFO TX base. */
+	base_adr = SX127X_FIFO_TX_BASE_ADDRESS;
 	regmap_raw_write(map, SX127X_REG_FIFO_ADDR_PTR, &base_adr, 1);
 
 	/* Write payload synchronously to fill the FIFO of the chip. */
-	blen = (len < IEEE802154_MTU) ? len : IEEE802154_MTU;
+	blen = (len <= IEEE802154_MTU) ? len : IEEE802154_MTU;
 	regmap_raw_write(map, SX127X_REG_FIFO, buf, blen);
 
 	/* Set the FIFO payload length. */
@@ -807,7 +814,7 @@ sx127X_sendLoRaData(struct regmap *map, uint8_t *buf, size_t len)
 
 /**
  * sx127X_getLoRaLastPacketSNR - Get last LoRa packet's SNR
- * @map:		the device as a regmap to communicate with
+ * @map:	the device as a regmap to communicate with
  *
  * Return:	the last LoRa packet's SNR in db
  */
@@ -825,7 +832,7 @@ sx127X_getLoRaLastPacketSNR(struct regmap *map)
 
 /**
  * sx127X_getLoRaLastPacketRSSI - Get last LoRa packet's SNR
- * @map:		the device as a regmap to communicate with
+ * @map:	the device as a regmap to communicate with
  *
  * Return:	the last LoRa packet's RSSI in dbm
  */
@@ -853,7 +860,7 @@ sx127X_getLoRaLastPacketRSSI(struct regmap *map)
 
 /**
  * sx127X_getLoRaRSSI - Get current RSSI value
- * @map:		the device as a regmap to communicate with
+ * @map:	the device as a regmap to communicate with
  *
  * Return:	the current RSSI in dbm
  */
@@ -875,7 +882,7 @@ sx127X_getLoRaRSSI(struct regmap *map)
 
 /**
  * sx127X_setLoRaPreambleLen - Set LoRa preamble length
- * @map:		the device as a regmap to communicate with
+ * @map:	the device as a regmap to communicate with
  * @len:	the preamble length going to be assigned
  */
 void
@@ -891,7 +898,7 @@ sx127X_setLoRaPreambleLen(struct regmap *map, uint32_t len)
 
 /**
  * sx127X_getLoRaPreambleLen - Get LoRa preamble length
- * @map:		the device as a regmap to communicate with
+ * @map:	the device as a regmap to communicate with
  *
  * Return:	length of the LoRa preamble
  */
@@ -909,7 +916,7 @@ sx127X_getLoRaPreambleLen(struct regmap *map)
 
 /**
  * sx127X_setLoRaCRC - Enable CRC generation and check on received payload
- * @map:		the device as a regmap to communicate with
+ * @map:	the device as a regmap to communicate with
  * @yesno:	1 / 0 for check / not check
  */
 void
@@ -924,7 +931,7 @@ sx127X_setLoRaCRC(struct regmap *map, uint8_t yesno)
 
 /**
  * sx127X_setBoost - Set RF power amplifier boost in normal output range
- * @map:		the device as a regmap to communicate with
+ * @map:	the device as a regmap to communicate with
  * @yesno:	1 / 0 for boost / not boost
  */
 void
@@ -939,7 +946,7 @@ sx127X_setBoost(struct regmap *map, uint8_t yesno)
 
 /**
  * sx127X_startLoRaMode - Start the device and set it in LoRa mode
- * @map:		the device as a regmap to communicate with
+ * @map:	the device as a regmap to communicate with
  */
 void
 sx127X_startLoRaMode(struct regmap *map)
@@ -988,7 +995,7 @@ sx127X_startLoRaMode(struct regmap *map)
 
 /**
  * init_sx127X - Initial the SX127X device
- * @map:		the device as a regmap to communicate with
+ * @map:	the device as a regmap to communicate with
  *
  * Return:	0 / negtive values for success / failed
  */
@@ -1320,6 +1327,10 @@ sx1278_set_promiscuous_mode(struct ieee802154_hw *hw, const bool on)
 	return 0;
 }
 
+/**
+ * sx1278_timer_irqwork - The actual work which checks the IRQ flags of the chip
+ * @work:	the work entry listed in the workqueue
+ */
 static void
 sx1278_timer_irqwork(struct work_struct *work)
 {
@@ -1377,6 +1388,10 @@ sx1278_timer_irqwork(struct work_struct *work)
 	return;
 }
 
+/**
+ * sx1278_timer_isr - Callback function for the timer interrupt
+ * @arg:	the general argument for this callback function
+ */
 static void
 sx1278_timer_isr(unsigned long arg)
 {
@@ -1468,6 +1483,8 @@ sx1278_ieee_del(struct sx1278_phy *phy)
 	ieee802154_free_hw(phy->hw);
 }
 
+/*--------------------------- SX1278 SPI Functions ---------------------------*/
+
 /* The compatible chip array. */
 #ifdef CONFIG_OF
 static const struct of_device_id sx1278_dt_ids[] = {
@@ -1516,7 +1533,7 @@ static const struct spi_device_id spi_ids[] = {
 };
 MODULE_DEVICE_TABLE(spi, spi_ids);
 
-bool sx127X_reg_volatile(struct device *dev, unsigned int reg)
+bool sx1278_reg_volatile(struct device *dev, unsigned int reg)
 {
 	return true;
 }
@@ -1528,7 +1545,7 @@ struct regmap_config sx1278_regmap_config = {
 	.max_register = SX127X_MAX_REG,
 	.read_flag_mask = 0x00,
 	.write_flag_mask = 0x80,
-	.volatile_reg = sx127X_reg_volatile,
+	.volatile_reg = sx1278_reg_volatile,
 };
 
 static int sx1278_spi_probe(struct spi_device *spi)
