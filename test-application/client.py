@@ -5,12 +5,6 @@ import socket
 
 MES_PORT = 8000
 
-class Message:
-    '''Message class.'''
-    def __init__(self):
-        self._Len = 0
-        self._Buf = None
-
 def fetch_ipv6_address(host, port):
     '''Get designated IPv6 and Port socket address.'''
     if not socket.has_ipv6:
@@ -41,9 +35,6 @@ if __name__ == "__main__":
         dst_port=MES_PORT
         data = "test string"
 
-    req = Message()
-    res = Message()
-
     # Connect to destination server with specific source IPv6.
     conn = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
     if 'src_addr' in locals():
@@ -52,19 +43,14 @@ if __name__ == "__main__":
     dst_sockaddr = fetch_ipv6_address(dst_addr, dst_port)
 
     # Prepare the request buffer going to be sent.
-    req._Len = len(data)
-    if req._Len > 255:
-        req._Len = 255
-    req._Buf = str.encode(data)[0:req._Len]
+    data = str.encode(data)
 
     # Send the request to the server.
-    print("Send {} with in {} bytes".format(req._Buf, req._Len))
-    conn.sendto(bytes([req._Len]) + req._Buf, dst_sockaddr)
+    print("Send {} with in {} bytes".format(data, len(data)))
+    conn.sendto(data, dst_sockaddr)
 
     # Read and parse the response from the server.
     data, addr = conn.recvfrom(1024)
-    res._Len = int.from_bytes([data[0]], byteorder='big')
-    res._Buf = data[1:res._Len + 1]#conn.recvfrom(res._Len)
-    print("Read {} with in {} bytes".format(res._Buf, res._Len))
+    print("Read {} with in {} bytes".format(data, len(data)))
 
     conn.close()
