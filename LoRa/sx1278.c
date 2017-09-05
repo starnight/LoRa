@@ -1204,7 +1204,7 @@ sx1278_ieee_rx_complete(struct ieee802154_hw *hw)
 	rssi = (rssi > 0) ? 0 : rssi;
 	lqi = ((int32_t)255 * (rssi + range) / range) % 255;
 
-	ieee802154_rx_irqsafe(hw, skb, 0xcc);
+	ieee802154_rx_irqsafe(hw, skb, lqi);
 
 	spin_lock(&phy->buf_lock);
 	phy->is_busy = false;
