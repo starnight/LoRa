@@ -1361,7 +1361,7 @@ sx1278_timer_irqwork(struct work_struct *work)
 	if (flags & SX127X_FLAG_TXDONE) {
 		sx1278_ieee_tx_complete(phy->hw);
 		sx127X_clearLoRaFlag(phy->map, SX127X_FLAG_TXDONE);
-		phy->tx_delay = 2;
+		phy->tx_delay = 10;
 		do_next_rx = true;
 	}
 
@@ -1381,7 +1381,7 @@ sx1278_timer_irqwork(struct work_struct *work)
 	}
 
 	if (!phy->suspended) {
-		phy->timer.expires = jiffies + HZ * 20 / 1000;
+		phy->timer.expires = jiffies_64 + 1;
 		add_timer(&(phy->timer));
 	}
 
@@ -1458,7 +1458,7 @@ sx1278_ieee_add_one(struct sx1278_phy *phy)
 	INIT_WORK(&(phy->irqwork), sx1278_timer_irqwork);
 
 	init_timer(&(phy->timer));
-	phy->timer.expires = jiffies + HZ;
+	phy->timer.expires = jiffies_64 + HZ;
 	phy->timer.function = sx1278_timer_isr;
 	phy->timer.data = (unsigned long)phy;
 
