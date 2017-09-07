@@ -778,9 +778,6 @@ sx127X_readLoRaData(struct regmap *map, uint8_t *buf, size_t len)
 	len = (len <= IEEE802154_MTU) ? len : IEEE802154_MTU;
 	ret = regmap_raw_read(map, SX127X_REG_FIFO, buf, len);
 
-	dev_dbg(regmap_get_device(map),
-		"read %zu bytes from 0x%u with ret=%d\n", len, start_adr, ret);
-
 	return (ret >= 0) ? len : ret;
 }
 
@@ -957,8 +954,8 @@ sx127X_startLoRaMode(struct regmap *map)
 	/* Get original OP Mode register. */
 	op_mode = sx127X_getMode(map);
 	dev_dbg(regmap_get_device(map),
-		"the original OP mode is 0x%X\n",
-		op_mode);
+		"the original OP mode is 0x%X\n", op_mode);
+
 	/* Set device to sleep state. */
 	sx127X_setState(map, SX127X_SLEEP_MODE);
 	/* Set device to LoRa mode. */
@@ -969,19 +966,16 @@ sx127X_startLoRaMode(struct regmap *map)
 	sx127X_setState(map, SX127X_STANDBY_MODE);
 	op_mode = sx127X_getMode(map);
 	dev_dbg(regmap_get_device(map),
-		"the current OP mode is 0x%X\n",
-		op_mode);
+		"the current OP mode is 0x%X\n", op_mode);
 
 	/* Set LoRa in explicit header mode. */
 	sx127X_setLoRaImplicit(map, 0);
 
 	/* Set chip FIFO RX base. */
 	base_adr = SX127X_FIFO_RX_BASE_ADDRESS;
-	dev_dbg(regmap_get_device(map), "going to set RX base address\n");
 	regmap_raw_write(map, SX127X_REG_FIFO_RX_BASE_ADDR, &base_adr, 1);
 	/* Set chip FIFO TX base. */
 	base_adr = SX127X_FIFO_TX_BASE_ADDRESS;
-	dev_dbg(regmap_get_device(map), "going to set TX base address\n");
 	regmap_raw_write(map, SX127X_REG_FIFO_TX_BASE_ADDR, &base_adr, 1);
 
 	sx127X_setLoRaRXTimeout(map, 1000);
@@ -1038,6 +1032,8 @@ sx1278_ieee_ed(struct ieee802154_hw *hw, u8 *level)
 	struct sx1278_phy *phy = hw->priv;
 	int32_t rssi;
 	int32_t range = SX127X_IEEE_ENERGY_RANGE - 10;
+
+	dev_dbg(regmap_get_device(phy->map), "%s\n", __func__);
 
 	/* ED: IEEE  802.15.4-2011 8.2.5 Recevier ED. */
 	rssi = sx127X_getLoRaRSSI(phy->map);
@@ -1120,6 +1116,9 @@ sx1278_ieee_set_channel(struct ieee802154_hw *hw, u8 page, u8 channel)
 	uint32_t fr;
 	int8_t d;
 
+	dev_dbg(regmap_get_device(phy->map),
+		"%s channel: %u", __func__, channel);
+
 	sx1278_ieee_get_rf_config(hw, &rf);
 
 	if (channel < rf.ch_min)
@@ -1146,6 +1145,9 @@ sx1278_ieee_set_txpower(struct ieee802154_hw *hw, s32 mbm)
 	struct sx1278_phy *phy = hw->priv;
 	int32_t dbm = sx127X_mbm2dbm(mbm);
 
+	dev_dbg(regmap_get_device(phy->map),
+		"%s TX power: %d mbm", __func__, mbm);
+
 	sx127X_setLoRaPower(phy->map, dbm);
 
 	return 0;
@@ -1156,6 +1158,8 @@ sx1278_ieee_rx(struct ieee802154_hw *hw)
 {
 	struct sx1278_phy *phy = hw->priv;
 	bool do_rx;
+
+	dev_dbg(regmap_get_device(phy->map), "%s\n", __func__);
 
 	spin_lock(&(phy->buf_lock));
 	if (!phy->is_busy) {
@@ -1187,7 +1191,6 @@ sx1278_ieee_rx_complete(struct ieee802154_hw *hw)
 	int32_t range = SX127X_IEEE_ENERGY_RANGE;
 	int err;
 
-	dev_dbg(hw->parent, "%s\n", __func__);
 	skb = dev_alloc_skb(IEEE802154_MTU);
 	if (!skb) {
 		dev_err(regmap_get_device(phy->map),
@@ -1212,10 +1215,7 @@ sx1278_ieee_rx_complete(struct ieee802154_hw *hw)
 
 	dev_dbg(regmap_get_device(phy->map),
 		"%s: len=%u LQI=%u\n", __func__, len, lqi);
-#ifdef DEBUG
-	print_hex_dump(KERN_DEBUG, "sx1278 rx: ", DUMP_PREFIX_OFFSET, 16, 1, \
-						skb->data, skb->len, 0);
-#endif
+
 	return 0;
 
 sx1278_ieee_rx_err:
@@ -1228,6 +1228,9 @@ sx1278_ieee_tx(struct ieee802154_hw *hw)
 	struct sx1278_phy *phy = hw->priv;
 	struct sk_buff *tx_buf = phy->tx_buf;
 	bool do_tx = false;
+
+	dev_dbg(regmap_get_device(phy->map),
+		"%s: len=%u\n", __func__, tx_buf->len);
 
 	if (!phy->post_tx_done) {
 		sx127X_sendLoRaData(phy->map, tx_buf->data, tx_buf->len);
@@ -1259,13 +1262,9 @@ sx1278_ieee_tx_complete(struct ieee802154_hw *hw)
 	struct sx1278_phy *phy = hw->priv;
 	struct sk_buff *skb = phy->tx_buf;
 
-	ieee802154_xmit_complete(hw, skb, false);
+	dev_dbg(regmap_get_device(phy->map), "%s\n", __func__);
 
-#ifdef DEBUG
-	print_hex_dump(KERN_DEBUG, "sx1278 tx: ", \
-			DUMP_PREFIX_OFFSET, 16, 1, \
-			phy->tx_buf->data, phy->tx_buf->len, 0);
-#endif
+	ieee802154_xmit_complete(hw, skb, false);
 
 	spin_lock(&(phy->buf_lock));
 	phy->is_busy = false;
@@ -1280,6 +1279,8 @@ sx1278_ieee_xmit(struct ieee802154_hw *hw, struct sk_buff *skb)
 {
 	struct sx1278_phy *phy = hw->priv;
 	int ret;
+
+	dev_dbg(regmap_get_device(phy->map), "%s\n", __func__);
 
 	WARN_ON(phy->suspended);
 
@@ -1303,6 +1304,8 @@ sx1278_ieee_start(struct ieee802154_hw *hw)
 {
 	struct sx1278_phy *phy = hw->priv;
 
+	dev_dbg(regmap_get_device(phy->map), "interface up\n");
+
 	phy->suspended = false;
 	sx127X_startLoRaMode(phy->map);
 	phy->opmode = sx127X_getMode(phy->map);
@@ -1315,6 +1318,8 @@ static void
 sx1278_ieee_stop(struct ieee802154_hw *hw)
 {
 	struct sx1278_phy *phy = hw->priv;
+
+	dev_dbg(regmap_get_device(phy->map), "interface down\n");
 
 	phy->suspended = true;
 	del_timer(&(phy->timer));
@@ -1573,7 +1578,7 @@ static int sx1278_spi_probe(struct spi_device *spi)
 
 	hw = ieee802154_alloc_hw(sizeof(*phy), &sx1278_ops);
 	if (!hw) {
-		dev_dbg(&(spi->dev), "not enough memory\n");
+		dev_err(&(spi->dev), "not enough memory\n");
 		return -ENOMEM;
 	}
 
@@ -1588,14 +1593,14 @@ static int sx1278_spi_probe(struct spi_device *spi)
 	err = sx1278_ieee_add_one(phy);
 	if (err < 0) {
 		dev_err(&(spi->dev), "no SX1278 compatible device\n");
-		goto err_slave;
+		goto sx1278_spi_probe_err;
 	}
 
 	dev_info(&(spi->dev), "add an IEEE 802.15.4 over LoRa SX1278 device\n");
 
 	return 0;
 
-err_slave:
+sx1278_spi_probe_err:
 	sx1278_ieee_del(phy);
 	return err;
 }
