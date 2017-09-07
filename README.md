@@ -5,7 +5,7 @@ This is a LoRa device driver as a Linux kernel module with IEEE 802.15.4 MAC int
 * Semtech SX1276/77/78/79
 
 ## Folders
-* LoRa: The general LoRa header and source files and the LoRa over SPI device driver.
+* LoRa: The LoRa header source and build files.
 * dts-overlay: The device tree overlayers with the boards and operating systems.
 * test-application: The user space applications for testing or demo.
 
