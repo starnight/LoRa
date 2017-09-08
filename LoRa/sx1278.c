@@ -1021,23 +1021,27 @@ init_sx127X(struct regmap *map)
 /*---------------------- SX1278 IEEE 802.15.4 Functions ----------------------*/
 
 /* LoRa device's sensitivity in dbm. */
-#ifndef SX127X_IEEE_SENSITIVITY
-#define SX127X_IEEE_SENSITIVITY	(-148)
+#ifndef SX1278_IEEE_SENSITIVITY
+#define SX1278_IEEE_SENSITIVITY	(-148)
 #endif
-#define SX127X_IEEE_ENERGY_RANGE	(-SX127X_IEEE_SENSITIVITY)
+static int32_t sensitivity = SX1278_IEEE_SENSITIVITY;
+module_param(sensitivity, int, 0);
+MODULE_PARM_DESC(sensitivity, "RF receiver's sensitivity");
+
+#define SX1278_IEEE_ENERGY_RANGE	(-sensitivity)
 
 static int
 sx1278_ieee_ed(struct ieee802154_hw *hw, u8 *level)
 {
 	struct sx1278_phy *phy = hw->priv;
 	int32_t rssi;
-	int32_t range = SX127X_IEEE_ENERGY_RANGE - 10;
+	int32_t range = SX1278_IEEE_ENERGY_RANGE - 10;
 
 	dev_dbg(regmap_get_device(phy->map), "%s\n", __func__);
 
 	/* ED: IEEE  802.15.4-2011 8.2.5 Recevier ED. */
 	rssi = sx127X_getLoRaRSSI(phy->map);
-	if (rssi < (SX127X_IEEE_SENSITIVITY + 10))
+	if (rssi < (sensitivity + 10))
 		*level = 0;
 	else if (rssi >= 0)
 		*level = 255;
@@ -1047,22 +1051,37 @@ sx1278_ieee_ed(struct ieee802154_hw *hw, u8 *level)
 	return 0;
 }
 
-#ifndef	SX127X_IEEE_CHANNEL_MIN
-#define	SX127X_IEEE_CHANNEL_MIN		11
+#ifndef SX1278_IEEE_CHANNEL_MIN
+#define SX1278_IEEE_CHANNEL_MIN		11
 #endif
-#ifndef	SX127X_IEEE_CHANNEL_MAX
-#define	SX127X_IEEE_CHANNEL_MAX		11
+static uint8_t channel_min = SX1278_IEEE_CHANNEL_MIN;
+module_param(channel_min, byte, 0);
+MODULE_PARM_DESC(channel_min, "Minimal channel number");
+
+#ifndef SX1278_IEEE_CHANNEL_MAX
+#define SX1278_IEEE_CHANNEL_MAX		11
 #endif
-#ifndef SX127X_IEEE_CENTER_CARRIER_FRQ
-#define SX127X_IEEE_CENTER_CARRIER_FRQ	434000000
+static uint8_t channel_max = SX1278_IEEE_CHANNEL_MAX;
+module_param(channel_max, byte, 0);
+MODULE_PARM_DESC(channel_max, "Maximum channel number");
+
+#ifndef SX1278_IEEE_CENTER_CARRIER_FRQ
+#define SX1278_IEEE_CENTER_CARRIER_FRQ	434000000
 #endif
-#ifndef SX127X_IEEE_BANDWIDTH
-#define	SX127X_IEEE_BANDWIDTH		500000
+static uint32_t carrier_frq = SX1278_IEEE_CENTER_CARRIER_FRQ;
+module_param(carrier_frq, uint, 0);
+MODULE_PARM_DESC(carrier_frq, "Center carrier frequency in Hz");
+
+#ifndef SX1278_IEEE_BANDWIDTH
+#define SX1278_IEEE_BANDWIDTH		500000
 #endif
+static uint32_t bandwidth = SX1278_IEEE_BANDWIDTH;
+module_param(bandwidth, uint, 0);
+MODULE_PARM_DESC(bandwidth, "Bandwidth in Hz");
 
 struct rf_frq {
 	uint32_t carrier;
-	uint32_t bandwidth;
+	uint32_t bw;
 	uint8_t ch_min;
 	uint8_t ch_max;
 };
@@ -1075,36 +1094,32 @@ sx1278_ieee_get_rf_config(struct ieee802154_hw *hw, struct rf_frq *rf)
 	const void *ptr;
 
 	/* Set the LoRa chip's center carrier frequency. */
-	ptr = of_get_property((regmap_get_device(phy->map))->of_node, \
-				"center-carrier-frq", \
+	ptr = of_get_property((regmap_get_device(phy->map))->of_node,
+				"center-carrier-frq",
 				NULL);
-	rf->carrier = (ptr != NULL) ? \
-			be32_to_cpup(ptr) : SX127X_IEEE_CENTER_CARRIER_FRQ;
+	rf->carrier = (ptr != NULL) ? be32_to_cpup(ptr) : carrier_frq;
 
 	/* Set the LoRa chip's RF bandwidth. */
-	ptr = of_get_property((regmap_get_device(phy->map))->of_node, \
-				"rf-bandwidth", \
+	ptr = of_get_property((regmap_get_device(phy->map))->of_node,
+				"rf-bandwidth",
 				NULL);
-	rf->bandwidth = (ptr != NULL) ? \
-			be32_to_cpup(ptr) : SX127X_IEEE_BANDWIDTH;
+	rf->bw = (ptr != NULL) ? be32_to_cpup(ptr) : bandwidth;
 
 	/* Set the LoRa chip's min & max RF channel if OF is defined. */
-	ptr = of_get_property((regmap_get_device(phy->map))->of_node, \
-				"minimal-RF-channel", \
+	ptr = of_get_property((regmap_get_device(phy->map))->of_node,
+				"minimal-RF-channel",
 				NULL);
-	rf->ch_min = (ptr != NULL) ? \
-			be32_to_cpup(ptr) : SX127X_IEEE_CHANNEL_MIN;
+	rf->ch_min = (ptr != NULL) ? be32_to_cpup(ptr) : channel_min;
 
-	ptr = of_get_property((regmap_get_device(phy->map))->of_node, \
-				"maximum-RF-channel", \
+	ptr = of_get_property((regmap_get_device(phy->map))->of_node,
+				"maximum-RF-channel",
 				NULL);
-	rf->ch_max = (ptr != NULL) ? \
-			be32_to_cpup(ptr) : SX127X_IEEE_CHANNEL_MAX;
+	rf->ch_max = (ptr != NULL) ? be32_to_cpup(ptr) : channel_max;
 #else
-	rf->carrier = SX127X_IEEE_CENTER_CARRIER_FRQ;
-	rf->bandwidth = SX127X_IEEE_BANDWIDTH;
-	rf->ch_min = SX127X_IEEE_CHANNEL_MIN;
-	rf->ch_max = SX127X_IEEE_CHANNEL_MAX;
+	rf->carrier = carrier_frq;
+	rf->bw = bandwidth;
+	rf->ch_min = channel_min;
+	rf->ch_max = channel_max;
 #endif
 }
 
@@ -1127,7 +1142,7 @@ sx1278_ieee_set_channel(struct ieee802154_hw *hw, u8 page, u8 channel)
 		channel = rf.ch_max;
 
 	d = channel - (rf.ch_min + rf.ch_max) / 2;
-	fr = rf.carrier + d * rf.bandwidth;
+	fr = rf.carrier + d * rf.bw;
 
 	sx127X_setLoRaFreq(phy->map, fr);
 
@@ -1188,7 +1203,7 @@ sx1278_ieee_rx_complete(struct ieee802154_hw *hw)
 	uint8_t len;
 	uint8_t lqi;
 	int32_t rssi;
-	int32_t range = SX127X_IEEE_ENERGY_RANGE;
+	int32_t range = SX1278_IEEE_ENERGY_RANGE;
 	int err;
 
 	skb = dev_alloc_skb(IEEE802154_MTU);
