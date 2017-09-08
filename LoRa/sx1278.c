@@ -51,6 +51,10 @@
 #ifndef F_XOSC
 #define F_XOSC		32000000
 #endif
+static uint32_t xosc_frq = F_XOSC;
+module_param(xosc_frq, uint, 0);
+MODULE_PARM_DESC(xosc_frq, "Crystal oscillator frequency of the LoRa chip");
+
 #define	__POW_2_19	0x80000
 
 /* SX127X Registers addresses */
@@ -254,9 +258,9 @@ sx127X_setLoRaFreq(struct regmap *map, uint32_t fr)
 	ptr = of_get_property((regmap_get_device(map))->of_node, \
 				"clock-frequency", \
 				NULL);
-	f_xosc = (ptr != NULL) ? be32_to_cpup(ptr) : F_XOSC;
+	f_xosc = (ptr != NULL) ? be32_to_cpup(ptr) : xosc_frq;
 #else
-	f_xosc = F_XOSC;
+	f_xosc = xosc_frq;
 #endif
 
 	frt64 = (uint64_t)fr * (uint64_t)__POW_2_19;
@@ -294,9 +298,9 @@ sx127X_getLoRaFreq(struct regmap *map)
 	ptr = of_get_property((regmap_get_device(map))->of_node,
 			"clock-frequency",
 			NULL);
-	f_xosc = (ptr != NULL) ? be32_to_cpup(ptr) : F_XOSC;
+	f_xosc = (ptr != NULL) ? be32_to_cpup(ptr) : xosc_frq;
 #else
-	f_xosc = F_XOSC;
+	f_xosc = xosc_frq;
 #endif
 
 	status = regmap_raw_read(map, SX127X_REG_FRF_MSB, buf, 3);
