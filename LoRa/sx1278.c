@@ -1638,5 +1638,5 @@ static struct spi_driver sx1278_spi_driver = {
 module_spi_driver(sx1278_spi_driver);
 
 MODULE_AUTHOR("Jian-Hong Pan, <starnight@g.ncu.edu.tw>");
-MODULE_DESCRIPTION("LoRa device SX1278 driver with SPI interface");
+MODULE_DESCRIPTION("LoRa device SX1278 driver with IEEE 802.15.4 interface");
 MODULE_LICENSE("Dual BSD/GPL");
