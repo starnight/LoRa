@@ -1348,24 +1348,19 @@ sx1278_ieee_stop(struct ieee802154_hw *hw)
 }
 
 static int
-sx1278_set_promiscuous_mode(struct ieee802154_hw *hw, const bool on)
+sx1278_ieee_set_promiscuous_mode(struct ieee802154_hw *hw, const bool on)
 {
 	return 0;
 }
 
-/**
- * sx1278_timer_irqwork - The actual work which checks the IRQ flags of the chip
- * @work:	the work entry listed in the workqueue
- */
-static void
-sx1278_timer_irqwork(struct work_struct *work)
+void
+sx1278_ieee_statemachine(struct ieee802154_hw *hw)
 {
-	struct sx1278_phy *phy;
+	struct sx1278_phy *phy = hw->priv;
 	u8 flags;
 	u8 state;
 	bool do_next_rx = false;
 
-	phy = container_of(work, struct sx1278_phy, irqwork);
 	flags = sx127X_getLoRaAllFlag(phy->map);
 	state = sx127X_getState(phy->map);
 
@@ -1415,6 +1410,19 @@ sx1278_timer_irqwork(struct work_struct *work)
 }
 
 /**
+ * sx1278_timer_irqwork - The actual work which checks the IRQ flags of the chip
+ * @work:	the work entry listed in the workqueue
+ */
+static void
+sx1278_timer_irqwork(struct work_struct *work)
+{
+	struct sx1278_phy *phy;
+
+	phy = container_of(work, struct sx1278_phy, irqwork);
+	sx1278_ieee_statemachine(phy->hw);
+}
+
+/**
  * sx1278_timer_isr - Callback function for the timer interrupt
  * @arg:	the general argument for this callback function
  */
@@ -1434,7 +1442,7 @@ static const struct ieee802154_ops sx1278_ops = {
 	.set_txpower = sx1278_ieee_set_txpower,
 	.start = sx1278_ieee_start,
 	.stop = sx1278_ieee_stop,
-	.set_promiscuous_mode = sx1278_set_promiscuous_mode,
+	.set_promiscuous_mode = sx1278_ieee_set_promiscuous_mode,
 };
 
 /**
@@ -1617,7 +1625,8 @@ static int sx1278_spi_probe(struct spi_device *spi)
 		goto sx1278_spi_probe_err;
 	}
 
-	dev_info(&(spi->dev), "add an IEEE 802.15.4 over LoRa SX1278 device\n");
+	dev_info(&(spi->dev),
+		"add an IEEE 802.15.4 over LoRa SX1278 compatible device\n");
 
 	return 0;
 
