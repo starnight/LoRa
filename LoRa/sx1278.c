@@ -57,6 +57,20 @@ MODULE_PARM_DESC(xosc_frq, "Crystal oscillator frequency of the LoRa chip");
 
 #define	__POW_2_19	0x80000
 
+#ifndef SX127X_SPRF
+#define SX127X_SPRF	512
+#endif
+static uint32_t sprf = SX127X_SPRF;
+module_param(sprf, uint, 0);
+MODULE_PARM_DESC(sprf, "Spreading factor of Chirp Spread Spectrum modulation");
+
+#ifndef SX127X_RX_BYTE_TIMEOUT
+#define SX127X_RX_BYTE_TIMEOUT	1023
+#endif
+static uint32_t rx_timeout = SX127X_RX_BYTE_TIMEOUT;
+module_param(rx_timeout, uint, 0);
+MODULE_PARM_DESC(rx_timeout, "RX time-out value as number of symbols");
+
 /* SX127X Registers addresses */
 #define SX127X_REG_FIFO				0x00
 #define SX127X_REG_OP_MODE			0x01
@@ -982,8 +996,8 @@ sx127X_startLoRaMode(struct regmap *map)
 	base_adr = SX127X_FIFO_TX_BASE_ADDRESS;
 	regmap_raw_write(map, SX127X_REG_FIFO_TX_BASE_ADDR, &base_adr, 1);
 
-	sx127X_setLoRaRXTimeout(map, 1000);
-	sx127X_setLoRaSPRFactor(map, 512);
+	sx127X_setLoRaSPRFactor(map, sprf);
+	sx127X_setLoRaRXByteTimeout(map, rx_timeout);
 
 	/* Clear all of the IRQ flags. */
 	sx127X_clearLoRaAllFlag(map);
