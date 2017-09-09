@@ -1567,11 +1567,11 @@ static void sx1278_probe_acpi(struct spi_device *spi) {};
 #endif
 
 /* The compatible SPI device id array. */
-static const struct spi_device_id spi_ids[] = {
+static const struct spi_device_id sx1278_spi_ids[] = {
 	{ .name = "sx1278" },
 	{},
 };
-MODULE_DEVICE_TABLE(spi, spi_ids);
+MODULE_DEVICE_TABLE(spi, sx1278_spi_ids);
 
 bool sx1278_reg_volatile(struct device *dev, unsigned int reg)
 {
@@ -1661,7 +1661,7 @@ static struct spi_driver sx1278_spi_driver = {
 	},
 	.probe = sx1278_spi_probe,
 	.remove = sx1278_spi_remove,
-	.id_table = spi_ids,
+	.id_table = sx1278_spi_ids,
 };
 
 /* Register SX1278 kernel module. */
