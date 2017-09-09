@@ -267,12 +267,10 @@ sx127X_setLoRaFreq(struct regmap *map, uint32_t fr)
 
 #ifdef CONFIG_OF
 	/* Set the LoRa module's crystal oscillator's clock if OF is defined. */
-	const void *ptr;
+	struct device_node *of_node = (regmap_get_device(map))->of_node;
 
-	ptr = of_get_property((regmap_get_device(map))->of_node, \
-				"clock-frequency", \
-				NULL);
-	f_xosc = (ptr != NULL) ? be32_to_cpup(ptr) : xosc_frq;
+	if (of_property_read_u32(of_node, "clock-frequency", &f_xosc))
+		f_xosc = xosc_frq;
 #else
 	f_xosc = xosc_frq;
 #endif
@@ -307,12 +305,10 @@ sx127X_getLoRaFreq(struct regmap *map)
 
 #ifdef CONFIG_OF
 	/* Set the LoRa module's crystal oscillator's clock if OF is defined. */
-	const void *ptr;
+	struct device_node *of_node = (regmap_get_device(map))->of_node;
 
-	ptr = of_get_property((regmap_get_device(map))->of_node,
-			"clock-frequency",
-			NULL);
-	f_xosc = (ptr != NULL) ? be32_to_cpup(ptr) : xosc_frq;
+	if (of_property_read_u32(of_node, "clock-frequency", &f_xosc))
+		f_xosc = xosc_frq;
 #else
 	f_xosc = xosc_frq;
 #endif
@@ -1109,30 +1105,22 @@ sx1278_ieee_get_rf_config(struct ieee802154_hw *hw, struct rf_frq *rf)
 {
 #ifdef CONFIG_OF
 	struct sx1278_phy *phy = hw->priv;
-	const void *ptr;
+	struct device_node *of_node = (regmap_get_device(phy->map))->of_node;
 
 	/* Set the LoRa chip's center carrier frequency. */
-	ptr = of_get_property((regmap_get_device(phy->map))->of_node,
-				"center-carrier-frq",
-				NULL);
-	rf->carrier = (ptr != NULL) ? be32_to_cpup(ptr) : carrier_frq;
+	if (of_property_read_u32(of_node, "center-carrier-frq", &(rf->carrier)))
+		rf->carrier = carrier_frq;
 
 	/* Set the LoRa chip's RF bandwidth. */
-	ptr = of_get_property((regmap_get_device(phy->map))->of_node,
-				"rf-bandwidth",
-				NULL);
-	rf->bw = (ptr != NULL) ? be32_to_cpup(ptr) : bandwidth;
+	if (of_property_read_u32(of_node, "rf-bandwidth", &(rf->carrier)))
+		rf->bw = bandwidth;
 
 	/* Set the LoRa chip's min & max RF channel if OF is defined. */
-	ptr = of_get_property((regmap_get_device(phy->map))->of_node,
-				"minimal-RF-channel",
-				NULL);
-	rf->ch_min = (ptr != NULL) ? be32_to_cpup(ptr) : channel_min;
+	if (of_property_read_u8(of_node, "minimal-RF-channel", &(rf->ch_min)))
+		rf->ch_min = channel_min;
 
-	ptr = of_get_property((regmap_get_device(phy->map))->of_node,
-				"maximum-RF-channel",
-				NULL);
-	rf->ch_max = (ptr != NULL) ? be32_to_cpup(ptr) : channel_max;
+	if (of_property_read_u8(of_node, "maximum-RF-channel", &(rf->ch_max)))
+		rf->ch_max = channel_max;
 #else
 	rf->carrier = carrier_frq;
 	rf->bw = bandwidth;
