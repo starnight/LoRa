@@ -1540,30 +1540,11 @@ MODULE_DEVICE_TABLE(of, sx1278_dt_ids);
 
 /* The compatible ACPI device array. */
 #ifdef CONFIG_ACPI
-#define SX1278_ACPI_DUMMY	1
 static const struct acpi_device_id sx1278_acpi_ids[] = {
 	{ .id = "sx1278" },
 	{},
 };
 MODULE_DEVICE_TABLE(acpi, sx1278_acpi_ids);
-
-/* The callback function of ACPI probes SX1278 SPI. */
-static void sx1278_probe_acpi(struct spi_device *spi) {
-	const struct acpi_device_id *id;
-
-	if (!has_acpi_companion(&(spi->dev)))
-		return;
-
-	id = acpi_match_device(sx1278_acpi_ids, &(spi->dev));
-	if (WARN_ON(!id))
-		return;
-
-	if (id->driver_data == SX1278_ACPI_DUMMY)
-		dev_warn(&(spi->dev),
-			"Do not use this driver in produciton systems.\n");
-}
-#else
-static void sx1278_probe_acpi(struct spi_device *spi) {};
 #endif
 
 /* The compatible SPI device id array. */
@@ -1594,16 +1575,6 @@ static int sx1278_spi_probe(struct spi_device *spi)
 	struct ieee802154_hw *hw;
 	struct sx1278_phy *phy;
 	int err;
-
-#ifdef CONFIG_OF
-	if (spi->dev.of_node && !of_match_device(sx1278_dt_ids, &(spi->dev))) {
-		dev_err(&(spi->dev),
-			"buggy DT: SX1278 listed directly in DT\n");
-		WARN_ON(spi->dev.of_node &&
-			!of_match_device(sx1278_dt_ids, &(spi->dev)));
-	}
-#endif
-	sx1278_probe_acpi(spi);
 
 	hw = ieee802154_alloc_hw(sizeof(*phy), &sx1278_ops);
 	if (!hw) {
@@ -1653,7 +1624,7 @@ static struct spi_driver sx1278_spi_driver = {
 		.name = __DRIVER_NAME,
 		.owner = THIS_MODULE,
 #ifdef CONFIG_OF
-		.of_match_table = sx1278_dt_ids,
+		.of_match_table = of_match_ptr(sx1278_dt_ids),
 #endif
 #ifdef CONFIG_ACPI
 		.acpi_match_table = ACPI_PTR(sx1278_acpi_ids),
