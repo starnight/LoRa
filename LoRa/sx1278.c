@@ -964,6 +964,9 @@ sx127X_startLoRaMode(struct regmap *map)
 {
 	uint8_t op_mode;
 	uint8_t base_adr;
+#ifdef CONFIG_OF
+	struct device_node *of_node = (regmap_get_device(map))->of_node;
+#endif
 
 	/* Get original OP Mode register. */
 	op_mode = sx127X_getMode(map);
@@ -992,7 +995,13 @@ sx127X_startLoRaMode(struct regmap *map)
 	base_adr = SX127X_FIFO_TX_BASE_ADDRESS;
 	regmap_raw_write(map, SX127X_REG_FIFO_TX_BASE_ADDR, &base_adr, 1);
 
+	/* Set the CSS spreading factor. */
+#ifdef CONFIG_OF
+	of_property_read_u32(of_node, "spreading-factor", &sprf);
+#endif
 	sx127X_setLoRaSPRFactor(map, sprf);
+
+	/* Set RX time-out value. */
 	sx127X_setLoRaRXByteTimeout(map, rx_timeout);
 
 	/* Clear all of the IRQ flags. */
