@@ -1,11 +1,11 @@
 # LoRa
-This is a LoRa device driver as a Linux kernel module with file operation interfaces.
+This is a LoRa device driver as a Linux kernel module with IEEE 802.15.4 MAC interfaces.
 
 ## Compatible Chips
 * Semtech SX1276/77/78/79
 
 ## Folders
-* LoRa: The general LoRa header and source files and the LoRa over SPI device driver.
+* LoRa: The LoRa header source and build files.
 * dts-overlay: The device tree overlayers with the boards and operating systems.
 * test-application: The user space applications for testing or demo.
 
@@ -35,9 +35,6 @@ modprobe sx1278
 ```sh
 dmesg
 ```
-
-## Usage
-After build and install successfully, there is ```/dev/loraSPIX.Y``` corresponding to the LoRa chip which could be _open_, _read_, _write_, _ioctl_, _select_, _close_ ... directly.
 
 ## License
 Under Dual BSD/GPL

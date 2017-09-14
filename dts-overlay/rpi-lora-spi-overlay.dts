@@ -22,6 +22,8 @@
 				status = "okay";
 				spi-max-frequency = <0x3b60>;
 				clock-frequency = <32000000>;
+				minimal-RF-channel = /bits/ 8 <11>;
+				maximum-RF-channel = /bits/ 8 <11>;
 			};
 
 			sx1278@1 {
@@ -30,6 +32,8 @@
 				status = "okay";
 				spi-max-frequency = <0x3b60>;
 				clock-frequency = <32000000>;
+				minimal-RF-channel = /bits/ 8 <11>;
+				maximum-RF-channel = /bits/ 8 <11>;
 			};
 		};
 	};
