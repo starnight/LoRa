@@ -7,7 +7,7 @@ The driver with file operation interfaces could be found at the *[file-ops branc
 * Semtech SX1276/77/78/79
 
 ## Folders
-* LoRa: The LoRa header source and build files.
+* LoRa: The LoRa source and build files.
 * dts-overlay: The device tree overlayers with the boards and operating systems.
 * test-application: The user space applications for testing or demo.
 
