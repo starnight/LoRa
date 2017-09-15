@@ -1,4 +1,4 @@
-# SX1278 IEEE 802.15.4 Compatible Radio Device Tree
+# SX1278 Compatible Radio Device Tree
 
 ## Required properties:
   - compatible:		should be "semtech,sx1276", "semtech,sx1277",
