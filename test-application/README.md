@@ -6,6 +6,36 @@ These applications communicate through UDP/IPv6 socket in simple client-server m
 2. Server will capitalize the recieved data string from the client and send back to the client.
 3. Client will receive the capitalized data string and print it out.
 
+## Setup a 6LoWPAN Test Network
+
+Refer to: linux-wpan http://wpan.cakelab.org/
+
+### wpan-tools
+
+1. Could be founded at https://github.com/linux-wpan/wpan-tools
+2. The dependencies will be listed during building
+
+### Hava a lowpan interface from a wpan interface
+
+**SX1278 driver** should be inserted or loaded before this action.
+
+```sh
+# Private Area Network ID
+panid="0xbeef"
+# Index of the wpan interface
+i=0
+
+# Set the PANID of the wpan interface
+iwpan dev wpan${i} set pan_id $panid
+# Create a lowpan interface over the wpan interface
+ip link add link wpan${i} name lowpan${i} type lowpan
+# Bring up the wpan and lowpan interfaces
+ip link set wpan${i} up
+ip link set lowpan${i} up
+```
+
+```ip addr``` will show the IPv6 addresses of the interfaces.
+
 ## server.py
 
 ```server.py <listening IPv6 address> <listening port>```
