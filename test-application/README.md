@@ -19,6 +19,8 @@ Refer to: linux-wpan http://wpan.cakelab.org/
 
 **SX1278 driver** should be inserted or loaded before this action.
 
+Do these works with the granted privilege.
+
 ```sh
 # Private Area Network ID
 panid="0xbeef"
