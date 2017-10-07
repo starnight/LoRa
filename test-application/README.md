@@ -17,7 +17,7 @@ Refer to: linux-wpan http://wpan.cakelab.org/
 
 ### Hava a lowpan interface from a wpan interface
 
-**SX1278 driver** should be inserted or loaded before this action.
+**SX1278 driver** and **6LoWPAN kernel module** should be inserted or loaded before this action.
 
 Do these works with the granted privilege.
 
