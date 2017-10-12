@@ -38,9 +38,15 @@ ip link set lowpan${i} up
 
 ```ip addr``` will show the IPv6 addresses of the interfaces.
 
-## server.py
+## Test Applications
 
-```server.py <listening IPv6 address> <listening port>```
+### Build test applications
+
+```make``` will produce **server** and **client**.
+
+### server
+
+```server <listening IPv6 address> <listening port>```
 
 - listening IPv6 address:
   Listening on which IPv6 address
@@ -48,17 +54,17 @@ ip link set lowpan${i} up
 - listening port:
   Listening on which UDP port
 
-## client.py
+### client
 
-```lient.py <src IPv6 address> <dest IPv6 address> <dest port> <data string>```
+```client <src IPv6 address> <dst IPv6 address> <dst port> <data string>```
 
 - src IPv6 address:
   Send with the source IPv6 address
 
-- dest IPv6 address:
+- dst IPv6 address:
   Send to the server's IPv6 address
 
-- dest port:
+- dst port:
   Send to the server's UDP port
 
 - data string:
