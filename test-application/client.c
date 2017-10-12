@@ -26,7 +26,7 @@ struct addrinfo * have_addr(char *ipv6, char *port)
 
 	memset(&hints, 0, sizeof(struct addrinfo));
 	hints.ai_family = PF_INET6;
-	hints.ai_socktype = SOCK_DGRAM;
+	hints.ai_socktype = SOCK_STREAM;
 
 	status = getaddrinfo(ipv6, port, &hints, &addr);
 	if (status) {
@@ -65,8 +65,6 @@ int main(int argc, char *argv[])
 {
 	int conn;
 	struct addrinfo *dst_addr;
-	struct sockaddr_in6 peer_addr;
-	socklen_t addrlen;
 
 #define	BUFLEN		(1024)
 	char buf[BUFLEN];
@@ -82,23 +80,25 @@ int main(int argc, char *argv[])
 	if (conn < 0)
 		return conn;
 
-	/* Have server's address information structure. */
+	/* Have server's address information structure and connect to it. */
 	dst_addr = have_addr(dst_ip, dst_port);
-	/* Send the data string to server. */
-	printf("Send %s with in %d bytes\n", data_str, strlen(data_str));
-	if (sendto(conn, data_str, strlen(data_str), 0,
-		   dst_addr->ai_addr, dst_addr->ai_addrlen) < 0) {
-		perror("send to server failed");
+	if (connect(conn, dst_addr->ai_addr, dst_addr->ai_addrlen) < 0) {
+		perror("connect to server failed");
 		freeaddrinfo(dst_addr);
 		return -1;
 	}
 	freeaddrinfo(dst_addr);
 
+	/* Send the data string to server. */
+	printf("Send %s with in %d bytes\n", data_str, strlen(data_str));
+	if (send(conn, data_str, strlen(data_str), 0) < 0) {
+		perror("send to server failed");
+		return -1;
+	}
+
 	/* Prepare and receive from server. */
 	memset(buf, 0, BUFLEN);
-	addrlen = sizeof(peer_addr);
-	buflen = recvfrom(conn, buf, BUFLEN, 0,
-			  (struct sockaddr *)&peer_addr, &addrlen);
+	buflen = recv(conn, buf, BUFLEN, 0);
 	if (buflen < 0) {
 		perror("receive from server failed");
 		return -1;

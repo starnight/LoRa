@@ -1,10 +1,12 @@
 # Test Applications
 
-These applications communicate through UDP/IPv6 socket in simple client-server model.
+These applications communicate through TCP/IPv6 socket in simple client-server model.
 
 1. Client will send a data string to server.
 2. Server will capitalize the recieved data string from the client and send back to the client.
 3. Client will receive the capitalized data string and print it out.
+
+PS. The communication through LoRa will take time.
 
 ## Setup a 6LoWPAN Test Network
 
@@ -52,7 +54,7 @@ ip link set lowpan${i} up
   Listening on which IPv6 address
 
 - listening port:
-  Listening on which UDP port
+  Listening on which TCP port
 
 ### client
 
@@ -65,7 +67,7 @@ ip link set lowpan${i} up
   Send to the server's IPv6 address
 
 - dst port:
-  Send to the server's UDP port
+  Send to the server's TCP port
 
 - data string:
   Send the data string to the server

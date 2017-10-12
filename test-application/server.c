@@ -26,7 +26,7 @@ struct addrinfo * have_addr(char *ipv6, char *port)
 
 	memset(&hints, 0, sizeof(struct addrinfo));
 	hints.ai_family = PF_INET6;
-	hints.ai_socktype = SOCK_DGRAM;
+	hints.ai_socktype = SOCK_STREAM;
 
 	status = getaddrinfo(ipv6, port, &hints, &addr);
 	if (status) {
@@ -65,7 +65,7 @@ int have_bound_socket(char *ipv6, char *port)
 
 int main(int argc, char *argv[])
 {
-	int srvsock;
+	int srvsock, clisock;
 	struct sockaddr_in6 cli_addr;
 	socklen_t addrlen;
 
@@ -82,22 +82,31 @@ int main(int argc, char *argv[])
 	if (srvsock < 0)
 		return srvsock;
 
-	printf("Server is started!!! Listening on %s UDP port %s\n",
+	/* Listening. */
+	listen(srvsock, 1);
+	printf("Server is started!!! Listening on %s TCP port %s\n",
 	       srv_ip, srv_port);
+
 	while (1) {
-		/* Prepare and receive from client. */
-		memset(buf, 0, BUFLEN);
+		/* Accept a client. */
 		addrlen = sizeof(cli_addr);
-		buflen = recvfrom(srvsock, buf, BUFLEN, 0,
-				  (struct sockaddr *)&cli_addr, &addrlen);
-		if (buflen < 0) {
-			perror("receive from client failed");
+		clisock = accept(srvsock,
+				 (struct sockaddr *)&cli_addr,
+				 &addrlen);
+		if (clisock < 0)
 			continue;
-		}
-		
+
 		/* Show client's information. */
 		printf("Client ");
 		show_addr_info(&cli_addr);
+
+		/* Prepare and receive from client. */
+		memset(buf, 0, BUFLEN);
+		buflen = recv(clisock, buf, BUFLEN, 0);
+		if (buflen <= 0) {
+			perror("receive from client failed");
+			continue;
+		}
 		printf("\tRecv %s with in %zd bytes\n", buf, buflen);
 
 		/* Uppercase received characters in buffer. */
@@ -106,10 +115,10 @@ int main(int argc, char *argv[])
 
 		/* Send the processed buffer back to client. */
 		printf("\tSend %s with in %d bytes\n", buf, strlen(buf));
-		if (sendto(srvsock, buf, strlen(buf), 0,
-			   (struct sockaddr *)&cli_addr, addrlen) < 0) {
+		if (send(clisock, buf, strlen(buf), 0) < 0)
 			perror("send to client failed");
-		}
+
+		close(clisock);
 	}
 
 	close(srvsock);
