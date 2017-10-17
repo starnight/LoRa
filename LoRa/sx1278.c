@@ -1199,6 +1199,8 @@ sx1278_ieee_rx(struct ieee802154_hw *hw)
 		sx127X_set_state(phy->map, SX127X_RXSINGLE_MODE);
 		return 0;
 	} else {
+		dev_dbg(regmap_get_device(phy->map),
+			"%s: device is busy\n", __func__);
 		return -EBUSY;
 	}
 }
@@ -1217,6 +1219,8 @@ sx1278_ieee_rx_complete(struct ieee802154_hw *hw)
 	skb = dev_alloc_skb(IEEE802154_MTU);
 	if (!skb) {
 		err = -ENOMEM;
+		dev_err(regmap_get_device(phy->map),
+			"%s: driver is out of memory\n", __func__);
 		goto sx1278_ieee_rx_err;
 	}
 
@@ -1230,16 +1234,15 @@ sx1278_ieee_rx_complete(struct ieee802154_hw *hw)
 
 	ieee802154_rx_irqsafe(hw, skb, lqi);
 
-	spin_lock(&phy->buf_lock);
-	phy->is_busy = false;
-	spin_unlock(&phy->buf_lock);
-
 	dev_dbg(regmap_get_device(phy->map),
 		"%s: len=%u LQI=%u\n", __func__, len, lqi);
 
-	return 0;
+	err = 0;
 
 sx1278_ieee_rx_err:
+	spin_lock(&phy->buf_lock);
+	phy->is_busy = false;
+	spin_unlock(&phy->buf_lock);
 	return err;
 }
 
@@ -1272,6 +1275,8 @@ sx1278_ieee_tx(struct ieee802154_hw *hw)
 		regmap_write_async(phy->map, SX127X_REG_OP_MODE, phy->opmode);
 		return 0;
 	} else {
+		dev_dbg(regmap_get_device(phy->map),
+			"%s: device is busy\n", __func__);
 		return -EBUSY;
 	}
 }
