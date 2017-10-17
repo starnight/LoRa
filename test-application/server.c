@@ -71,9 +71,13 @@ int main(int argc, char *argv[])
 
 #define	BUFLEN		(1024)
 	char buf[BUFLEN];
-	size_t buflen;
+	ssize_t buflen;
 	int i;
 
+	if (argc < 3) {
+		printf("Usage: server <srv_addr> <srv_port>\n");
+		return 0;
+	}
 	char *srv_ip = argv[1];
 	char *srv_port = argv[2];
 
@@ -105,7 +109,7 @@ int main(int argc, char *argv[])
 			buf[i] = toupper(buf[i]);
 
 		/* Send the processed buffer back to client. */
-		printf("\tSend %s with in %d bytes\n", buf, strlen(buf));
+		printf("\tSend %s with in %zu bytes\n", buf, strlen(buf));
 		if (sendto(srvsock, buf, strlen(buf), 0,
 			   (struct sockaddr *)&cli_addr, addrlen) < 0) {
 			perror("send to client failed");

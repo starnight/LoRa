@@ -70,7 +70,12 @@ int main(int argc, char *argv[])
 
 #define	BUFLEN		(1024)
 	char buf[BUFLEN];
-	size_t buflen;
+	ssize_t buflen;
+
+	if (argc < 5) {
+		printf("Usage: client <src_addr> <dst_addr> <dst_port> <msg>\n");
+		return 0;
+	}
 
 	char *src_ip = argv[1];
 	char *dst_ip = argv[2];
@@ -85,7 +90,7 @@ int main(int argc, char *argv[])
 	/* Have server's address information structure. */
 	dst_addr = have_addr(dst_ip, dst_port);
 	/* Send the data string to server. */
-	printf("Send %s with in %d bytes\n", data_str, strlen(data_str));
+	printf("Send %s with in %zu bytes\n", data_str, strlen(data_str));
 	if (sendto(conn, data_str, strlen(data_str), 0,
 		   dst_addr->ai_addr, dst_addr->ai_addrlen) < 0) {
 		perror("send to server failed");

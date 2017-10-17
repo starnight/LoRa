@@ -40,3 +40,7 @@ dmesg
 
 ## License
 Under Dual BSD/GPL
+
+## Contributors
+* Jian-Hong, Pan <starnight AT g.ncu.edu.tw>
+* Dmitry Shmidt <dimitrysh AT google.com>
