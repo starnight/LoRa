@@ -202,6 +202,17 @@ sx127X_read_version(struct regmap *map)
 }
 
 /**
+ * sx127X_set_mode - Set LoRa device's mode register
+ * @map:	the device as a regmap to communicate with
+ * @op_mode:	LoRa device's operation mode register value
+ */
+void
+sx127X_set_mode(struct regmap *map, u8 op_mode)
+{
+	regmap_raw_write(map, SX127X_REG_OP_MODE, &op_mode, 1);
+}
+
+/**
  * sx127X_get_mode - Get LoRa device's mode register
  * @map:	the device as a regmap to communicate with
  *
@@ -259,11 +270,11 @@ sx127X_get_state(struct regmap *map)
 void
 sx127X_set_lorafrq(struct regmap *map, u32 fr)
 {
-	u64 frt64;
-	u32 frt;
+	u64 frt;
 	u8 buf[3];
-	u8 i;
+	s8 i;
 	u32 f_xosc;
+	u8 op_mode;
 
 #ifdef CONFIG_OF
 	/* Set the LoRa module's crystal oscillator's clock if OF is defined. */
@@ -275,16 +286,21 @@ sx127X_set_lorafrq(struct regmap *map, u32 fr)
 	f_xosc = xosc_frq;
 #endif
 
-	frt64 = (uint64_t)fr * (uint64_t)__POW_2_19;
-	do_div(frt64, f_xosc);
-	frt = frt64;
+	frt = (uint64_t)fr * (uint64_t)__POW_2_19;
+	do_div(frt, f_xosc);
 
-	for (i = 2; i >= 0; i--) {
-		buf[i] = frt % 256;
-		frt = frt >> 8;
-	}
+	for (i = 2; i >= 0; i--)
+		buf[i] = do_div(frt, 256);
 
+	op_mode = sx127X_get_mode(map);
+	/* Set Low/High frequency bit. */
+	if (fr >= 779000000)
+		op_mode &= ~0x8;
+	else if (fr <= 525000000)
+		op_mode |= 0x8;
+	sx127X_set_state(map, SX127X_SLEEP_MODE);
 	regmap_raw_write(map, SX127X_REG_FRF_MSB, buf, 3);
+	sx127X_set_mode(map, op_mode);
 }
 
 /**
@@ -1142,7 +1158,7 @@ sx1278_ieee_set_channel(struct ieee802154_hw *hw, u8 page, u8 channel)
 	s8 d;
 
 	dev_dbg(regmap_get_device(phy->map),
-		"%s channel: %u", __func__, channel);
+		"%s channel: %u\n", __func__, channel);
 
 	sx1278_ieee_get_rf_config(hw, &rf);
 
@@ -1155,6 +1171,7 @@ sx1278_ieee_set_channel(struct ieee802154_hw *hw, u8 page, u8 channel)
 	fr = rf.carrier + d * rf.bw;
 
 	sx127X_set_lorafrq(phy->map, fr);
+	phy->opmode = sx127X_get_mode(phy->map);
 
 	return 0;
 }
@@ -1171,7 +1188,7 @@ sx1278_ieee_set_txpower(struct ieee802154_hw *hw, s32 mbm)
 	s32 dbm = sx127X_mbm2dbm(mbm);
 
 	dev_dbg(regmap_get_device(phy->map),
-		"%s TX power: %d mbm", __func__, mbm);
+		"%s TX power: %d mbm\n", __func__, mbm);
 
 	sx127X_set_lorapower(phy->map, dbm);
 
@@ -1330,6 +1347,7 @@ sx1278_ieee_start(struct ieee802154_hw *hw)
 
 	dev_dbg(regmap_get_device(phy->map), "interface up\n");
 
+	sx1278_ieee_set_channel(hw, 0, hw->phy->current_channel);
 	phy->suspended = false;
 	sx127X_start_loramode(phy->map);
 	phy->opmode = sx127X_get_mode(phy->map);
