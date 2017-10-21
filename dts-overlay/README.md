@@ -9,9 +9,9 @@
   - reg:		the chipselect index
   - clock-frequency:	the external crystal oscillator frequency in Hz of the
 			transceiver
+  - center-carrier-frq:	the RF center carrier frequency in Hz
 
 ## Optional properties:
-  - center-carrier-frq:	the RF center carrier frequency in Hz
   - rf-bandwidth:	the RF bandwidth in Hz
   - minimal-RF-channel:	the minimal RF channel number and the value must be with
 			prefix "/bits/ 8" because of being a byte datatype
@@ -26,6 +26,7 @@
 		spi-max-frequency = <15200>;
 		reg = <0>;
 		clock-frequency = <32000000>;
+		center-carrier-frq = <434000000>;
 		minimal-RF-channel = /bits/ 8 <11>;
 		maximum-RF-channel = /bits/ 8 <11>;
 	};
