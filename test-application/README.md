@@ -15,7 +15,7 @@ Refer to: linux-wpan http://wpan.cakelab.org/
 1. Could be founded at https://github.com/linux-wpan/wpan-tools
 2. The dependencies will be listed during building
 
-### Hava a lowpan interface from a wpan interface
+### Have a lowpan interface from a wpan interface
 
 **SX1278 driver** and **6LoWPAN kernel module** should be inserted or loaded before this action.
 
