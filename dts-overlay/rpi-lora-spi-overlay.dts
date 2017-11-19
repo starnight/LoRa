@@ -21,6 +21,7 @@
 				reg = <0>;
 				status = "okay";
 				spi-max-frequency = <0x3b60>;
+				center-carrier-frq = <434000000>;
 				clock-frequency = <32000000>;
 				minimal-RF-channel = /bits/ 8 <11>;
 				maximum-RF-channel = /bits/ 8 <11>;
@@ -31,6 +32,7 @@
 				reg = <1>;
 				status = "okay";
 				spi-max-frequency = <0x3b60>;
+				center-carrier-frq = <434000000>;
 				clock-frequency = <32000000>;
 				minimal-RF-channel = /bits/ 8 <11>;
 				maximum-RF-channel = /bits/ 8 <11>;
