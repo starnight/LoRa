@@ -1200,17 +1200,18 @@ sx1278_ieee_rx(struct ieee802154_hw *hw)
 {
 	struct sx1278_phy *phy = hw->priv;
 	bool do_rx;
+	unsigned long f;
 
 	dev_dbg(regmap_get_device(phy->map), "%s\n", __func__);
 
-	spin_lock(&phy->buf_lock);
+	spin_lock_irqsave(&phy->buf_lock, f);
 	if (!phy->is_busy) {
 		phy->is_busy = true;
 		do_rx = true;
 	} else {
 		do_rx = false;
 	}
-	spin_unlock(&phy->buf_lock);
+	spin_unlock_irqrestore(&phy->buf_lock, f);
 
 	if (do_rx) {
 		sx127X_set_state(phy->map, SX127X_RXSINGLE_MODE);
@@ -1232,6 +1233,7 @@ sx1278_ieee_rx_complete(struct ieee802154_hw *hw)
 	s32 rssi;
 	s32 range = SX1278_IEEE_ENERGY_RANGE;
 	int err;
+	unsigned long f;
 
 	skb = dev_alloc_skb(IEEE802154_MTU);
 	if (!skb) {
@@ -1257,9 +1259,9 @@ sx1278_ieee_rx_complete(struct ieee802154_hw *hw)
 	err = 0;
 
 sx1278_ieee_rx_err:
-	spin_lock(&phy->buf_lock);
+	spin_lock_irqsave(&phy->buf_lock, f);
 	phy->is_busy = false;
-	spin_unlock(&phy->buf_lock);
+	spin_unlock_irqrestore(&phy->buf_lock, f);
 	return err;
 }
 
@@ -1269,6 +1271,7 @@ sx1278_ieee_tx(struct ieee802154_hw *hw)
 	struct sx1278_phy *phy = hw->priv;
 	struct sk_buff *tx_buf = phy->tx_buf;
 	bool do_tx = false;
+	unsigned long f;
 
 	dev_dbg(regmap_get_device(phy->map),
 		"%s: len=%u\n", __func__, tx_buf->len);
@@ -1278,13 +1281,13 @@ sx1278_ieee_tx(struct ieee802154_hw *hw)
 		phy->post_tx_done = true;
 	}
 
-	spin_lock(&phy->buf_lock);
+	spin_lock_irqsave(&phy->buf_lock, f);
 	if (!phy->is_busy) {
 		phy->is_busy = true;
 		do_tx = true;
 		phy->one_to_be_sent = false;
 	}
-	spin_unlock(&phy->buf_lock);
+	spin_unlock_irqrestore(&phy->buf_lock, f);
 
 	if (do_tx) {
 		/* Set chip as TX state and transfer the data in FIFO. */
@@ -1303,15 +1306,16 @@ sx1278_ieee_tx_complete(struct ieee802154_hw *hw)
 {
 	struct sx1278_phy *phy = hw->priv;
 	struct sk_buff *skb = phy->tx_buf;
+	unsigned long f;
 
 	dev_dbg(regmap_get_device(phy->map), "%s\n", __func__);
 
 	ieee802154_xmit_complete(hw, skb, false);
 
-	spin_lock(&phy->buf_lock);
+	spin_lock_irqsave(&phy->buf_lock, f);
 	phy->is_busy = false;
 	phy->tx_buf = NULL;
-	spin_unlock(&phy->buf_lock);
+	spin_unlock_irqrestore(&phy->buf_lock, f);
 
 	return 0;
 }
@@ -1321,12 +1325,13 @@ sx1278_ieee_xmit(struct ieee802154_hw *hw, struct sk_buff *skb)
 {
 	struct sx1278_phy *phy = hw->priv;
 	int ret;
+	unsigned long f;
 
 	dev_dbg(regmap_get_device(phy->map), "%s\n", __func__);
 
 	WARN_ON(phy->suspended);
 
-	spin_lock(&phy->buf_lock);
+	spin_lock_irqsave(&phy->buf_lock, f);
 	if (phy->tx_buf) {
 		ret = -EBUSY;
 	} else {
@@ -1335,7 +1340,7 @@ sx1278_ieee_xmit(struct ieee802154_hw *hw, struct sk_buff *skb)
 		phy->post_tx_done = false;
 		ret = 0;
 	}
-	spin_unlock(&phy->buf_lock);
+	spin_unlock_irqrestore(&phy->buf_lock, f);
 
 	return ret;
 }
@@ -1381,6 +1386,7 @@ sx1278_ieee_statemachine(struct ieee802154_hw *hw)
 	u8 flags;
 	u8 state;
 	bool do_next_rx = false;
+	unsigned long f;
 
 	flags = sx127X_get_loraallflag(phy->map);
 	state = sx127X_get_state(phy->map);
@@ -1389,9 +1395,9 @@ sx1278_ieee_statemachine(struct ieee802154_hw *hw)
 		sx127X_clear_loraflag(phy->map, SX127X_FLAG_RXTIMEOUT
 						| SX127X_FLAG_PAYLOADCRCERROR
 						| SX127X_FLAG_RXDONE);
-		spin_lock(&phy->buf_lock);
+		spin_lock_irqsave(&phy->buf_lock, f);
 		phy->is_busy = false;
-		spin_unlock(&phy->buf_lock);
+		spin_unlock_irqrestore(&phy->buf_lock, f);
 		do_next_rx = true;
 	} else if (flags & SX127X_FLAG_RXDONE) {
 		sx1278_ieee_rx_complete(phy->hw);
