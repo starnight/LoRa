@@ -54,12 +54,7 @@
 #include "lorawan.h"
 #include "lrwsec.h"
 
-static LIST_HEAD(device_list);
-static DEFINE_MUTEX(device_list_lock);
-
-#ifndef LRW_BUFLEN
-#define LRW_BUFLEN	127
-#endif
+#define	LORAWAN_MODULE_NAME	"lorawan"
 
 struct lrw_session *
 lrw_alloc_ss(struct lrw_struct *lrw_st)
@@ -128,95 +123,6 @@ ready2read(struct lrw_struct *lrw_st)
 	return status;
 }
 
-static int
-file_open(struct inode *inode, struct file *filp)
-{
-	struct lrw_struct *lrw_st;
-	int status = -ENXIO;
-
-	pr_debug("lorawan: open file\n");
-	
-	mutex_lock(&device_list_lock);
-	/* Find the lora data in device_entry with matched dev_t in inode */
-	list_for_each_entry(lrw_st, &device_list, device_entry) {
-		if (lrw_st->devt == inode->i_rdev) {
-			status = 0;
-			break;
-		}
-	}
-
-	if (status) {
-		mutex_unlock(&device_list_lock);
-		pr_debug("lorawan: nothing for minor %d\n", iminor(inode));
-
-		return status;
-	}
-
-	init_waitqueue_head(&(lrw_st->waitqueue));
-	/* Map the data location to the file data pointer */
-	filp->private_data = lrw_st;
-	mutex_unlock(&device_list_lock);
-
-	/* This a character device, so it is not seekable */
-	nonseekable_open(inode, filp);
-
-	return 0;
-}
-
-static int
-file_close(struct inode *inode, struct file *filp)
-{
-	struct lrw_struct *lrw_st;
-	
-	pr_debug("lora: close file\n");
-	
-	lrw_st = filp->private_data;
-
-	mutex_lock(&device_list_lock);
-	filp->private_data = NULL;
-	mutex_unlock(&device_list_lock);
-
-	return 0;
-}
-
-static ssize_t
-file_read(struct file *filp, char __user *buf, size_t size, loff_t *pos)
-{
-	struct lrw_struct *lrw_st;
-	struct lrw_session *ss;
-	struct sk_buff *skb;
-	size_t len;
-	ssize_t ret;
-
-	pr_debug("lora: read file (size=%zu)\n", size);
-
-	lrw_st = filp->private_data;
-
-	mutex_lock(&lrw_st->ss_list_lock);
-	if (ready2read(lrw_st)) {
-		ss = list_first_entry(lrw_st->ss_list,
-				      struct lrw_session,
-				      entry);
-		skb = ss->rx_skb;
-		len = (size <= skb->len) ? size : skb->len;
-		if(!copy_to_user(buf, skb->data, len)) {
-			ret = len;
-			skb_pull(skb, len);
-			if (!skb->len)
-				lrw_del_ss(ss);
-		}
-		else {
-			ret = -EFAULT;
-		}
-	}
-	else {
-		ret = -EBUSY;
-	}
-	mutex_unlock(&lrw_st->ss_list_lock);
-
-	return ret;
-}
-
 void
 lrw_prepare_tx_frame(struct lrw_session *ss)
 {
@@ -273,185 +179,6 @@ lrw_xmit(unsigned long data)
 	ss->state = LRW_XMITTING_SS;
 	lrw_st->ops->xmit_async(&lrw_st->hw, ss->tx_skb);
 }
-
-static ssize_t
-file_write(struct file *filp, const char __user *buf, size_t size, loff_t *pos)
-{
-	struct lrw_struct *lrw_st;
-	struct lrw_session *ss;
-	struct sk_buff *tx_skb;
-	unsigned long rem;
-	int ret;
-
-	pr_debug("lora: write file (size=%zu)\n", size);
-
-	lrw_st = filp->private_data;
-	ss = NULL;
-
-	mutex_lock(&lrw_st->ss_list_lock);
-	if (ready2write(lrw_st)) {
-		ss = lrw_alloc_ss(lrw_st);
-		if (ss != NULL) {
-			list_add_tail(&ss->entry, &lrw_st->ss_list);
-			lrw_st->_cur_ss = ss;
-			lrw_st->fcnt_up += 1;
-			ss->fcnt_up = lrw_st->fcnt_up;
-			ss->fcnt_down = lrw_st->fcnt_down;
-		}
-		else {
-			ret = -ENOMEM;
-		}
-	}
-	else {
-		ret = -EBUSY;
-	}
-	mutex_unlock(&lrw_st->ss_list_lock);
-
-	if (ss != NULL) {
-		tx_skb = dev_alloc_skb(1 + 7 + 16 + size + 4);
-		if (tx_skb != NULL) {
-			ss->state = LRW_INIT_SS;
-			ss->tx_skb = tx_skb;
-			skb_reserve(tx_skb, 1 + 7 + 16);
-			rem = copy_from_user(skb_put(tx_skb, size), buf, size);
-			ret = size - rem;
-			lrw_prepare_tx_frame(ss);
-			tasklet_schedule(&lrw_st->xmit_task);
-		}
-		else {
-			ret = -ENOMEM;
-		}
-	}
-
-	return ret;
-}
-
-static long
-file_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
-{
-	long ret;
-	int *pval;
-	struct lrw_struct *lrw_st;
-
-	pr_debug("lora: ioctl file (cmd=0x%X)\n", cmd);
-
-	ret = -ENOTTY;
-	pval = (void __user *)arg;
-	lrw_st = filp->private_data;
-
-	/* I/O control by each command */
-	switch (cmd) {
-	/* Set & read the state of the LoRa device */
-	case LRW_SET_STATE:
-		if (lrw_st->ops->setState != NULL)
-			ret = lrw_st->ops->setState(lrw_st, pval);
-		break;
-	case LRW_GET_STATE:
-		if (lrw_st->ops->getState != NULL)
-			ret = lrw_st->ops->getState(lrw_st, pval);
-		break;
-	/* Set & get the carrier frequency */
-	case LRW_SET_FREQUENCY:
-		if (lrw_st->ops->setFreq != NULL)
-			ret = lrw_st->ops->setFreq(lrw_st, pval);
-		break;
-	case LRW_GET_FREQUENCY:
-		if (lrw_st->ops->getFreq != NULL)
-			ret = lrw_st->ops->getFreq(lrw_st, pval);
-		break;
-	/* Set & get the PA power */
-	case LRW_SET_POWER:
-		if (lrw_st->ops->setPower != NULL)
-			ret = lrw_st->ops->setPower(lrw_st, pval);
-		break;
-	case LRW_GET_POWER:
-		if (lrw_st->ops->getPower != NULL)
-			ret = lrw_st->ops->getPower(lrw_st, pval);
-		break;
-	/* Set & get the LNA gain */
-	case LRW_SET_LNA:
-		if (lrw_st->ops->setLNA != NULL)
-			ret = lrw_st->ops->setLNA(lrw_st, pval);
-		break;
-	case LRW_GET_LNA:
-		if (lrw_st->ops->getLNA != NULL)
-			ret = lrw_st->ops->getLNA(lrw_st, pval);
-		break;
-	/* Set the LNA be auto gain control or manual */
-	case LRW_SET_LNAAGC:
-		if (lrw_st->ops->setLNAAGC != NULL)
-			ret = lrw_st->ops->setLNAAGC(lrw_st, pval);
-		break;
-	/* Set & get the RF spreading factor */
-	case LRW_SET_SPRFACTOR:
-		if (lrw_st->ops->setSPRFactor != NULL)
-			ret = lrw_st->ops->setSPRFactor(lrw_st, pval);
-		break;
-	case LRW_GET_SPRFACTOR:
-		if (lrw_st->ops->getSPRFactor != NULL)
-			ret = lrw_st->ops->getSPRFactor(lrw_st, pval);
-		break;
-	/* Set & get the RF bandwith */
-	case LRW_SET_BANDWIDTH:
-		if (lrw_st->ops->setBW != NULL)
-			ret = lrw_st->ops->setBW(lrw_st, pval);
-		break;
-	case LRW_GET_BANDWIDTH:
-		if (lrw_st->ops->getBW != NULL)
-			ret = lrw_st->ops->getBW(lrw_st, pval);
-		break;
-	/* Get current RSSI */
-	case LRW_GET_RSSI:
-		if (lrw_st->ops->getRSSI != NULL)
-			ret = lrw_st->ops->getRSSI(lrw_st, pval);
-		break;
-	/* Get last packet's SNR */
-	case LRW_GET_SNR:
-		if (lrw_st->ops->getSNR != NULL)
-			ret = lrw_st->ops->getSNR(lrw_st, pval);
-		break;
-	default:
-		ret = -ENOTTY;
-	}
-
-	return ret;
-}
-
-static unsigned int
-file_poll(struct file *filp, poll_table *wait)
-{
-	struct lrw_struct *lrw_st;
-	unsigned int mask;
-
-	pr_debug("lora: poll file\n");
-
-	lrw_st = filp->private_data;
-
-	/* Register the file into wait queue for multiplexing */
-	poll_wait(filp, &lrw_st->waitqueue, wait);
-
-	/* Check ready to write / read */
-	mask = 0;
-	mutex_lock(&lrw_st->ss_list_lock);
-	if (ready2write(lrw_st))
-		mask |= POLLOUT | POLLWRNORM;
-	if (ready2read(lrw_st))
-		mask |= POLLIN | POLLRDNORM;
-	mutex_unlock(&lrw_st->ss_list_lock);
-
-	return mask;
-}
-
-static struct file_operations lrw_fops = {
-	.owner		= THIS_MODULE,
-	.open 		= file_open,
-	.release	= file_close,
-	.read		= file_read,
-	.write		= file_write,
-	.unlocked_ioctl = file_ioctl,
-	.poll		= file_poll,
-	.llseek		= no_llseek,
-};
 
 struct lora_hw *
 lora_alloc_hw(struct lora_operations *lr_ops)
@@ -765,10 +492,15 @@ lora_xmit_complete(struct lora_hw *hw, struct sk_buff *skb)
 	lrw_sent_tx_work(lrw_st, skb);
 }
 
+
+/* ---------------------- Character device driver part ---------------------- */
+
 static struct class *lrw_sys_class;
 static int lrw_major;
 static unsigned int lora_hw_amount = sizeof(int) * 8;
-#define	LORAWAN_MODULE_NAME	"lorawan"
+
+static LIST_HEAD(device_list);
+static DEFINE_MUTEX(device_list_lock);
 
 static DECLARE_BITMAP(minors, lora_hw_amount);
 static DEFINE_MUTEX(minors_lock);
@@ -793,7 +525,6 @@ lrw_add_hw(struct lrw_struct *lrw_st)
 	lrw_st->_cur_ss = NULL;
 
 	tasklet_init(&lrw_st->xmit_task, lrw_xmit, (unsigned long) lrw_st);
-	INIT_WORK(&lrw_st->sent_tx_work, lrw_sent_tx_work);
 	INIT_WORK(&lrw_st->rx_work, lrw_rx_work);
 
 	return 0;
@@ -816,6 +547,274 @@ lrw_remove_hw(struct lrw_struct *lrw_st)
 
 	return 0;
 }
+
+static int
+file_open(struct inode *inode, struct file *filp)
+{
+	struct lrw_struct *lrw_st;
+	int status = -ENXIO;
+
+	pr_debug("lorawan: open file\n");
+
+	mutex_lock(&device_list_lock);
+	/* Find the lora data in device_entry with matched dev_t in inode */
+	list_for_each_entry(lrw_st, &device_list, device_entry) {
+		if (lrw_st->devt == inode->i_rdev) {
+			status = 0;
+			break;
+		}
+	}
+
+	if (status) {
+		mutex_unlock(&device_list_lock);
+		pr_debug("lorawan: nothing for minor %d\n", iminor(inode));
+
+		return status;
+	}
+
+	init_waitqueue_head(&(lrw_st->waitqueue));
+	/* Map the data location to the file data pointer */
+	filp->private_data = lrw_st;
+	mutex_unlock(&device_list_lock);
+
+	/* This a character device, so it is not seekable */
+	nonseekable_open(inode, filp);
+
+	return 0;
+}
+
+static int
+file_close(struct inode *inode, struct file *filp)
+{
+	struct lrw_struct *lrw_st;
+
+	pr_debug("lora: close file\n");
+
+	lrw_st = filp->private_data;
+
+	mutex_lock(&device_list_lock);
+	filp->private_data = NULL;
+	mutex_unlock(&device_list_lock);
+
+	return 0;
+}
+
+static ssize_t
+file_read(struct file *filp, char __user *buf, size_t size, loff_t *pos)
+{
+	struct lrw_struct *lrw_st;
+	struct lrw_session *ss;
+	struct sk_buff *skb;
+	size_t len;
+	ssize_t ret;
+
+	pr_debug("lora: read file (size=%zu)\n", size);
+
+	lrw_st = filp->private_data;
+
+	mutex_lock(&lrw_st->ss_list_lock);
+	if (ready2read(lrw_st)) {
+		ss = list_first_entry(lrw_st->ss_list,
+				      struct lrw_session,
+				      entry);
+		skb = ss->rx_skb;
+		len = (size <= skb->len) ? size : skb->len;
+		if(!copy_to_user(buf, skb->data, len)) {
+			ret = len;
+			skb_pull(skb, len);
+			if (!skb->len)
+				lrw_del_ss(ss);
+		}
+		else {
+			ret = -EFAULT;
+		}
+	}
+	else {
+		ret = -EBUSY;
+	}
+	mutex_unlock(&lrw_st->ss_list_lock);
+
+	return ret;
+}
+
+static ssize_t
+file_write(struct file *filp, const char __user *buf, size_t size, loff_t *pos)
+{
+	struct lrw_struct *lrw_st;
+	struct lrw_session *ss;
+	struct sk_buff *tx_skb;
+	unsigned long rem;
+	int ret;
+
+	pr_debug("lora: write file (size=%zu)\n", size);
+
+	lrw_st = filp->private_data;
+	ss = NULL;
+
+	mutex_lock(&lrw_st->ss_list_lock);
+	if (ready2write(lrw_st)) {
+		ss = lrw_alloc_ss(lrw_st);
+		if (ss != NULL) {
+			list_add_tail(&ss->entry, &lrw_st->ss_list);
+			lrw_st->_cur_ss = ss;
+			lrw_st->fcnt_up += 1;
+			ss->fcnt_up = lrw_st->fcnt_up;
+			ss->fcnt_down = lrw_st->fcnt_down;
+		}
+		else {
+			ret = -ENOMEM;
+		}
+	}
+	else {
+		ret = -EBUSY;
+	}
+	mutex_unlock(&lrw_st->ss_list_lock);
+
+	if (ss != NULL) {
+		tx_skb = dev_alloc_skb(1 + 7 + 16 + size + 4);
+		if (tx_skb != NULL) {
+			ss->state = LRW_INIT_SS;
+			ss->tx_skb = tx_skb;
+			skb_reserve(tx_skb, 1 + 7 + 16);
+			rem = copy_from_user(skb_put(tx_skb, size), buf, size);
+			ret = size - rem;
+			lrw_prepare_tx_frame(ss);
+			tasklet_schedule(&lrw_st->xmit_task);
+		}
+		else {
+			ret = -ENOMEM;
+		}
+	}
+
+	return ret;
+}
+
+static long
+file_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
+{
+	long ret;
+	int *pval;
+	struct lrw_struct *lrw_st;
+
+	pr_debug("lora: ioctl file (cmd=0x%X)\n", cmd);
+
+	ret = -ENOTTY;
+	pval = (void __user *)arg;
+	lrw_st = filp->private_data;
+
+	/* I/O control by each command */
+	switch (cmd) {
+	/* Set & read the state of the LoRa device */
+	case LRW_SET_STATE:
+		if (lrw_st->ops->setState != NULL)
+			ret = lrw_st->ops->setState(lrw_st, pval);
+		break;
+	case LRW_GET_STATE:
+		if (lrw_st->ops->getState != NULL)
+			ret = lrw_st->ops->getState(lrw_st, pval);
+		break;
+	/* Set & get the carrier frequency */
+	case LRW_SET_FREQUENCY:
+		if (lrw_st->ops->setFreq != NULL)
+			ret = lrw_st->ops->setFreq(lrw_st, pval);
+		break;
+	case LRW_GET_FREQUENCY:
+		if (lrw_st->ops->getFreq != NULL)
+			ret = lrw_st->ops->getFreq(lrw_st, pval);
+		break;
+	/* Set & get the PA power */
+	case LRW_SET_POWER:
+		if (lrw_st->ops->setPower != NULL)
+			ret = lrw_st->ops->setPower(lrw_st, pval);
+		break;
+	case LRW_GET_POWER:
+		if (lrw_st->ops->getPower != NULL)
+			ret = lrw_st->ops->getPower(lrw_st, pval);
+		break;
+	/* Set & get the LNA gain */
+	case LRW_SET_LNA:
+		if (lrw_st->ops->setLNA != NULL)
+			ret = lrw_st->ops->setLNA(lrw_st, pval);
+		break;
+	case LRW_GET_LNA:
+		if (lrw_st->ops->getLNA != NULL)
+			ret = lrw_st->ops->getLNA(lrw_st, pval);
+		break;
+	/* Set the LNA be auto gain control or manual */
+	case LRW_SET_LNAAGC:
+		if (lrw_st->ops->setLNAAGC != NULL)
+			ret = lrw_st->ops->setLNAAGC(lrw_st, pval);
+		break;
+	/* Set & get the RF spreading factor */
+	case LRW_SET_SPRFACTOR:
+		if (lrw_st->ops->setSPRFactor != NULL)
+			ret = lrw_st->ops->setSPRFactor(lrw_st, pval);
+		break;
+	case LRW_GET_SPRFACTOR:
+		if (lrw_st->ops->getSPRFactor != NULL)
+			ret = lrw_st->ops->getSPRFactor(lrw_st, pval);
+		break;
+	/* Set & get the RF bandwith */
+	case LRW_SET_BANDWIDTH:
+		if (lrw_st->ops->setBW != NULL)
+			ret = lrw_st->ops->setBW(lrw_st, pval);
+		break;
+	case LRW_GET_BANDWIDTH:
+		if (lrw_st->ops->getBW != NULL)
+			ret = lrw_st->ops->getBW(lrw_st, pval);
+		break;
+	/* Get current RSSI */
+	case LRW_GET_RSSI:
+		if (lrw_st->ops->getRSSI != NULL)
+			ret = lrw_st->ops->getRSSI(lrw_st, pval);
+		break;
+	/* Get last packet's SNR */
+	case LRW_GET_SNR:
+		if (lrw_st->ops->getSNR != NULL)
+			ret = lrw_st->ops->getSNR(lrw_st, pval);
+		break;
+	default:
+		ret = -ENOTTY;
+	}
+
+	return ret;
+}
+
+static unsigned int
+file_poll(struct file *filp, poll_table *wait)
+{
+	struct lrw_struct *lrw_st;
+	unsigned int mask;
+
+	pr_debug("lora: poll file\n");
+
+	lrw_st = filp->private_data;
+
+	/* Register the file into wait queue for multiplexing */
+	poll_wait(filp, &lrw_st->waitqueue, wait);
+
+	/* Check ready to write / read */
+	mask = 0;
+	mutex_lock(&lrw_st->ss_list_lock);
+	if (ready2write(lrw_st))
+		mask |= POLLOUT | POLLWRNORM;
+	if (ready2read(lrw_st))
+		mask |= POLLIN | POLLRDNORM;
+	mutex_unlock(&lrw_st->ss_list_lock);
+
+	return mask;
+}
+
+static struct file_operations lrw_fops = {
+	.owner		= THIS_MODULE,
+	.open 		= file_open,
+	.release	= file_close,
+	.read		= file_read,
+	.write		= file_write,
+	.unlocked_ioctl = file_ioctl,
+	.poll		= file_poll,
+	.llseek		= no_llseek,
+};
 
 /**
  * lora_register_hw - Register there is a kind of LoRa driver
@@ -848,8 +847,8 @@ lora_register_hw(struct lora_hw *hw)
 	cdev_init(&(lrw_st->lrw_cdev), &lrw_fops);
 	lrw_st->lrw_cdev.owner = THIS_MODULE;
 	lrw_st->devt = MKDEV(lrw_major, minor);
-	dev = device_create(lrw_sys_class, NULL, lrw_st->devt, lrw_st,
-			    "lora%d", minor);
+	lrw_st->dev = device_create(lrw_sys_class, NULL, lrw_st->devt, lrw_st,
+				    "lora%d", minor);
 	status = PTR_ERR_OR_ZERO(dev);
 	if (status == 0)
 		lrw_add_hw(lrw_st);
@@ -876,7 +875,7 @@ lora_unregister_hw(struct lora_hw *hw)
 	lrw_st = container_of(hw, struct lrw_struct, hw);
 	minor = minor(lrw_st->devt);
 
-	pr_debug("lorawan: unregister lora%d\n", minor);
+	pr_info("%s: unregister lora%d\n", LORAWAN_MODULE_NAME, minor);
 	/* Delete the character device driver from system */
 	cdev_del(&(lrw_st->lrw_cdev));
 	lrw_remove_hw(lrw_st);
@@ -891,53 +890,55 @@ lora_unregister_hw(struct lora_hw *hw)
 static int
 lrw_init(void)
 {
-	dev_t dev;
+	dev_t devt;
 	int alloc_ret = -1;
 	int err;
 
-	pr_debug("lorawan: insert %s\n module", LORAWAN_MODULE_NAME);
+	pr_info("%s: module inserted", LORAWAN_MODULE_NAME);
 
 	/* Allocate a character device */
-	alloc_ret = alloc_chrdev_region(&dev,
+	alloc_ret = alloc_chrdev_region(&devt,
 					0,
 					lora_hw_amount,
 					LORAWAN_MODULE_NAME);
 	if (alloc_ret) {
-		pr_err("lorawan: Failed to allocate a character device\n");
+		pr_err("%s: Failed to allocate a character device\n",
+		       LORAWAN_MODULE_NAME);
 		err = alloc_ret;
 		goto lrw_init_error;
 	}
 
-	lrw_major = MAJOR(dev);
+	lrw_major = MAJOR(devt);
 
 	/* Create device class */
 	lrw_sys_class = class_create(THIS_MODULE, LORAWAN_MODULE_NAME);
 	if (IS_ERR(lrw_sys_class)) {
-		pr_err("lorawan: Failed to create a class of LoRaWAN\n");
+		pr_err("%s: Failed to create a class of LoRaWAN\n",
+		       LORAWAN_MODULE_NAME);
 		err = PTR_ERR(lrw_sys_class);
 		goto lrw_init_error;
 	}
-	pr_debug("lorawan: %s class created\n", LORAWAN_MODULE_NAME);
+	pr_debug("%s: class created\n", LORAWAN_MODULE_NAME);
 
 	return 0;
 
 lrw_init_error:
 	/* Release the allocated character device */
 	if (alloc_ret == 0)
-		unregister_chrdev_region(dev, lora_hw_amount);
+		unregister_chrdev_region(devt, lora_hw_amount);
 	return err;
 }
 
 static void
 lrw_exit(void)
 {
-	dev_t dev = MKDEV(lrw_major, 0);
+	dev_t devt = MKDEV(lrw_major, 0);
 	
 	/* Delete device class */
 	class_destroy(lrw_sys_class);
 	/* Unregister the allocated character device */
-	unregister_chrdev_region(dev, lora_hw_amount);
-	pr_debug("lorawan: %s module removed\n", LORAWAN_MODULE_NAME);
+	unregister_chrdev_region(devt, lora_hw_amount);
+	pr_info("%s: module removed\n", LORAWAN_MODULE_NAME);
 
 	return 0;
 }

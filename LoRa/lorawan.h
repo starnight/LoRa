@@ -114,6 +114,7 @@ struct lrw_session {
  */
 struct lrw_struct {
 	dev_t devt;
+	struct device *dev;
 	struct lora_hw hw;
 	struct lora_operations *ops;
 	struct list_head device_entry;
