@@ -72,11 +72,11 @@ lrw_aes_cmac(struct crypto_shash *tfm, u8 *bz, u8 *data, size_t len, u8 *out)
 	if (err)
 		goto lrw_aes_cmac_end;
 
-	err = crypto_shash_updata(desc, bz, 16);
+	err = crypto_shash_update(desc, bz, 16);
 	if (err)
 		goto lrw_aes_cmac_end;
 
-	err = crypto_shash_updata(desc, data, len);
+	err = crypto_shash_update(desc, data, len);
 	if (err)
 		goto lrw_aes_cmac_end;
 
@@ -104,7 +104,7 @@ lrw_set_bzero(u8 dir, u8 *devaddr, u32 fcnt, u8 len, u8 *bz)
 
 int
 lrw_calc_mic(struct crypto_shash *tfm,
-	     u8 dir, u8 devaddr, u32 fcnt, u8* buf, size_t len, u8 *mic4)
+	     u8 dir, u8 *devaddr, u32 fcnt, u8* buf, size_t len, u8 *mic4)
 {
 	u8 mic[16];
 	u8 bz[16];

@@ -44,7 +44,7 @@
 
 struct crypto_shash *lrw_mic_key_setup(u8 *k, size_t k_len);
 int lrw_calc_mic(struct crypto_shash *tfm,
-		 u8 dir, u8 devaddr, u32 fcnt, u8* buf, size_t len, u8 *mic4);
+		 u8 dir, u8 *devaddr, u32 fcnt, u8* buf, size_t len, u8 *mic4);
 void lrw_mic_key_free(struct crypto_shash *tfm);
 
 struct crypto_skcipher *lrw_encrypt_key_setup(u8 *k, size_t k_len);

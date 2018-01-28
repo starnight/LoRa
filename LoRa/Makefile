@@ -1,6 +1,6 @@
-PROJ=sx1278
+PROJ=lorawan
 obj-m := $(PROJ).o
-$(PROJ)-objs := lora.o spi-sx1278.o
+$(PROJ)-objs := lorawan.o lrwsec.o
 
 KERNEL_LOCATION=/lib/modules/$(shell uname -r)
 BUILDDIR=$(KERNEL_LOCATION)/build
