@@ -56,6 +56,29 @@
 
 #define	LORAWAN_MODULE_NAME	"lorawan"
 
+struct lora_hw *
+lora_alloc_hw(struct lora_operations *lr_ops)
+{
+	struct lrw_struct *lrw_st;
+
+	lrw_st = kzalloc(sizeof(struct lrw_struct), GFP_KERNEL);
+	if (!lrw_st)
+		return NULL;
+
+	lrw_st->ops = lr_ops;
+
+	return &lrw_st->hw;
+}
+
+void
+lora_free_hw(struct lora_hw *hw)
+{
+	struct lrw_struct *lrw_st;
+
+	lrw_st = container_of(hw, struct lrw_struct, hw);
+	kfree(lrw_st);
+}
+
 struct lrw_session *
 lrw_alloc_ss(struct lrw_struct *lrw_st)
 {
@@ -178,29 +201,6 @@ lrw_xmit(unsigned long data)
 
 	ss->state = LRW_XMITTING_SS;
 	lrw_st->ops->xmit_async(&lrw_st->hw, ss->tx_skb);
-}
-
-struct lora_hw *
-lora_alloc_hw(struct lora_operations *lr_ops)
-{
-	struct lrw_struct *lrw_st;
-
-	lrw_st = kzalloc(sizeof(struct lrw_struct), GFP_KERNEL);
-	if (!lrw_st)
-		return NULL;
-
-	lrw_st->ops = lr_ops;
-
-	return &lrw_st->hw;
-}
-
-void
-lora_free_hw(struct lora_hw *hw)
-{
-	struct lrw_struct *lrw_st;
-
-	lrw_st = container_of(hw, struct lrw_struct, hw);
-	kfree(lrw_st);
 }
 
 void
