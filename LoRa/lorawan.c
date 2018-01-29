@@ -79,6 +79,8 @@ lora_free_hw(struct lora_hw *hw)
 	kfree(lrw_st);
 }
 
+static void rx_timeout_work(struct work_struct *work);
+
 struct lrw_session *
 lrw_alloc_ss(struct lrw_struct *lrw_st)
 {
@@ -97,6 +99,7 @@ lrw_alloc_ss(struct lrw_struct *lrw_st)
 	ss->should_ack = false;
 	ss->retry = 3;
 	spin_lock_init(&ss->state_lock);
+	INIT_WORK(&ss->timeout_work, rx_timeout_work);
 
 lrw_alloc_ss_end:
 	return ss;
@@ -403,7 +406,7 @@ rx2_timeout_isr(unsigned long data)
 		else
 			return;
 	}
-	
+
 	/* Check the session need to be retransmitted or not */
 	if (ss->retry > 0) {
 		ss->state = LRW_RETRANSMIT_SS;
@@ -418,8 +421,7 @@ rx2_timeout_isr(unsigned long data)
 	else {
 		/* Retry failed */
 rx2_timeout_isr_no_retry_rx_frame:
-		INIT_WORK(&ss->timeout_work, rx_timeout_work);
-		schedule_work(&ss->rx_timeout_work);
+		schedule_work(&ss->timeout_work);
 	}
 }
 
@@ -435,7 +437,7 @@ rx2_delay_isr(unsigned long data)
 	delay = jiffies_64 + (ss->rx2_window + 20) * HZ / 1000 + HZ;
 	ss->timer.expired = delay;
 	add_timer(&ss->timer);
-	
+
 	/* Start LoRa hardware to RX2 window */
 	ss->state = LRW_RX2_SS;
 	lrw_st->ops->start_rx2_window(lrw_st->hw, ss->rx2_window + 20);
@@ -554,7 +556,7 @@ file_open(struct inode *inode, struct file *filp)
 	struct lrw_struct *lrw_st;
 	int status = -ENXIO;
 
-	pr_debug("lorawan: open file\n");
+	pr_debug("%s: open file\n", LORAWAN_MODULE_NAME);
 
 	mutex_lock(&device_list_lock);
 	/* Find the lora data in device_entry with matched dev_t in inode */
@@ -567,7 +569,8 @@ file_open(struct inode *inode, struct file *filp)
 
 	if (status) {
 		mutex_unlock(&device_list_lock);
-		pr_debug("lorawan: nothing for minor %d\n", iminor(inode));
+		pr_debug("%s: nothing for minor %d\n",
+			 LORAWAN_MODULE_NAME, iminor(inode));
 
 		return status;
 	}
@@ -588,7 +591,7 @@ file_close(struct inode *inode, struct file *filp)
 {
 	struct lrw_struct *lrw_st;
 
-	pr_debug("lora: close file\n");
+	pr_debug("%s: close file\n", LORAWAN_MODULE_NAME);
 
 	lrw_st = filp->private_data;
 
@@ -608,7 +611,7 @@ file_read(struct file *filp, char __user *buf, size_t size, loff_t *pos)
 	size_t len;
 	ssize_t ret;
 
-	pr_debug("lora: read file (size=%zu)\n", size);
+	pr_debug("%s: read file (size=%zu)\n", LORAWAN_MODULE_NAME, size);
 
 	lrw_st = filp->private_data;
 
@@ -646,7 +649,7 @@ file_write(struct file *filp, const char __user *buf, size_t size, loff_t *pos)
 	unsigned long rem;
 	int ret;
 
-	pr_debug("lora: write file (size=%zu)\n", size);
+	pr_debug("%s: write file (size=%zu)\n", LORAWAN_MODULE_NAME, size);
 
 	lrw_st = filp->private_data;
 	ss = NULL;
@@ -696,7 +699,7 @@ file_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 	int *pval;
 	struct lrw_struct *lrw_st;
 
-	pr_debug("lora: ioctl file (cmd=0x%X)\n", cmd);
+	pr_debug("%s: ioctl file (cmd=0x%X)\n", LORAWAN_MODULE_NAME, cmd);
 
 	ret = -ENOTTY;
 	pval = (void __user *)arg;
@@ -786,7 +789,7 @@ file_poll(struct file *filp, poll_table *wait)
 	struct lrw_struct *lrw_st;
 	unsigned int mask;
 
-	pr_debug("lora: poll file\n");
+	pr_debug("%s: poll file\n", LORAWAN_MODULE_NAME);
 
 	lrw_st = filp->private_data;
 
