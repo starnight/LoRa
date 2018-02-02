@@ -82,7 +82,7 @@ struct lrw_session {
 	bool tx_should_ack;
 	u8 retry;
 	u8 state;
-	struct spinlock_t state_lock;
+	spinlock_t state_lock;
 
 	struct timer_list timer;
 	struct work_struct timeout_work;
@@ -136,6 +136,9 @@ struct lrw_struct {
 	struct crypto_shash *nwks_shash_tfm;
 	struct crypto_skcipher *nwks_skc_tfm;
 	struct crypto_skcipher *apps_skc_tfm;
+
+	u16 fcnt_up;
+	u16 fcnt_down;
 
 	struct tasklet_struct xmit_task;
 	struct work_struct rx_work;

@@ -1,4 +1,4 @@
-PROJ=lorawan
+PROJ=lrw
 obj-m := $(PROJ).o
 $(PROJ)-objs := lorawan.o lrwsec.o
 

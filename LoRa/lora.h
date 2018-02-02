@@ -50,6 +50,8 @@
 #define	LRW_CLASS_B_NODE		0x2
 #define	LRW_CLASS_C_NODE		0x3
 
+#define	LRW_DEVADDR_LEN			4
+
 /* List the message types of LoRaWAN */
 #define	LRW_JOIN_REQUEST		0x0
 #define LRW_JOIN_ACCEPT			0x1
@@ -97,30 +99,30 @@ struct lora_hw {
 
 /* The structure lists the LoRa device's operations. */
 struct lora_operations {
-	/* Set & get the state of the LoRa device. */
-	long (*setState)(struct lora_hw *, void __user *);
-	long (*getState)(struct lora_hw *, void __user *);
-	/* Set & get the carrier frequency. */
-	long (*setFreq)(struct lora_hw *, void __user *);
-	long (*getFreq)(struct lora_hw *, void __user *);
-	/* Set & get the PA power. */
-	long (*setPower)(struct lora_hw *, void __user *);
-	long (*getPower)(struct lora_hw *, void __user *);
-	/* Set & get the LNA gain. */
-	long (*setLNA)(struct lora_hw *, void __user *);
-	long (*getLNA)(struct lora_hw *, void __user *);
-	/* Set LNA be auto gain control or manual. */
-	long (*setLNAAGC)(struct lora_hw *, void __user *);
-	/* Set & get the RF spreading factor. */
-	long (*setSPRFactor)(struct lora_hw *, void __user *);
-	long (*getSPRFactor)(struct lora_hw *, void __user *);
-	/* Set & get the RF bandwith. */
-	long (*setBW)(struct lora_hw *, void __user *);
-	long (*getBW)(struct lora_hw *, void __user *);
-	/* Get current RSSI. */
-	long (*getRSSI)(struct lora_hw *, void __user *);
-	/* Get last packet's SNR. */
-	long (*getSNR)(struct lora_hw *, void __user *);
+//	/* Set & get the state of the LoRa device. */
+//	long (*setState)(struct lora_hw *, void __user *);
+//	long (*getState)(struct lora_hw *, void __user *);
+//	/* Set & get the carrier frequency. */
+//	long (*setFreq)(struct lora_hw *, void __user *);
+//	long (*getFreq)(struct lora_hw *, void __user *);
+//	/* Set & get the PA power. */
+//	long (*setPower)(struct lora_hw *, void __user *);
+//	long (*getPower)(struct lora_hw *, void __user *);
+//	/* Set & get the LNA gain. */
+//	long (*setLNA)(struct lora_hw *, void __user *);
+//	long (*getLNA)(struct lora_hw *, void __user *);
+//	/* Set LNA be auto gain control or manual. */
+//	long (*setLNAAGC)(struct lora_hw *, void __user *);
+//	/* Set & get the RF spreading factor. */
+//	long (*setSPRFactor)(struct lora_hw *, void __user *);
+//	long (*getSPRFactor)(struct lora_hw *, void __user *);
+//	/* Set & get the RF bandwith. */
+//	long (*setBW)(struct lora_hw *, void __user *);
+//	long (*getBW)(struct lora_hw *, void __user *);
+//	/* Get current RSSI. */
+//	long (*getRSSI)(struct lora_hw *, void __user *);
+//	/* Get last packet's SNR. */
+//	long (*getSNR)(struct lora_hw *, void __user *);
 
 	int (*start)(struct lora_hw *);
 	void (*stop)(struct lora_hw *);
@@ -160,6 +162,6 @@ void lora_unregister_hw(struct lora_hw *);
 void lora_rx_irqsave(struct lora_hw *, struct sk_buff *);
 void lora_xmit_complete(struct lora_hw *, struct sk_buff *);
 
-int lrw_get_devaddr(struct lora_hw *);
+int lrw_get_devaddr(struct lora_hw *, u8 *devaddr);
 
 #endif

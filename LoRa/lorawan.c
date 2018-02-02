@@ -69,6 +69,7 @@ lora_alloc_hw(struct lora_operations *lr_ops)
 
 	return &lrw_st->hw;
 }
+EXPORT_SYMBOL(lora_alloc_hw);
 
 void
 lora_free_hw(struct lora_hw *hw)
@@ -78,6 +79,7 @@ lora_free_hw(struct lora_hw *hw)
 	lrw_st = container_of(hw, struct lrw_struct, hw);
 	kfree(lrw_st);
 }
+EXPORT_SYMBOL(lora_free_hw);
 
 static void rx_timeout_work(struct work_struct *work);
 
@@ -96,7 +98,7 @@ lrw_alloc_ss(struct lrw_struct *lrw_st)
 	ss->nwkskey = lrw_st->nwkskey;
 	ss->appskey = lrw_st->appskey;
 
-	ss->should_ack = false;
+	ss->tx_should_ack = false;
 	ss->retry = 3;
 	spin_lock_init(&ss->state_lock);
 	INIT_WORK(&ss->timeout_work, rx_timeout_work);
@@ -138,8 +140,8 @@ ready2read(struct lrw_struct *lrw_st)
 	bool status = false;
 	struct lrw_session *ss;
 
-	if (!list_empty(lrw_st->ss_list)) {
-		ss = list_first_entry(lrw_st->ss_list,
+	if (!list_empty(&lrw_st->ss_list)) {
+		ss = list_first_entry(&lrw_st->ss_list,
 				      struct lrw_session,
 				      entry);
 		if (ss->state == LRW_RXRECEIVED_SS)
@@ -152,7 +154,6 @@ ready2read(struct lrw_struct *lrw_st)
 void
 lrw_prepare_tx_frame(struct lrw_session *ss)
 {
-	struct lrw_session *ss = lrw_st->_cur_ss;
 	struct lrw_struct *lrw_st = ss->lrw_st;
 	struct sk_buff *skb = ss->tx_skb;
 	u8 mhdr, fctrl, fport;
@@ -169,8 +170,8 @@ lrw_prepare_tx_frame(struct lrw_session *ss)
 	}
 
 	/* Encrypt the plain buffer content */
-	lrw_encrypt_buf(LRW_UPLINK, ss->devaddr,
-			ss->fcnt_up, skb->data, skb->len);
+	lrw_encrypt_buf(lrw_st->apps_skc_tfm, LRW_UPLINK,
+			ss->devaddr, ss->fcnt_up, skb->data, skb->len);
 
 	/* Push FPort */
 	if (skb->len) {
@@ -191,8 +192,8 @@ lrw_prepare_tx_frame(struct lrw_session *ss)
 	memcpy(skb_push(skb, 1), &mhdr, 1);
 
 	/* Put MIC */
-	lrw_calc_mic(LRW_UPLINK, ss->devaddr, ss->fcnt_up,
-		     skb->data, skb->len, mic);
+	lrw_calc_mic(lrw_st->nwks_shash_tfm, LRW_UPLINK,
+		     ss->devaddr, ss->fcnt_up, skb->data, skb->len, mic);
 	memcpy(skb_put(skb, 4), mic, 4);
 }
 
@@ -213,7 +214,7 @@ lrw_parse_frame(struct lrw_session *ss, struct sk_buff *skb)
 	__le16 *p_fcnt;
 
 	/* Get message type */
-	rx_fhdr->mtype = skb->data[0];
+	fhdr->mtype = skb->data[0];
 	skb_pull(skb, 1);
 
 	/* Trim Device Address */
@@ -275,8 +276,8 @@ lrw_rx_work(struct work_struct *work)
 	struct sk_buff *skb;
 
 	lrw_st = container_of(work, struct lrw_struct, rx_work);
-	skb = (struct sk_buff *) lrw_st->rx_skb_list->next;
-	skb_dequeu(&lrw_st->rx_skb_list);
+	skb = lrw_st->rx_skb_list.next;
+	skb_dequeue(&lrw_st->rx_skb_list);
 
 	/* Check and parse the RX frame */
 	ss = lrw_rx_skb_2_session(lrw_st, skb);
@@ -347,7 +348,6 @@ lora_rx_irqsave(struct lora_hw *hw, struct sk_buff *skb)
 {
 	struct lrw_struct *lrw_st;
 	u8 mtype;
-	u8 mic[4];
 	bool is_new_frame;
 
 	lrw_st = container_of(hw, struct lrw_struct, hw);
@@ -372,6 +372,7 @@ lora_rx_irqsave(struct lora_hw *hw, struct sk_buff *skb)
 		kfree_skb(skb);
 	}
 }
+EXPORT_SYMBOL(lora_rx_irqsave);
 
 static void
 rx_timeout_work(struct work_struct *work)
@@ -415,7 +416,7 @@ rx2_timeout_isr(unsigned long data)
 		/* Start timer for ack timeout and retransmit */
 		ss->timer.function = lrw_xmit;
 		ss->timer.data = (unsigned long) lrw_st;
-		ss->timer.expired = jiffies_64 + ss->ack_timeout * HZ;
+		ss->timer.expires = jiffies_64 + ss->ack_timeout * HZ;
 		add_timer(&ss->timer);
 	}
 	else {
@@ -430,17 +431,18 @@ rx2_delay_isr(unsigned long data)
 {
 	struct lrw_session *ss = (struct lrw_session *) data;
 	struct lrw_struct *lrw_st = ss->lrw_st;
+	unsigned long delay;
 
 	/* Start timer for RX2 window */
 	ss->timer.function = rx2_timeout_isr;
 	ss->timer.data = (unsigned long) ss;
 	delay = jiffies_64 + (ss->rx2_window + 20) * HZ / 1000 + HZ;
-	ss->timer.expired = delay;
+	ss->timer.expires = delay;
 	add_timer(&ss->timer);
 
 	/* Start LoRa hardware to RX2 window */
 	ss->state = LRW_RX2_SS;
-	lrw_st->ops->start_rx2_window(lrw_st->hw, ss->rx2_window + 20);
+	lrw_st->ops->start_rx2_window(&lrw_st->hw, ss->rx2_window + 20);
 }
 
 static void
@@ -448,24 +450,24 @@ rx1_delay_isr(unsigned long data)
 {
 	struct lrw_session *ss = (struct lrw_session *) data;
 	struct lrw_struct *lrw_st = ss->lrw_st;
+	unsigned long delay;
 
 	/* Start timer for RX_Delay2 - RX_Delay2 */
 	ss->timer.function = rx2_delay_isr;
 	ss->timer.data = (unsigned long) ss;
 	delay = jiffies_64 + (ss->rx_delay2 - ss->rx_delay1) * HZ - 20 * HZ / 1000;
-	ss->timer.expired = delay;
+	ss->timer.expires = delay;
 	add_timer(&ss->timer);
 
 	/* Start LoRa hardware to RX1 window */
 	ss->state = LRW_RX1_SS;
-	lrw_st->ops->start_rx1_window(lrw_st->hw, ss->rx1_window + 20);
+	lrw_st->ops->start_rx1_window(&lrw_st->hw, ss->rx1_window + 20);
 }
 
 static void
 lrw_sent_tx_work(struct lrw_struct *lrw_st, struct sk_buff *skb)
 {
 	struct lrw_session *ss;
-	int status;
 	unsigned long delay;
 
 	/* Find the session in ss_list_entry with matched skb */
@@ -476,16 +478,16 @@ lrw_sent_tx_work(struct lrw_struct *lrw_st, struct sk_buff *skb)
 	/* Start session timer for RX_Delay1 */
 	init_timer(&ss->timer);
 	ss->timer.function = rx1_delay_isr;
-	ss_st->timer.data = (unsigned long) ss;
+	ss->timer.data = (unsigned long) ss;
 	delay = jiffies_64 + ss->rx_delay1 * HZ - 20 * HZ / 1000;
-	ss->timer.expired = delay;
+	ss->timer.expires = delay;
 	add_timer(&ss->timer);
 
 	/* Set LoRa hardware to IDLE state */
-	lrw_st->ops->set_state(hw, LORA_STATE_IDLE);
+	lrw_st->ops->set_state(&lrw_st->hw, LORA_STATE_IDLE);
 }
 
-static void
+void
 lora_xmit_complete(struct lora_hw *hw, struct sk_buff *skb)
 {
 	struct lrw_struct *lrw_st;
@@ -493,18 +495,30 @@ lora_xmit_complete(struct lora_hw *hw, struct sk_buff *skb)
 	lrw_st = container_of(hw, struct lrw_struct, hw);
 	lrw_sent_tx_work(lrw_st, skb);
 }
+EXPORT_SYMBOL(lora_xmit_complete);
 
+int
+lrw_get_devaddr(struct lora_hw *hw, u8 *devaddr)
+{
+	struct lrw_struct *lrw_st;
+
+	lrw_st = container_of(hw, struct lrw_struct, hw);
+	memcpy(devaddr, lrw_st->devaddr, LRW_DEVADDR_LEN);
+
+	return 0;
+}
+EXPORT_SYMBOL(lrw_get_devaddr);
 
 /* ---------------------- Character device driver part ---------------------- */
 
 static struct class *lrw_sys_class;
 static int lrw_major;
-static unsigned int lora_hw_amount = sizeof(int) * 8;
+#define	LORA_HW_AMOUNT		(sizeof(int) * 8)
 
 static LIST_HEAD(device_list);
 static DEFINE_MUTEX(device_list_lock);
 
-static DECLARE_BITMAP(minors, lora_hw_amount);
+static DECLARE_BITMAP(minors, LORA_HW_AMOUNT);
 static DEFINE_MUTEX(minors_lock);
 
 /**
@@ -617,7 +631,7 @@ file_read(struct file *filp, char __user *buf, size_t size, loff_t *pos)
 
 	mutex_lock(&lrw_st->ss_list_lock);
 	if (ready2read(lrw_st)) {
-		ss = list_first_entry(lrw_st->ss_list,
+		ss = list_first_entry(&lrw_st->ss_list,
 				      struct lrw_session,
 				      entry);
 		skb = ss->rx_skb;
@@ -707,75 +721,75 @@ file_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 
 	/* I/O control by each command */
 	switch (cmd) {
-	/* Set & read the state of the LoRa device */
-	case LRW_SET_STATE:
-		if (lrw_st->ops->setState != NULL)
-			ret = lrw_st->ops->setState(lrw_st, pval);
-		break;
-	case LRW_GET_STATE:
-		if (lrw_st->ops->getState != NULL)
-			ret = lrw_st->ops->getState(lrw_st, pval);
-		break;
-	/* Set & get the carrier frequency */
-	case LRW_SET_FREQUENCY:
-		if (lrw_st->ops->setFreq != NULL)
-			ret = lrw_st->ops->setFreq(lrw_st, pval);
-		break;
-	case LRW_GET_FREQUENCY:
-		if (lrw_st->ops->getFreq != NULL)
-			ret = lrw_st->ops->getFreq(lrw_st, pval);
-		break;
-	/* Set & get the PA power */
-	case LRW_SET_POWER:
-		if (lrw_st->ops->setPower != NULL)
-			ret = lrw_st->ops->setPower(lrw_st, pval);
-		break;
-	case LRW_GET_POWER:
-		if (lrw_st->ops->getPower != NULL)
-			ret = lrw_st->ops->getPower(lrw_st, pval);
-		break;
-	/* Set & get the LNA gain */
-	case LRW_SET_LNA:
-		if (lrw_st->ops->setLNA != NULL)
-			ret = lrw_st->ops->setLNA(lrw_st, pval);
-		break;
-	case LRW_GET_LNA:
-		if (lrw_st->ops->getLNA != NULL)
-			ret = lrw_st->ops->getLNA(lrw_st, pval);
-		break;
-	/* Set the LNA be auto gain control or manual */
-	case LRW_SET_LNAAGC:
-		if (lrw_st->ops->setLNAAGC != NULL)
-			ret = lrw_st->ops->setLNAAGC(lrw_st, pval);
-		break;
-	/* Set & get the RF spreading factor */
-	case LRW_SET_SPRFACTOR:
-		if (lrw_st->ops->setSPRFactor != NULL)
-			ret = lrw_st->ops->setSPRFactor(lrw_st, pval);
-		break;
-	case LRW_GET_SPRFACTOR:
-		if (lrw_st->ops->getSPRFactor != NULL)
-			ret = lrw_st->ops->getSPRFactor(lrw_st, pval);
-		break;
-	/* Set & get the RF bandwith */
-	case LRW_SET_BANDWIDTH:
-		if (lrw_st->ops->setBW != NULL)
-			ret = lrw_st->ops->setBW(lrw_st, pval);
-		break;
-	case LRW_GET_BANDWIDTH:
-		if (lrw_st->ops->getBW != NULL)
-			ret = lrw_st->ops->getBW(lrw_st, pval);
-		break;
-	/* Get current RSSI */
-	case LRW_GET_RSSI:
-		if (lrw_st->ops->getRSSI != NULL)
-			ret = lrw_st->ops->getRSSI(lrw_st, pval);
-		break;
-	/* Get last packet's SNR */
-	case LRW_GET_SNR:
-		if (lrw_st->ops->getSNR != NULL)
-			ret = lrw_st->ops->getSNR(lrw_st, pval);
-		break;
+//	/* Set & read the state of the LoRa device */
+//	case LRW_SET_STATE:
+//		if (lrw_st->ops->setState != NULL)
+//			ret = lrw_st->ops->setState(lrw_st, pval);
+//		break;
+//	case LRW_GET_STATE:
+//		if (lrw_st->ops->getState != NULL)
+//			ret = lrw_st->ops->getState(lrw_st, pval);
+//		break;
+//	/* Set & get the carrier frequency */
+//	case LRW_SET_FREQUENCY:
+//		if (lrw_st->ops->setFreq != NULL)
+//			ret = lrw_st->ops->setFreq(lrw_st, pval);
+//		break;
+//	case LRW_GET_FREQUENCY:
+//		if (lrw_st->ops->getFreq != NULL)
+//			ret = lrw_st->ops->getFreq(lrw_st, pval);
+//		break;
+//	/* Set & get the PA power */
+//	case LRW_SET_POWER:
+//		if (lrw_st->ops->setPower != NULL)
+//			ret = lrw_st->ops->setPower(lrw_st, pval);
+//		break;
+//	case LRW_GET_POWER:
+//		if (lrw_st->ops->getPower != NULL)
+//			ret = lrw_st->ops->getPower(lrw_st, pval);
+//		break;
+//	/* Set & get the LNA gain */
+//	case LRW_SET_LNA:
+//		if (lrw_st->ops->setLNA != NULL)
+//			ret = lrw_st->ops->setLNA(lrw_st, pval);
+//		break;
+//	case LRW_GET_LNA:
+//		if (lrw_st->ops->getLNA != NULL)
+//			ret = lrw_st->ops->getLNA(lrw_st, pval);
+//		break;
+//	/* Set the LNA be auto gain control or manual */
+//	case LRW_SET_LNAAGC:
+//		if (lrw_st->ops->setLNAAGC != NULL)
+//			ret = lrw_st->ops->setLNAAGC(lrw_st, pval);
+//		break;
+//	/* Set & get the RF spreading factor */
+//	case LRW_SET_SPRFACTOR:
+//		if (lrw_st->ops->setSPRFactor != NULL)
+//			ret = lrw_st->ops->setSPRFactor(lrw_st, pval);
+//		break;
+//	case LRW_GET_SPRFACTOR:
+//		if (lrw_st->ops->getSPRFactor != NULL)
+//			ret = lrw_st->ops->getSPRFactor(lrw_st, pval);
+//		break;
+//	/* Set & get the RF bandwith */
+//	case LRW_SET_BANDWIDTH:
+//		if (lrw_st->ops->setBW != NULL)
+//			ret = lrw_st->ops->setBW(lrw_st, pval);
+//		break;
+//	case LRW_GET_BANDWIDTH:
+//		if (lrw_st->ops->getBW != NULL)
+//			ret = lrw_st->ops->getBW(lrw_st, pval);
+//		break;
+//	/* Get current RSSI */
+//	case LRW_GET_RSSI:
+//		if (lrw_st->ops->getRSSI != NULL)
+//			ret = lrw_st->ops->getRSSI(lrw_st, pval);
+//		break;
+//	/* Get last packet's SNR */
+//	case LRW_GET_SNR:
+//		if (lrw_st->ops->getSNR != NULL)
+//			ret = lrw_st->ops->getSNR(lrw_st, pval);
+//		break;
 	default:
 		ret = -ENOTTY;
 	}
@@ -837,11 +851,11 @@ lora_register_hw(struct lora_hw *hw)
 
 	/* Check there is a space for new LoRa hardware */
 	mutex_lock(&minors_lock);
-	minor = find_first_zero_bit(minors, lora_hw_amount);
-	if (minor < lora_hw_amount)
+	minor = find_first_zero_bit(minors, LORA_HW_AMOUNT);
+	if (minor < LORA_HW_AMOUNT)
 		set_bit(minor, minors);
 	mutex_unlock(&minors_lock);
-	if (minor >= lora_hw_amount) {
+	if (minor >= LORA_HW_AMOUNT) {
 		status = -ENODEV;
 		goto lrw_register_hw_end;
 	}
@@ -864,6 +878,7 @@ lora_register_hw(struct lora_hw *hw)
 lrw_register_hw_end:
 	return status;
 }
+EXPORT_SYMBOL(lora_register_hw);
 
 /**
  * lora_unregister_hw - Unregister the LoRa driver
@@ -876,7 +891,7 @@ lora_unregister_hw(struct lora_hw *hw)
 	int minor;
 
 	lrw_st = container_of(hw, struct lrw_struct, hw);
-	minor = minor(lrw_st->devt);
+	minor = MINOR(lrw_st->devt);
 
 	pr_info("%s: unregister lora%d\n", LORAWAN_MODULE_NAME, minor);
 	/* Delete the character device driver from system */
@@ -887,8 +902,9 @@ lora_unregister_hw(struct lora_hw *hw)
 	clear_bit(minor, minors);
 	mutex_unlock(&minors_lock);
 
-	return 0;
+	return;
 }
+EXPORT_SYMBOL(lora_unregister_hw);
 
 static int
 lrw_init(void)
@@ -902,7 +918,7 @@ lrw_init(void)
 	/* Allocate a character device */
 	alloc_ret = alloc_chrdev_region(&devt,
 					0,
-					lora_hw_amount,
+					LORA_HW_AMOUNT,
 					LORAWAN_MODULE_NAME);
 	if (alloc_ret) {
 		pr_err("%s: Failed to allocate a character device\n",
@@ -928,7 +944,7 @@ lrw_init(void)
 lrw_init_error:
 	/* Release the allocated character device */
 	if (alloc_ret == 0)
-		unregister_chrdev_region(devt, lora_hw_amount);
+		unregister_chrdev_region(devt, LORA_HW_AMOUNT);
 	return err;
 }
 
@@ -940,10 +956,10 @@ lrw_exit(void)
 	/* Delete device class */
 	class_destroy(lrw_sys_class);
 	/* Unregister the allocated character device */
-	unregister_chrdev_region(devt, lora_hw_amount);
+	unregister_chrdev_region(devt, LORA_HW_AMOUNT);
 	pr_info("%s: module removed\n", LORAWAN_MODULE_NAME);
 
-	return 0;
+	return;
 }
 
 module_init(lrw_init);
