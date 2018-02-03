@@ -19,10 +19,5 @@ uninstall:
 	# Rebuild the kernel module dependencies for modprobe
 	sudo depmod -a
 
-test:
-	make install; echo
-	ls -l /dev/$(PROJ)*
-	make uninstall
-
 clean:
 	make -C $(BUILDDIR) M=$(PWD) clean
