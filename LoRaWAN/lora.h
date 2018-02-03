@@ -155,7 +155,7 @@ struct lrw_driver {
 	struct module *owner;
 };
 
-struct lora_hw *lora_alloc_hw(struct lora_operations *);
+struct lora_hw *lora_alloc_hw(size_t, struct lora_operations *);
 void lora_free_hw(struct lora_hw *);
 int lora_register_hw(struct lora_hw *);
 void lora_unregister_hw(struct lora_hw *);

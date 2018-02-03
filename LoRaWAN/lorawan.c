@@ -57,15 +57,25 @@
 #define	LORAWAN_MODULE_NAME	"lorawan"
 
 struct lora_hw *
-lora_alloc_hw(struct lora_operations *lr_ops)
+lora_alloc_hw(size_t priv_data_len, struct lora_operations *lr_ops)
 {
 	struct lrw_struct *lrw_st;
 
-	lrw_st = kzalloc(sizeof(struct lrw_struct), GFP_KERNEL);
+	/* In memory it'll be like this:
+	 *
+	 * +-----------------------+
+	 * | struct lrw_struct     |
+	 * +-----------------------+
+	 * | driver's private data |
+	 * +-----------------------+
+	 */
+
+	lrw_st = kzalloc(sizeof(struct lrw_struct) + priv_data_len, GFP_KERNEL);
 	if (!lrw_st)
 		return NULL;
 
 	lrw_st->ops = lr_ops;
+	lrw_st->hw.priv = (void *) lrw_st + sizeof(struct lrw_struct);
 
 	return &lrw_st->hw;
 }
