@@ -61,6 +61,7 @@ lora_alloc_hw(size_t priv_data_len, struct lora_operations *lr_ops)
 {
 	struct lrw_struct *lrw_st;
 
+	pr_debug("%s: %s\n", LORAWAN_MODULE_NAME, __func__);
 	/* In memory it'll be like this:
 	 *
 	 * +-----------------------+
@@ -904,6 +905,7 @@ lora_unregister_hw(struct lora_hw *hw)
 	minor = MINOR(lrw_st->devt);
 
 	pr_info("%s: unregister lora%d\n", LORAWAN_MODULE_NAME, minor);
+
 	/* Delete the character device driver from system */
 	cdev_del(&(lrw_st->lrw_cdev));
 	lrw_remove_hw(lrw_st);
@@ -923,7 +925,7 @@ lrw_init(void)
 	int alloc_ret = -1;
 	int err;
 
-	pr_info("%s: module inserted", LORAWAN_MODULE_NAME);
+	pr_info("%s: module inserted\n", LORAWAN_MODULE_NAME);
 
 	/* Allocate a character device */
 	alloc_ret = alloc_chrdev_region(&devt,
@@ -962,7 +964,7 @@ static void
 lrw_exit(void)
 {
 	dev_t devt = MKDEV(lrw_major, 0);
-	
+
 	/* Delete device class */
 	class_destroy(lrw_sys_class);
 	/* Unregister the allocated character device */

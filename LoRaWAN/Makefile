@@ -15,7 +15,7 @@ install:
 
 uninstall:
 	sudo modprobe -r $(PROJ)
-	sudo rm $(KERNEL_LOCATION)/extra/$(PROJ).ko.gz
+	sudo rm $(KERNEL_LOCATION)/extra/$(PROJ).ko.[bgx]z
 	# Rebuild the kernel module dependencies for modprobe
 	sudo depmod -a
 
