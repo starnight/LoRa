@@ -386,6 +386,15 @@ lora_rx_irqsave(struct lora_hw *hw, struct sk_buff *skb)
 EXPORT_SYMBOL(lora_rx_irqsave);
 
 static void
+lrw_rexmit(struct timer_list *timer)
+{
+	struct lrw_session *ss = container_of(timer, struct lrw_session, timer);
+	struct lrw_struct *lrw_st = ss->lrw_st;
+
+	lrw_xmit((unsigned long) lrw_st);
+}
+
+static void
 rx_timeout_work(struct work_struct *work)
 {
 	struct lrw_struct *lrw_st;
@@ -401,10 +410,9 @@ rx_timeout_work(struct work_struct *work)
 }
 
 static void
-rx2_timeout_isr(unsigned long data)
+rx2_timeout_isr(struct timer_list *timer)
 {
-	struct lrw_session *ss = (struct lrw_session *) data;
-	struct lrw_struct *lrw_st = ss->lrw_st;
+	struct lrw_session *ss = container_of(timer, struct lrw_session, timer);
 
 	/* Check TX is acked or not */
 	if (!ss->tx_should_ack) {
@@ -425,8 +433,7 @@ rx2_timeout_isr(unsigned long data)
 		ss->retry--;
 
 		/* Start timer for ack timeout and retransmit */
-		ss->timer.function = lrw_xmit;
-		ss->timer.data = (unsigned long) lrw_st;
+		ss->timer.function = lrw_rexmit;
 		ss->timer.expires = jiffies_64 + ss->ack_timeout * HZ;
 		add_timer(&ss->timer);
 	}
@@ -438,15 +445,14 @@ rx2_timeout_isr_no_retry_rx_frame:
 }
 
 static void
-rx2_delay_isr(unsigned long data)
+rx2_delay_isr(struct timer_list *timer)
 {
-	struct lrw_session *ss = (struct lrw_session *) data;
+	struct lrw_session *ss = container_of(timer, struct lrw_session, timer);
 	struct lrw_struct *lrw_st = ss->lrw_st;
 	unsigned long delay;
 
 	/* Start timer for RX2 window */
 	ss->timer.function = rx2_timeout_isr;
-	ss->timer.data = (unsigned long) ss;
 	delay = jiffies_64 + (ss->rx2_window + 20) * HZ / 1000 + HZ;
 	ss->timer.expires = delay;
 	add_timer(&ss->timer);
@@ -457,15 +463,14 @@ rx2_delay_isr(unsigned long data)
 }
 
 static void
-rx1_delay_isr(unsigned long data)
+rx1_delay_isr(struct timer_list *timer)
 {
-	struct lrw_session *ss = (struct lrw_session *) data;
+	struct lrw_session *ss = container_of(timer, struct lrw_session, timer);
 	struct lrw_struct *lrw_st = ss->lrw_st;
 	unsigned long delay;
 
 	/* Start timer for RX_Delay2 - RX_Delay2 */
 	ss->timer.function = rx2_delay_isr;
-	ss->timer.data = (unsigned long) ss;
 	delay = jiffies_64 + (ss->rx_delay2 - ss->rx_delay1) * HZ - 20 * HZ / 1000;
 	ss->timer.expires = delay;
 	add_timer(&ss->timer);
@@ -487,9 +492,7 @@ lrw_sent_tx_work(struct lrw_struct *lrw_st, struct sk_buff *skb)
 	ss->state = LRW_XMITTED;
 
 	/* Start session timer for RX_Delay1 */
-	init_timer(&ss->timer);
-	ss->timer.function = rx1_delay_isr;
-	ss->timer.data = (unsigned long) ss;
+	timer_setup(&ss->timer, rx1_delay_isr, 0);
 	delay = jiffies_64 + ss->rx_delay1 * HZ - 20 * HZ / 1000;
 	ss->timer.expires = delay;
 	add_timer(&ss->timer);
@@ -908,6 +911,7 @@ lora_unregister_hw(struct lora_hw *hw)
 
 	/* Delete the character device driver from system */
 	cdev_del(&(lrw_st->lrw_cdev));
+	device_destroy(lrw_sys_class, lrw_st->devt);
 	lrw_remove_hw(lrw_st);
 
 	mutex_lock(&minors_lock);

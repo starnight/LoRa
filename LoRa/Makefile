@@ -10,11 +10,13 @@ all:
 install:
 	sudo make -C $(BUILDDIR) M=$(PWD) modules_install
 	# Rebuild the kernel module dependencies for modprobe
-	sudo modprobe  $(PROJ)
+	sudo depmod -a
+	sudo modprobe $(PROJ)
 
 uninstall:
 	sudo modprobe -r $(PROJ)
 	sudo rm $(KERNEL_LOCATION)/extra/$(PROJ).ko.[bgx]z
+	sudo depmod -a
 
 test:
 	make install; echo
