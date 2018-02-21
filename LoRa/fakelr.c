@@ -82,12 +82,6 @@ fakelr_set_txpower(struct lora_hw *hw, s32 pwr)
 }
 
 static int
-fakelr_set_channel(struct lora_hw *hw, u8 ch)
-{
-	return 0;
-}
-
-static int
 fakelr_start_rx1_window(struct lora_hw *hw, u32 t)
 {
 	return 0;
@@ -110,7 +104,6 @@ static struct lora_operations lr_ops = {
 	.stop = fakelr_stop,
 	.xmit_async = fakelr_xmit_async,
 	.set_txpower = fakelr_set_txpower,
-	.set_channel = fakelr_set_channel,
 	.start_rx1_window = fakelr_start_rx1_window,
 	.start_rx2_window = fakelr_start_rx2_window,
 	.set_state = fakelr_set_state,
@@ -153,7 +146,6 @@ fakelr_del(struct fakelr_phy *phy)
 
 	dev_info(hw->parent, "unregister a lora hardware\n");
 	lora_unregister_hw(hw);
-	dev_info(hw->parent, "free a lora hardware\n");
 	lora_free_hw(hw);
 }
 

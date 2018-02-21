@@ -129,7 +129,10 @@ struct lora_operations {
 	/* Write to the LoRa device's communication. */
 	int (*xmit_async)(struct lora_hw *, struct sk_buff *);
 	int (*set_txpower)(struct lora_hw *, s32);
-	int (*set_channel)(struct lora_hw *, u8);
+	int (*set_frq)(struct lora_hw *, u32);
+	int (*set_bw)(struct lora_hw *, u32);
+	int (*set_mod)(struct lora_hw *, u8);
+	int (*set_sf)(struct lora_hw *, u8);
 	int (*start_rx1_window)(struct lora_hw *, u32);
 	int (*start_rx2_window)(struct lora_hw *, u32);
 	int (*set_state)(struct lora_hw *, u8);
@@ -155,13 +158,13 @@ struct lrw_driver {
 	struct module *owner;
 };
 
-extern struct lora_hw *lora_alloc_hw(size_t, struct lora_operations *);
-extern void lora_free_hw(struct lora_hw *);
-extern int lora_register_hw(struct lora_hw *);
-extern void lora_unregister_hw(struct lora_hw *);
-extern void lora_rx_irqsave(struct lora_hw *, struct sk_buff *);
-extern void lora_xmit_complete(struct lora_hw *, struct sk_buff *);
+struct lora_hw *lora_alloc_hw(size_t, struct lora_operations *);
+void lora_free_hw(struct lora_hw *);
+int lora_register_hw(struct lora_hw *);
+void lora_unregister_hw(struct lora_hw *);
+void lora_rx_irqsave(struct lora_hw *, struct sk_buff *);
+void lora_xmit_complete(struct lora_hw *, struct sk_buff *);
 
-extern int lrw_get_devaddr(struct lora_hw *, u8 *devaddr);
+int lrw_get_devaddr(struct lora_hw *, u8 *devaddr);
 
 #endif

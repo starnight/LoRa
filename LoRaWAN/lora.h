@@ -129,7 +129,10 @@ struct lora_operations {
 	/* Write to the LoRa device's communication. */
 	int (*xmit_async)(struct lora_hw *, struct sk_buff *);
 	int (*set_txpower)(struct lora_hw *, s32);
-	int (*set_channel)(struct lora_hw *, u8);
+	int (*set_frq)(struct lora_hw *, u32);
+	int (*set_bw)(struct lora_hw *, u32);
+	int (*set_mod)(struct lora_hw *, u8);
+	int (*set_sf)(struct lora_hw *, u8);
 	int (*start_rx1_window)(struct lora_hw *, u32);
 	int (*start_rx2_window)(struct lora_hw *, u32);
 	int (*set_state)(struct lora_hw *, u8);
