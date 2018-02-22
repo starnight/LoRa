@@ -82,6 +82,30 @@ fakelr_set_txpower(struct lora_hw *hw, s32 pwr)
 }
 
 static int
+fakelr_set_frq(struct lora_hw *hw, u32 frq)
+{
+	return 0;
+}
+
+static int
+fakelr_set_bw(struct lora_hw *hw, u32 bw)
+{
+	return 0;
+}
+
+static int
+fakelr_set_mod(struct lora_hw *hw, u8 mod)
+{
+	return 0;
+}
+
+static int
+fakelr_set_sf(struct lora_hw *hw, u8 sf)
+{
+	return 0;
+}
+
+static int
 fakelr_start_rx1_window(struct lora_hw *hw, u32 t)
 {
 	return 0;
@@ -104,6 +128,10 @@ static struct lora_operations lr_ops = {
 	.stop = fakelr_stop,
 	.xmit_async = fakelr_xmit_async,
 	.set_txpower = fakelr_set_txpower,
+	.set_frq = fakelr_set_frq,
+	.set_bw = fakelr_set_bw,
+	.set_mod = fakelr_set_mod,
+	.set_sf = fakelr_set_sf,
 	.start_rx1_window = fakelr_start_rx1_window,
 	.start_rx2_window = fakelr_start_rx2_window,
 	.set_state = fakelr_set_state,

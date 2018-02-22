@@ -57,11 +57,18 @@
 #define	LORAWAN_MODULE_NAME	"lorawan"
 
 struct lora_hw *
-lora_alloc_hw(size_t priv_data_len, struct lora_operations *lr_ops)
+lora_alloc_hw(size_t priv_data_len, struct lora_operations *ops)
 {
 	struct lrw_struct *lrw_st;
 
 	pr_debug("%s: %s\n", LORAWAN_MODULE_NAME, __func__);
+
+	if (WARN_ON(!ops || !ops->start || !ops->stop || !ops->xmit_async ||
+		    !ops->set_txpower || !ops->set_frq || !ops->set_bw ||
+		    !ops->set_mod || !ops->set_sf || !ops->start_rx1_window ||
+		    !ops->start_rx2_window || !ops->set_state))
+		return NULL;
+
 	/* In memory it'll be like this:
 	 *
 	 * +-----------------------+
@@ -70,12 +77,11 @@ lora_alloc_hw(size_t priv_data_len, struct lora_operations *lr_ops)
 	 * | driver's private data |
 	 * +-----------------------+
 	 */
-
 	lrw_st = kzalloc(sizeof(struct lrw_struct) + priv_data_len, GFP_KERNEL);
 	if (!lrw_st)
 		return NULL;
 
-	lrw_st->ops = lr_ops;
+	lrw_st->ops = ops;
 	lrw_st->hw.priv = (void *) lrw_st + sizeof(struct lrw_struct);
 
 	return &lrw_st->hw;
@@ -861,6 +867,7 @@ lora_register_hw(struct lora_hw *hw)
 	unsigned int minor;
 	int status = 0;
 
+	pr_debug("%s: %s\n", LORAWAN_MODULE_NAME, __func__);
 	lrw_st = container_of(hw, struct lrw_struct, hw);
 
 	/* Check there is a space for new LoRa hardware */
