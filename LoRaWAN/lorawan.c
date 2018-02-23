@@ -550,6 +550,8 @@ static DEFINE_MUTEX(minors_lock);
 int
 lrw_add_hw(struct lrw_struct *lrw_st)
 {
+	pr_debug("%s: %s\n", LORAWAN_MODULE_NAME, __func__);
+
 	INIT_LIST_HEAD(&(lrw_st->device_entry));
 
 	mutex_lock(&device_list_lock);
@@ -863,9 +865,8 @@ int
 lora_register_hw(struct lora_hw *hw)
 {
 	struct lrw_struct *lrw_st;
-	struct device *dev;
 	unsigned int minor;
-	int status = 0;
+	int status;
 
 	pr_debug("%s: %s\n", LORAWAN_MODULE_NAME, __func__);
 	lrw_st = container_of(hw, struct lrw_struct, hw);
@@ -882,12 +883,17 @@ lora_register_hw(struct lora_hw *hw)
 	}
 
 	/* Add a LoRa device node under /dev */
-	cdev_init(&(lrw_st->lrw_cdev), &lrw_fops);
+	cdev_init(&lrw_st->lrw_cdev, &lrw_fops);
 	lrw_st->lrw_cdev.owner = THIS_MODULE;
 	lrw_st->devt = MKDEV(lrw_major, minor);
+	status = cdev_add(&lrw_st->lrw_cdev, lrw_st->devt, LORA_HW_AMOUNT);
+	if (status)
+		goto lrw_register_hw_end;
 	lrw_st->dev = device_create(lrw_sys_class, NULL, lrw_st->devt, lrw_st,
 				    "lora%d", minor);
-	status = PTR_ERR_OR_ZERO(dev);
+	status = PTR_ERR_OR_ZERO(lrw_st->dev);
+
+lrw_register_hw_end:
 	if (status == 0)
 		lrw_add_hw(lrw_st);
 	else {
@@ -896,7 +902,6 @@ lora_register_hw(struct lora_hw *hw)
 		mutex_unlock(&minors_lock);
 	}
 
-lrw_register_hw_end:
 	return status;
 }
 EXPORT_SYMBOL(lora_register_hw);
