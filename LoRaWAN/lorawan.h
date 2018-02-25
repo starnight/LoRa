@@ -130,9 +130,9 @@ struct lrw_struct {
 	bool rx_should_ack;
 
 	u8 devaddr[LRW_DEVADDR_LEN];
-	u8 appkey[16];
-	u8 nwkskey[16];
-	u8 appskey[16];
+	u8 appkey[LORA_KEY_LEN];
+	u8 nwkskey[LORA_KEY_LEN];
+	u8 appskey[LORA_KEY_LEN];
 	struct crypto_shash *nwks_shash_tfm;
 	struct crypto_skcipher *nwks_skc_tfm;
 	struct crypto_skcipher *apps_skc_tfm;

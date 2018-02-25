@@ -176,6 +176,8 @@ lrw_prepare_tx_frame(struct lrw_session *ss)
 	u8 mhdr, fctrl, fport;
 	u8 mic[4];
 
+	pr_debug("%s: %s\n", LORAWAN_MODULE_NAME, __func__);
+
 	mhdr = LRW_UNCONFIRMED_DATA_UP << 5;
 	if ((mhdr & (0x6 << 5)) == (0x4 << 5))
 		ss->tx_should_ack = true;
@@ -529,6 +531,32 @@ lrw_get_devaddr(struct lora_hw *hw, u8 *devaddr)
 }
 EXPORT_SYMBOL(lrw_get_devaddr);
 
+int
+lora_set_key(struct lora_hw *hw, u8 type, u8 *key, size_t l)
+{
+	int ret;
+	struct lrw_struct *lrw_st;
+
+	lrw_st = container_of(hw, struct lrw_struct, hw);
+
+	ret = 0;
+	switch (type) {
+	case LORA_APPKEY:
+		memcpy(lrw_st->appkey, key, LORA_KEY_LEN);
+		break;
+	case LORA_NWKSKEY:
+		memcpy(lrw_st->nwkskey, key, LORA_KEY_LEN);
+		break;
+	case LORA_APPSKEY:
+		memcpy(lrw_st->appskey, key, LORA_KEY_LEN);
+		break;
+	default:
+		ret = -1;
+	}
+
+	return ret;
+}
+
 /* ---------------------- Character device driver part ---------------------- */
 
 static struct class *lrw_sys_class;
@@ -855,6 +883,29 @@ static struct file_operations lrw_fops = {
 	.llseek		= no_llseek,
 };
 
+int lora_start_hw(struct lrw_struct *lrw_st)
+{
+	pr_debug("%s: %s\n", LORAWAN_MODULE_NAME, __func__);
+	lrw_st->nwks_shash_tfm = lrw_mic_key_setup(lrw_st->nwkskey,
+						   LORA_KEY_LEN);
+	lrw_st->nwks_skc_tfm = lrw_encrypt_key_setup(lrw_st->nwkskey,
+						     LORA_KEY_LEN);
+	lrw_st->apps_skc_tfm = lrw_encrypt_key_setup(lrw_st->appskey,
+						     LORA_KEY_LEN);
+	lrw_st->ops->start(&lrw_st->hw);
+
+	return 0;
+}
+
+void lora_stop_hw(struct lrw_struct *lrw_st)
+{
+	pr_debug("%s: %s\n", LORAWAN_MODULE_NAME, __func__);
+	lrw_st->ops->stop(&lrw_st->hw);
+	lrw_mic_key_free(lrw_st->nwks_shash_tfm);
+	lrw_encrypt_key_free(lrw_st->nwks_skc_tfm);
+	lrw_encrypt_key_free(lrw_st->apps_skc_tfm);
+}
+
 /**
  * lora_register_hw - Register there is a kind of LoRa driver
  * @driver:	LoRa driver going to be registered
@@ -894,8 +945,10 @@ lora_register_hw(struct lora_hw *hw)
 	status = PTR_ERR_OR_ZERO(lrw_st->dev);
 
 lrw_register_hw_end:
-	if (status == 0)
+	if (status == 0) {
 		lrw_add_hw(lrw_st);
+		lora_start_hw(lrw_st);
+	}
 	else {
 		mutex_lock(&minors_lock);
 		clear_bit(minor, minors);
@@ -924,6 +977,7 @@ lora_unregister_hw(struct lora_hw *hw)
 	/* Delete the character device driver from system */
 	cdev_del(&(lrw_st->lrw_cdev));
 	device_destroy(lrw_sys_class, lrw_st->devt);
+	lora_stop_hw(lrw_st);
 	lrw_remove_hw(lrw_st);
 
 	mutex_lock(&minors_lock);

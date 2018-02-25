@@ -165,6 +165,11 @@ void lora_unregister_hw(struct lora_hw *);
 void lora_rx_irqsave(struct lora_hw *, struct sk_buff *);
 void lora_xmit_complete(struct lora_hw *, struct sk_buff *);
 
+#define	LORA_APPKEY		0
+#define	LORA_NWKSKEY		1
+#define	LORA_APPSKEY		2
+#define	LORA_KEY_LEN		16
+int lora_set_key(struct lora_hw *, u8, u8 *, size_t);
 int lrw_get_devaddr(struct lora_hw *, u8 *devaddr);
 
 #endif
