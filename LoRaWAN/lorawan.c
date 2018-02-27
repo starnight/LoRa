@@ -105,6 +105,8 @@ lrw_alloc_ss(struct lrw_struct *lrw_st)
 {
 	struct lrw_session *ss;
 
+	pr_debug("%s: %s\n", LORAWAN_MODULE_NAME, __func__);
+
 	ss = kzalloc(sizeof(struct lrw_session), GFP_KERNEL);
 	if (!ss)
 		goto lrw_alloc_ss_end;
@@ -114,6 +116,7 @@ lrw_alloc_ss(struct lrw_struct *lrw_st)
 	ss->appkey = lrw_st->appkey;
 	ss->nwkskey = lrw_st->nwkskey;
 	ss->appskey = lrw_st->appskey;
+	INIT_LIST_HEAD(&ss->entry);
 
 	ss->tx_should_ack = false;
 	ss->retry = 3;
@@ -145,6 +148,7 @@ ready2write(struct lrw_struct *lrw_st)
 {
 	bool status = false;
 
+	pr_debug("%s: %s\n", LORAWAN_MODULE_NAME, __func__);
 	if (!lrw_st->_cur_ss)
 		status = true;
 
@@ -590,6 +594,9 @@ lrw_add_hw(struct lrw_struct *lrw_st)
 	lrw_st->fcnt_down = 0;
 	lrw_st->_cur_ss = NULL;
 
+	mutex_init(&lrw_st->ss_list_lock);
+	INIT_LIST_HEAD(&lrw_st->ss_list);
+
 	tasklet_init(&lrw_st->xmit_task, lrw_xmit, (unsigned long) lrw_st);
 	INIT_WORK(&lrw_st->rx_work, lrw_rx_work);
 
@@ -737,6 +744,7 @@ file_write(struct file *filp, const char __user *buf, size_t size, loff_t *pos)
 	}
 	mutex_unlock(&lrw_st->ss_list_lock);
 
+	pr_debug("%s: write a new skb\n", LORAWAN_MODULE_NAME);
 	if (ss != NULL) {
 		tx_skb = dev_alloc_skb(1 + 7 + 16 + size + 4);
 		if (tx_skb != NULL) {
