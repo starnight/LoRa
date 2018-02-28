@@ -81,11 +81,13 @@
 #define LRW_GET_SNR			(_IOR(LRW_IOC_MAGIC, 14, int))
 
 /* List the state of the LoRa hardware. */
-#define LORA_STATE_IDLE			0
-#define LORA_STATE_TX			1
-#define LORA_STATE_RX1			2
-#define	LORA_STATE_RX2			3
-#define LORA_STATE_CAD			4
+#define	LORA_STOP			0
+#define	LORA_START			1
+#define	LORA_STATE_IDLE			2
+#define	LORA_STATE_TX			3
+#define	LORA_STATE_RX1			4
+#define	LORA_STATE_RX2			5
+#define	LORA_STATE_CAD			6
 
 struct lora_hw {
 	struct device *parent;
@@ -133,8 +135,7 @@ struct lora_operations {
 	int (*set_bw)(struct lora_hw *, u32);
 	int (*set_mod)(struct lora_hw *, u8);
 	int (*set_sf)(struct lora_hw *, u8);
-	int (*start_rx1_window)(struct lora_hw *, u32);
-	int (*start_rx2_window)(struct lora_hw *, u32);
+	int (*start_rx_window)(struct lora_hw *, u32);
 	int (*set_state)(struct lora_hw *, u8);
 };
 

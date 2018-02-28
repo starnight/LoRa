@@ -128,6 +128,7 @@ struct lrw_struct {
 	wait_queue_head_t waitqueue;
 	struct cdev lrw_cdev;
 	bool rx_should_ack;
+	u8 state;
 
 	u8 devaddr[LRW_DEVADDR_LEN];
 	u8 appkey[LORA_KEY_LEN];

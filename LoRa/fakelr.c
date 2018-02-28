@@ -106,13 +106,7 @@ fakelr_set_sf(struct lora_hw *hw, u8 sf)
 }
 
 static int
-fakelr_start_rx1_window(struct lora_hw *hw, u32 t)
-{
-	return 0;
-}
-
-static int
-fakelr_start_rx2_window(struct lora_hw *hw, u32 t)
+fakelr_start_rx_window(struct lora_hw *hw, u32 t)
 {
 	return 0;
 }
@@ -132,8 +126,7 @@ static struct lora_operations lr_ops = {
 	.set_bw = fakelr_set_bw,
 	.set_mod = fakelr_set_mod,
 	.set_sf = fakelr_set_sf,
-	.start_rx1_window = fakelr_start_rx1_window,
-	.start_rx2_window = fakelr_start_rx2_window,
+	.start_rx_window = fakelr_start_rx_window,
 	.set_state = fakelr_set_state,
 };
 

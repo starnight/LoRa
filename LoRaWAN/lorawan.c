@@ -65,8 +65,8 @@ lora_alloc_hw(size_t priv_data_len, struct lora_operations *ops)
 
 	if (WARN_ON(!ops || !ops->start || !ops->stop || !ops->xmit_async ||
 		    !ops->set_txpower || !ops->set_frq || !ops->set_bw ||
-		    !ops->set_mod || !ops->set_sf || !ops->start_rx1_window ||
-		    !ops->start_rx2_window || !ops->set_state))
+		    !ops->set_mod || !ops->set_sf || !ops->start_rx_window ||
+		    !ops->set_state))
 		return NULL;
 
 	/* In memory it'll be like this:
@@ -143,13 +143,27 @@ lrw_del_ss(struct lrw_session *ss)
 	lrw_free_ss(ss);
 }
 
+void
+lrw_del_all_ss(struct lrw_struct *lrw_st)
+{
+	struct lrw_session *ss, *tmp;
+
+	mutex_lock(&lrw_st->ss_list_lock);
+	lrw_st->_cur_ss = NULL;
+	list_for_each_entry_safe(ss, tmp, &lrw_st->ss_list, entry) {
+		del_timer(&ss->timer);
+		lrw_del_ss(ss);
+	}
+	mutex_unlock(&lrw_st->ss_list_lock);
+}
+
 bool
 ready2write(struct lrw_struct *lrw_st)
 {
 	bool status = false;
 
 	pr_debug("%s: %s\n", LORAWAN_MODULE_NAME, __func__);
-	if (!lrw_st->_cur_ss)
+	if ((!lrw_st->_cur_ss) && (lrw_st->state != LORA_STOP))
 		status = true;
 
 	return status;
@@ -161,7 +175,7 @@ ready2read(struct lrw_struct *lrw_st)
 	bool status = false;
 	struct lrw_session *ss;
 
-	if (!list_empty(&lrw_st->ss_list)) {
+	if (!list_empty(&lrw_st->ss_list) && (lrw_st->state != LORA_STOP)) {
 		ss = list_first_entry(&lrw_st->ss_list,
 				      struct lrw_session,
 				      entry);
@@ -471,7 +485,7 @@ rx2_delay_isr(struct timer_list *timer)
 
 	/* Start LoRa hardware to RX2 window */
 	ss->state = LRW_RX2_SS;
-	lrw_st->ops->start_rx2_window(&lrw_st->hw, ss->rx2_window + 20);
+	lrw_st->ops->start_rx_window(&lrw_st->hw, ss->rx2_window + 20);
 }
 
 static void
@@ -489,7 +503,7 @@ rx1_delay_isr(struct timer_list *timer)
 
 	/* Start LoRa hardware to RX1 window */
 	ss->state = LRW_RX1_SS;
-	lrw_st->ops->start_rx1_window(&lrw_st->hw, ss->rx1_window + 20);
+	lrw_st->ops->start_rx_window(&lrw_st->hw, ss->rx1_window + 20);
 }
 
 static void
@@ -901,6 +915,7 @@ int lora_start_hw(struct lrw_struct *lrw_st)
 	lrw_st->apps_skc_tfm = lrw_encrypt_key_setup(lrw_st->appskey,
 						     LORA_KEY_LEN);
 	lrw_st->ops->start(&lrw_st->hw);
+	lrw_st->state = LORA_START;
 
 	return 0;
 }
@@ -908,7 +923,11 @@ int lora_start_hw(struct lrw_struct *lrw_st)
 void lora_stop_hw(struct lrw_struct *lrw_st)
 {
 	pr_debug("%s: %s\n", LORAWAN_MODULE_NAME, __func__);
+	lrw_st->state = LORA_STOP;
 	lrw_st->ops->stop(&lrw_st->hw);
+
+	lrw_del_all_ss(lrw_st);
+
 	lrw_mic_key_free(lrw_st->nwks_shash_tfm);
 	lrw_encrypt_key_free(lrw_st->nwks_skc_tfm);
 	lrw_encrypt_key_free(lrw_st->apps_skc_tfm);
