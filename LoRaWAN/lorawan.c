@@ -157,6 +157,34 @@ lrw_del_all_ss(struct lrw_struct *lrw_st)
 	mutex_unlock(&lrw_st->ss_list_lock);
 }
 
+int lora_start_hw(struct lrw_struct *lrw_st)
+{
+	pr_debug("%s: %s\n", LORAWAN_MODULE_NAME, __func__);
+	lrw_st->nwks_shash_tfm = lrw_mic_key_setup(lrw_st->nwkskey,
+						   LORA_KEY_LEN);
+	lrw_st->nwks_skc_tfm = lrw_encrypt_key_setup(lrw_st->nwkskey,
+						     LORA_KEY_LEN);
+	lrw_st->apps_skc_tfm = lrw_encrypt_key_setup(lrw_st->appskey,
+						     LORA_KEY_LEN);
+	lrw_st->ops->start(&lrw_st->hw);
+	lrw_st->state = LORA_START;
+
+	return 0;
+}
+
+void lora_stop_hw(struct lrw_struct *lrw_st)
+{
+	pr_debug("%s: %s\n", LORAWAN_MODULE_NAME, __func__);
+	lrw_st->state = LORA_STOP;
+	lrw_st->ops->stop(&lrw_st->hw);
+
+	lrw_del_all_ss(lrw_st);
+
+	lrw_mic_key_free(lrw_st->nwks_shash_tfm);
+	lrw_encrypt_key_free(lrw_st->nwks_skc_tfm);
+	lrw_encrypt_key_free(lrw_st->apps_skc_tfm);
+}
+
 bool
 ready2write(struct lrw_struct *lrw_st)
 {
@@ -635,6 +663,28 @@ lrw_remove_hw(struct lrw_struct *lrw_st)
 	return 0;
 }
 
+int
+lrw_set_hw_state(struct lrw_struct *lrw_st, void __user *arg)
+{
+	int ret = 0;
+	u8 state;
+
+	pr_debug("%s: %s\n", LORAWAN_MODULE_NAME, __func__);
+	copy_from_user(&state, arg, 1);
+	switch (state) {
+	case LORA_START:
+		lora_start_hw(lrw_st);
+		break;
+	case LORA_STOP:
+		lora_stop_hw(lrw_st);
+		break;
+	default:
+		ret = -ENOTSUPP;
+	}
+
+	return ret;
+}
+
 static int
 file_open(struct inode *inode, struct file *filp)
 {
@@ -782,22 +832,20 @@ static long
 file_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 {
 	long ret;
-	int *pval;
+	void *pval;
 	struct lrw_struct *lrw_st;
 
 	pr_debug("%s: ioctl file (cmd=0x%X)\n", LORAWAN_MODULE_NAME, cmd);
 
-	ret = -ENOTTY;
 	pval = (void __user *)arg;
 	lrw_st = filp->private_data;
 
 	/* I/O control by each command */
 	switch (cmd) {
-//	/* Set & read the state of the LoRa device */
-//	case LRW_SET_STATE:
-//		if (lrw_st->ops->setState != NULL)
-//			ret = lrw_st->ops->setState(lrw_st, pval);
-//		break;
+	/* Set & read the state of the LoRa device */
+	case LRW_SET_STATE:
+		ret = lrw_set_hw_state(lrw_st, (u8 *)pval);
+		break;
 //	case LRW_GET_STATE:
 //		if (lrw_st->ops->getState != NULL)
 //			ret = lrw_st->ops->getState(lrw_st, pval);
@@ -863,7 +911,7 @@ file_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 //			ret = lrw_st->ops->getSNR(lrw_st, pval);
 //		break;
 	default:
-		ret = -ENOTTY;
+		ret = -ENOTSUPP;
 	}
 
 	return ret;
@@ -904,34 +952,6 @@ static struct file_operations lrw_fops = {
 	.poll		= file_poll,
 	.llseek		= no_llseek,
 };
-
-int lora_start_hw(struct lrw_struct *lrw_st)
-{
-	pr_debug("%s: %s\n", LORAWAN_MODULE_NAME, __func__);
-	lrw_st->nwks_shash_tfm = lrw_mic_key_setup(lrw_st->nwkskey,
-						   LORA_KEY_LEN);
-	lrw_st->nwks_skc_tfm = lrw_encrypt_key_setup(lrw_st->nwkskey,
-						     LORA_KEY_LEN);
-	lrw_st->apps_skc_tfm = lrw_encrypt_key_setup(lrw_st->appskey,
-						     LORA_KEY_LEN);
-	lrw_st->ops->start(&lrw_st->hw);
-	lrw_st->state = LORA_START;
-
-	return 0;
-}
-
-void lora_stop_hw(struct lrw_struct *lrw_st)
-{
-	pr_debug("%s: %s\n", LORAWAN_MODULE_NAME, __func__);
-	lrw_st->state = LORA_STOP;
-	lrw_st->ops->stop(&lrw_st->hw);
-
-	lrw_del_all_ss(lrw_st);
-
-	lrw_mic_key_free(lrw_st->nwks_shash_tfm);
-	lrw_encrypt_key_free(lrw_st->nwks_skc_tfm);
-	lrw_encrypt_key_free(lrw_st->apps_skc_tfm);
-}
 
 /**
  * lora_register_hw - Register there is a kind of LoRa driver
@@ -974,7 +994,7 @@ lora_register_hw(struct lora_hw *hw)
 lrw_register_hw_end:
 	if (status == 0) {
 		lrw_add_hw(lrw_st);
-		lora_start_hw(lrw_st);
+		//lora_start_hw(lrw_st);
 	}
 	else {
 		mutex_lock(&minors_lock);

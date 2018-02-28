@@ -60,12 +60,14 @@
 #define LORA_GET_RSSI		(_IOR(LORA_IOC_MAGIC, 13, int))
 #define LORA_GET_SNR		(_IOR(LORA_IOC_MAGIC, 14, int))
 
-/* List the state of the LoRa device. */
-#define LORA_STATE_SLEEP	0
-#define LORA_STATE_STANDBY	1
-#define LORA_STATE_TX		2
-#define LORA_STATE_RX		3
-#define LORA_STATE_CAD		4
+/* List the state of the LoRa hardware. */
+#define	LORA_STOP			0
+#define	LORA_START			1
+#define	LORA_STATE_IDLE			2
+#define	LORA_STATE_TX			3
+#define	LORA_STATE_RX1			4
+#define	LORA_STATE_RX2			5
+#define	LORA_STATE_CAD			6
 
 /* Read the device data. */
 ssize_t do_read(int fd, char *buf, size_t len);
@@ -74,7 +76,7 @@ ssize_t do_read(int fd, char *buf, size_t len);
 ssize_t do_write(int fd, char *buf, size_t len);
 
 /* Set & get the device's state. */
-void set_state(int fd, uint32_t st);
+void set_state(int fd, uint8_t st);
 uint32_t get_state(int fd);
 
 /* Set & get the carrier frequency. */

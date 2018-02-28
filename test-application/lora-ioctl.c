@@ -64,7 +64,7 @@ ssize_t do_write(int fd, char *buf, size_t len)
 }
 
 /* Set the device in sleep state. */
-void set_state(int fd, uint32_t st)
+void set_state(int fd, uint8_t st)
 {
 	ioctl(fd, LORA_SET_STATE, &st);
 }

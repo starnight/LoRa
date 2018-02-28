@@ -101,9 +101,6 @@ struct lora_hw {
 
 /* The structure lists the LoRa device's operations. */
 struct lora_operations {
-//	/* Set & get the state of the LoRa device. */
-//	long (*setState)(struct lora_hw *, void __user *);
-//	long (*getState)(struct lora_hw *, void __user *);
 //	/* Set & get the carrier frequency. */
 //	long (*setFreq)(struct lora_hw *, void __user *);
 //	long (*getFreq)(struct lora_hw *, void __user *);
@@ -136,7 +133,11 @@ struct lora_operations {
 	int (*set_mod)(struct lora_hw *, u8);
 	int (*set_sf)(struct lora_hw *, u8);
 	int (*start_rx_window)(struct lora_hw *, u32);
+
+	/* Set & get the state of the LoRa device. */
 	int (*set_state)(struct lora_hw *, u8);
+	int (*get_state)(struct lora_hw *, u8);
+
 };
 
 /**
