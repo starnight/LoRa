@@ -180,6 +180,10 @@ void lora_stop_hw(struct lrw_struct *lrw_st)
 	pr_debug("%s: going to stop hardware\n", LORAWAN_MODULE_NAME);
 	lrw_st->ops->stop(&lrw_st->hw);
 
+	pr_debug("%s: going to kill tasks & flush works", LORAWAN_MODULE_NAME);
+	tasklet_kill(&lrw_st->xmit_task);
+	flush_work(&lrw_st->rx_work);
+
 	pr_debug("%s: going to delete all session\n", LORAWAN_MODULE_NAME);
 	lrw_del_all_ss(lrw_st);
 
