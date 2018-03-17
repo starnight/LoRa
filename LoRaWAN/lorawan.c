@@ -81,6 +81,7 @@ lora_alloc_hw(size_t priv_data_len, struct lora_operations *ops)
 	if (!lrw_st)
 		return NULL;
 
+	lrw_st->state = LORA_STOP;
 	lrw_st->ops = ops;
 	lrw_st->hw.priv = (void *) lrw_st + sizeof(struct lrw_struct);
 
@@ -176,12 +177,17 @@ void lora_stop_hw(struct lrw_struct *lrw_st)
 {
 	pr_debug("%s: %s\n", LORAWAN_MODULE_NAME, __func__);
 	lrw_st->state = LORA_STOP;
+	pr_debug("%s: going to stop hardware\n", LORAWAN_MODULE_NAME);
 	lrw_st->ops->stop(&lrw_st->hw);
 
+	pr_debug("%s: going to delete all session\n", LORAWAN_MODULE_NAME);
 	lrw_del_all_ss(lrw_st);
 
+	pr_debug("%s: going to free mic tfm\n", LORAWAN_MODULE_NAME);
 	lrw_mic_key_free(lrw_st->nwks_shash_tfm);
+	pr_debug("%s: going to free nwks tfm\n", LORAWAN_MODULE_NAME);
 	lrw_encrypt_key_free(lrw_st->nwks_skc_tfm);
+	pr_debug("%s: going to free apps tfm\n", LORAWAN_MODULE_NAME);
 	lrw_encrypt_key_free(lrw_st->apps_skc_tfm);
 }
 
@@ -268,6 +274,7 @@ lrw_xmit(unsigned long data)
 	struct lrw_struct *lrw_st = (struct lrw_struct *) data;
 	struct lrw_session *ss = lrw_st->_cur_ss;
 
+	pr_debug("%s: %s\n", LORAWAN_MODULE_NAME, __func__);
 	ss->state = LRW_XMITTING_SS;
 	lrw_st->ops->xmit_async(&lrw_st->hw, ss->tx_skb);
 }
@@ -277,6 +284,8 @@ lrw_parse_frame(struct lrw_session *ss, struct sk_buff *skb)
 {
 	struct lrw_fhdr *fhdr = &ss->rx_fhdr;
 	__le16 *p_fcnt;
+
+	pr_debug("%s: %s\n", LORAWAN_MODULE_NAME, __func__);
 
 	/* Get message type */
 	fhdr->mtype = skb->data[0];
@@ -318,6 +327,8 @@ lrw_rx_skb_2_session(struct lrw_struct *lrw_st, struct sk_buff *rx_skb)
 	u16 fcnt;
 	__le16 *p_fcnt;
 
+	pr_debug("%s: %s\n", LORAWAN_MODULE_NAME, __func__);
+
 	p_fcnt = (__le16 *)(rx_skb->data + 6);
 	fcnt = le16_to_cpu(*p_fcnt);
 
@@ -339,6 +350,8 @@ lrw_rx_work(struct work_struct *work)
 	struct lrw_struct *lrw_st;
 	struct lrw_session *ss;
 	struct sk_buff *skb;
+
+	pr_debug("%s: %s\n", LORAWAN_MODULE_NAME, __func__);
 
 	lrw_st = container_of(work, struct lrw_struct, rx_work);
 	skb = lrw_st->rx_skb_list.next;
@@ -396,6 +409,8 @@ lrw_check_mic(struct crypto_shash *tfm, struct sk_buff *skb)
 	u8 cks[4];
 	u8 *mic;
 
+	pr_debug("%s: %s\n", LORAWAN_MODULE_NAME, __func__);
+
 	buf = skb->data;
 	len = skb->len - 4;
 	devaddr = buf + 1;
@@ -414,6 +429,8 @@ lora_rx_irqsave(struct lora_hw *hw, struct sk_buff *skb)
 	struct lrw_struct *lrw_st;
 	u8 mtype;
 	bool is_new_frame;
+
+	pr_debug("%s: %s\n", LORAWAN_MODULE_NAME, __func__);
 
 	lrw_st = container_of(hw, struct lrw_struct, hw);
 	mtype = skb->data[0] >> 5;
@@ -445,6 +462,8 @@ lrw_rexmit(struct timer_list *timer)
 	struct lrw_session *ss = container_of(timer, struct lrw_session, timer);
 	struct lrw_struct *lrw_st = ss->lrw_st;
 
+	pr_debug("%s: %s\n", LORAWAN_MODULE_NAME, __func__);
+
 	lrw_xmit((unsigned long) lrw_st);
 }
 
@@ -453,6 +472,8 @@ rx_timeout_work(struct work_struct *work)
 {
 	struct lrw_struct *lrw_st;
 	struct lrw_session *ss;
+
+	pr_debug("%s: %s\n", LORAWAN_MODULE_NAME, __func__);
 
 	ss = container_of(work, struct lrw_session, timeout_work);
 	lrw_st = ss->lrw_st;
@@ -467,6 +488,8 @@ static void
 rx2_timeout_isr(struct timer_list *timer)
 {
 	struct lrw_session *ss = container_of(timer, struct lrw_session, timer);
+
+	pr_debug("%s: %s\n", LORAWAN_MODULE_NAME, __func__);
 
 	/* Check TX is acked or not */
 	if (!ss->tx_should_ack) {
@@ -505,6 +528,8 @@ rx2_delay_isr(struct timer_list *timer)
 	struct lrw_struct *lrw_st = ss->lrw_st;
 	unsigned long delay;
 
+	pr_debug("%s: %s\n", LORAWAN_MODULE_NAME, __func__);
+
 	/* Start timer for RX2 window */
 	ss->timer.function = rx2_timeout_isr;
 	delay = jiffies_64 + (ss->rx2_window + 20) * HZ / 1000 + HZ;
@@ -523,6 +548,8 @@ rx1_delay_isr(struct timer_list *timer)
 	struct lrw_struct *lrw_st = ss->lrw_st;
 	unsigned long delay;
 
+	pr_debug("%s: %s\n", LORAWAN_MODULE_NAME, __func__);
+
 	/* Start timer for RX_Delay2 - RX_Delay2 */
 	ss->timer.function = rx2_delay_isr;
 	delay = jiffies_64 + (ss->rx_delay2 - ss->rx_delay1) * HZ - 20 * HZ / 1000;
@@ -539,6 +566,8 @@ lrw_sent_tx_work(struct lrw_struct *lrw_st, struct sk_buff *skb)
 {
 	struct lrw_session *ss;
 	unsigned long delay;
+
+	pr_debug("%s: %s\n", LORAWAN_MODULE_NAME, __func__);
 
 	/* Find the session in ss_list_entry with matched skb */
 	ss = lrw_st->_cur_ss;	
@@ -559,6 +588,8 @@ void
 lora_xmit_complete(struct lora_hw *hw, struct sk_buff *skb)
 {
 	struct lrw_struct *lrw_st;
+
+	pr_debug("%s: %s\n", LORAWAN_MODULE_NAME, __func__);
 
 	lrw_st = container_of(hw, struct lrw_struct, hw);
 	lrw_sent_tx_work(lrw_st, skb);
@@ -673,10 +704,12 @@ lrw_set_hw_state(struct lrw_struct *lrw_st, void __user *arg)
 	copy_from_user(&state, arg, 1);
 	switch (state) {
 	case LORA_START:
-		lora_start_hw(lrw_st);
+		if (lrw_st->state == LORA_STOP)
+			lora_start_hw(lrw_st);
 		break;
 	case LORA_STOP:
-		lora_stop_hw(lrw_st);
+		if (lrw_st->state != LORA_STOP)
+			lora_stop_hw(lrw_st);
 		break;
 	default:
 		ret = -ENOTSUPP;
@@ -782,7 +815,7 @@ file_write(struct file *filp, const char __user *buf, size_t size, loff_t *pos)
 	struct lrw_session *ss;
 	struct sk_buff *tx_skb;
 	unsigned long rem;
-	int ret;
+	int ret = 0;
 
 	pr_debug("%s: write file (size=%zu)\n", LORAWAN_MODULE_NAME, size);
 
@@ -1024,7 +1057,8 @@ lora_unregister_hw(struct lora_hw *hw)
 	/* Delete the character device driver from system */
 	cdev_del(&(lrw_st->lrw_cdev));
 	device_destroy(lrw_sys_class, lrw_st->devt);
-	lora_stop_hw(lrw_st);
+	if (lrw_st->state != LORA_STOP)
+		lora_stop_hw(lrw_st);
 	lrw_remove_hw(lrw_st);
 
 	mutex_lock(&minors_lock);

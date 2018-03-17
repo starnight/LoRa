@@ -64,30 +64,31 @@ int main(int argc, char **argv)
 	printf("Going to open %s\n", path);
 	/* Open device node. */
 	fd = open(path, O_RDWR);
-	printf("Opened %s\n", path);
 	if (fd == -1) {
 		sprintf(pstr, "Open %s failed", path);
 		perror(pstr);
 		return -1;
 	}
+	printf("Opened %s\n", path);
 
-	/*Set the RF spreading factor. */
-	uint32_t sprf = 2048;
-	set_sprfactor(fd, sprf);
-	printf("Going to set the RF spreading factor %u chips\n", sprf);
-
-	/* Set the RF bandwidth. */
-	uint32_t bw = 125000;
-	set_bw(fd, bw);
-	printf("Going to set the RF bandwith %u Hz\n", bw);
-
-	/* Set the RF power. */
-	int32_t power = 10;
-	set_power(fd, power);
-	printf("Going to set the RF power %d dbm\n", power);
-
-	printf("The current RSSI is %d dbm\n", get_rssi(fd));
-
+	set_state(fd, LORA_START);
+//	/*Set the RF spreading factor. */
+//	uint32_t sprf = 2048;
+//	set_sprfactor(fd, sprf);
+//	printf("Going to set the RF spreading factor %u chips\n", sprf);
+//
+//	/* Set the RF bandwidth. */
+//	uint32_t bw = 125000;
+//	set_bw(fd, bw);
+//	printf("Going to set the RF bandwith %u Hz\n", bw);
+//
+//	/* Set the RF power. */
+//	int32_t power = 10;
+//	set_power(fd, power);
+//	printf("Going to set the RF power %d dbm\n", power);
+//
+//	printf("The current RSSI is %d dbm\n", get_rssi(fd));
+//
 	/* Write to the file descriptor if it is ready to be written. */
 	printf("Going to write %s\n", path);
 	s = 0;
@@ -99,37 +100,42 @@ int main(int argc, char **argv)
 	}
 	printf("\n");
 	len = do_write(fd, data, strlen(data));
-	printf("Written %d bytes: %s\n", len, data);
+	if (len < 0)
+		perror("Error");
+	else
+		printf("Written %d bytes: %s\n", len, data);
+//
+//	/* Read from echo if it is ready to be read. */
+//	memset(buf, 0, MAX_BUFFER_LEN);
+//	printf("Going to read %s\n", path);
+//	/* Set the device in read state. */
+//	set_state(fd, LORA_STATE_RX);
+//	s = 0;
+//	while (!ready2read(fd)) {
+//		sleep(1);
+//		s++;
+//		printf("\t%s is not ready to read, do other things.", path);
+//		printf("  %u s\r", s);
+//	}
+//	printf("\n");
+//	len = do_read(fd, buf, MAX_BUFFER_LEN - 1);
+//	if (len > 0)
+//		printf("Read %d bytes: %s\n", len, buf);
+//
+//	printf("The LoRa carrier frequency is %u Hz\n", get_freq(fd));
+//	printf("The RF spreading factor is %u chips\n", get_sprfactor(fd));
+//	printf("The RF bandwith is %u Hz\n", get_bw(fd));
+//	printf("The current RSSI is %d dbm\n", get_rssi(fd));
+//	printf("The last packet SNR is %d db\n", get_snr(fd));
+//	printf("The output power is %d dbm\n", get_power(fd));
+//	printf("The LNA gain is %d db\n", get_lna(fd));
+//
+//	/* Set the device in sleep state. */
+//	set_state(fd, LORA_STATE_SLEEP);
+//	printf("The LoRa device is in 0x%X state\n", get_state(fd));
 
-	/* Read from echo if it is ready to be read. */
-	memset(buf, 0, MAX_BUFFER_LEN);
-	printf("Going to read %s\n", path);
-	/* Set the device in read state. */
-	set_state(fd, LORA_STATE_RX);
-	s = 0;
-	while (!ready2read(fd)) {
-		sleep(1);
-		s++;
-		printf("\t%s is not ready to read, do other things.", path);
-		printf("  %u s\r", s);
-	}
-	printf("\n");
-	len = do_read(fd, buf, MAX_BUFFER_LEN - 1);
-	if (len > 0)
-		printf("Read %d bytes: %s\n", len, buf);
-
-	printf("The LoRa carrier frequency is %u Hz\n", get_freq(fd));
-	printf("The RF spreading factor is %u chips\n", get_sprfactor(fd));
-	printf("The RF bandwith is %u Hz\n", get_bw(fd));
-	printf("The current RSSI is %d dbm\n", get_rssi(fd));
-	printf("The last packet SNR is %d db\n", get_snr(fd));
-	printf("The output power is %d dbm\n", get_power(fd));
-	printf("The LNA gain is %d db\n", get_lna(fd));
-
-	/* Set the device in sleep state. */
-	set_state(fd, LORA_STATE_SLEEP);
-	printf("The LoRa device is in 0x%X state\n", get_state(fd));
-
+	sleep(10);
+	set_state(fd, LORA_STOP);
 	/* Close device node. */
 	close(fd);
 

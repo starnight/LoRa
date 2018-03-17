@@ -61,17 +61,22 @@ struct fakelr_phy {
 static int
 fakelr_start(struct lora_hw *hw)
 {
+	dev_dbg(hw->parent, "%s\n", __func__);
 	return 0;
 }
 
 static void
 fakelr_stop(struct lora_hw *hw)
 {
+	dev_dbg(hw->parent, "%s\n", __func__);
 }
 
 static int
 fakelr_xmit_async(struct lora_hw *hw, struct sk_buff *skb)
 {
+	print_hex_dump(KERN_DEBUG, "", DUMP_PREFIX_OFFSET, 16, 8, skb->data, skb->len, true);
+	lora_xmit_complete(hw, skb);
+
 	return 0;
 }
 

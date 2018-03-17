@@ -227,11 +227,13 @@ lrw_decrypt_buf(struct crypto_skcipher *tfm,
 void
 lrw_aes_enc_key_free(struct crypto_skcipher *tfm)
 {
+	pr_debug("lrwsec: %s\n", __func__);
 	crypto_free_skcipher(tfm);
 }
 
 void
 lrw_encrypt_key_free(struct crypto_skcipher *tfm)
 {
+	pr_debug("lrwsec: %s\n", __func__);
 	lrw_aes_enc_key_free(tfm);
 }
