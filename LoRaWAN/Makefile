@@ -1,6 +1,6 @@
 PROJ=lrw
 obj-m := $(PROJ).o
-$(PROJ)-objs := lorawan.o lrwsec.o
+$(PROJ)-objs := main.o mac.o lrwsec.o
 
 KERNEL_LOCATION=/lib/modules/$(shell uname -r)
 BUILDDIR=$(KERNEL_LOCATION)/build

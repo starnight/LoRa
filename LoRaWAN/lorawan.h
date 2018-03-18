@@ -42,9 +42,12 @@
 #include <linux/mutex.h>
 #include <linux/spinlock.h>
 #include <linux/skbuff.h>
+#include <linux/workqueue.h>
 #include <crypto/hash.h>
 #include <crypto/skcipher.h>
 #include "lora.h"
+
+#define	LORAWAN_MODULE_NAME	"lorawan"
 
 #define	LRW_UPLINK		0
 #define	LRW_DOWNLINK		1
@@ -144,5 +147,13 @@ struct lrw_struct {
 	struct tasklet_struct xmit_task;
 	struct work_struct rx_work;
 };
+
+struct lrw_session * lrw_alloc_ss(struct lrw_struct *);
+void lrw_del_ss(struct lrw_session *);
+int lora_start_hw(struct lrw_struct *);
+void lora_stop_hw(struct lrw_struct *);
+void lrw_prepare_tx_frame(struct lrw_session *);
+void lrw_xmit(unsigned long);
+void lrw_rx_work(struct work_struct *);
 
 #endif
