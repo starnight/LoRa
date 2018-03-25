@@ -38,34 +38,35 @@
 
 #include <linux/init.h>
 #include <linux/module.h>
-#include <linux/cdev.h>
-#include <linux/fs.h>
 #include <linux/device.h>
-#include <linux/poll.h>
-#include <asm/uaccess.h>
 #include <linux/string.h>
 #include <linux/errno.h>
 #include <linux/list.h>
-#include <linux/slab.h>
 #include <linux/interrupt.h>
 
 #include "lora.h"
 #include "lorawan.h"
 
+#define	PHY_NAME		"lora"
+
 static struct class *lrw_sys_class;
-static int lrw_major;
-#define	LORA_HW_AMOUNT		(sizeof(int) * 8)
 
-static LIST_HEAD(device_list);
-static DEFINE_MUTEX(device_list_lock);
-
-static DECLARE_BITMAP(minors, LORA_HW_AMOUNT);
-static DEFINE_MUTEX(minors_lock);
+static void
+lora_if_setup(struct net_device *ndev)
+{
+	ndev->hard_header_len = LRW_MHDR_LEN + LRW_FHDR_MAX_LEN + LRW_FPORT_LEN;
+	ndev->needed_tailroom = LRW_MIC_LEN;
+	// TODO: M is a dynamic value defined by Regional Parameters
+	//ndev->mtu = M - ndev->hard_header_len;
+	ndev->mtu = 20;
+}
 
 struct lora_hw *
 lora_alloc_hw(size_t priv_data_len, struct lora_operations *ops)
 {
+	struct net_device *ndev;
 	struct lrw_struct *lrw_st;
+	int ret;
 
 	pr_debug("%s: %s\n", LORAWAN_MODULE_NAME, __func__);
 
@@ -78,20 +79,37 @@ lora_alloc_hw(size_t priv_data_len, struct lora_operations *ops)
 	/* In memory it'll be like this:
 	 *
 	 * +-----------------------+
+	 * | struct net_device     |
+	 * +-----------------------+
 	 * | struct lrw_struct     |
 	 * +-----------------------+
 	 * | driver's private data |
 	 * +-----------------------+
 	 */
-	lrw_st = kzalloc(sizeof(struct lrw_struct) + priv_data_len, GFP_KERNEL);
-	if (!lrw_st)
-		return NULL;
+	ndev = alloc_netdev(sizeof(struct lrw_struct) + priv_data_len,
+			    PHY_NAME"%d", NET_NAME_ENUM, lora_if_setup);
+	if (!ndev)
+		return ERR_PTR(-ENOMEM);
+	ret = dev_alloc_name(ndev, ndev->name);
+	if (ret < 0)
+		goto lora_alloc_hw_err;
+
+	lrw_st = (struct lrw_struct *)netdev_priv(ndev);
+	lrw_st->ndev = ndev;
 
 	lrw_st->state = LORA_STOP;
 	lrw_st->ops = ops;
 	lrw_st->hw.priv = (void *) lrw_st + sizeof(struct lrw_struct);
 
+	SET_NETDEV_DEV(ndev, &lrw_st->dev);
+	ndev->flags |= IFF_NOARP;
+	ndev->features |= NETIF_F_HW_CSUM;
+
 	return &lrw_st->hw;
+
+lora_alloc_hw_err:
+	free_netdev(ndev);
+	return ERR_PTR(ret);
 }
 EXPORT_SYMBOL(lora_alloc_hw);
 
@@ -101,12 +119,12 @@ lora_free_hw(struct lora_hw *hw)
 	struct lrw_struct *lrw_st;
 
 	lrw_st = container_of(hw, struct lrw_struct, hw);
-	kfree(lrw_st);
+	free_netdev(lrw_st->ndev);
 }
 EXPORT_SYMBOL(lora_free_hw);
 
 /**
- * lrw_add_hw - Add a LoRaWAN compatible hardware into the device list
+ * lrw_register_ndev - Add a LoRaWAN hardware as a network device
  * @lrw_st:	the LoRa device going to be added
  *
  * Return:	0 / other number for success / failed
@@ -114,13 +132,10 @@ EXPORT_SYMBOL(lora_free_hw);
 int
 lrw_add_hw(struct lrw_struct *lrw_st)
 {
+	struct net_device *ndev = lrw_st->ndev;
+	int ret;
+
 	pr_debug("%s: %s\n", LORAWAN_MODULE_NAME, __func__);
-
-	INIT_LIST_HEAD(&(lrw_st->device_entry));
-
-	mutex_lock(&device_list_lock);
-	list_add(&lrw_st->device_entry, &device_list);
-	mutex_unlock(&device_list_lock);
 
 	lrw_st->fcnt_up = 0;
 	lrw_st->fcnt_down = 0;
@@ -132,25 +147,20 @@ lrw_add_hw(struct lrw_struct *lrw_st)
 	tasklet_init(&lrw_st->xmit_task, lrw_xmit, (unsigned long) lrw_st);
 	INIT_WORK(&lrw_st->rx_work, lrw_rx_work);
 
-	return 0;
+	ret = register_netdev(ndev);
+
+	return ret;
 }
 
 /**
- * lrw_remove_hw - Remove a LoRaWAN compatible hardware from the device list
+ * lrw_unregister_ndev - Remove a LoRaWAN hardware from a network device
  * @lrw_st:	the LoRa device going to be removed
- *
- * Return:	0 / other number for success / failed
  */
-int
+void
 lrw_remove_hw(struct lrw_struct *lrw_st)
 {
-	mutex_lock(&device_list_lock);
-	list_del(&(lrw_st->device_entry));
-	mutex_unlock(&device_list_lock);
-
+	unregister_netdev(lrw_st->ndev);
 	tasklet_kill(&lrw_st->xmit_task);
-
-	return 0;
 }
 
 int
@@ -233,53 +243,34 @@ lora_set_key(struct lora_hw *hw, u8 type, u8 *key, size_t l)
 }
 
 static int
-file_open(struct inode *inode, struct file *filp)
+lrw_if_up(struct net_device *ndev)
 {
-	struct lrw_struct *lrw_st;
-	int status = -ENXIO;
+	struct lrw_struct *lrw_st = NETDEV_2_LRW(ndev);
+	int ret = 0;
 
-	pr_debug("%s: open file\n", LORAWAN_MODULE_NAME);
+	pr_debug("%s: %s\n", LORAWAN_MODULE_NAME, __func__);
 
-	mutex_lock(&device_list_lock);
-	/* Find the lora data in device_entry with matched dev_t in inode */
-	list_for_each_entry(lrw_st, &device_list, device_entry) {
-		if (lrw_st->devt == inode->i_rdev) {
-			status = 0;
-			break;
-		}
+	if (lrw_st->state == LORA_STOP) {
+		ret = lora_start_hw(lrw_st);
+		netif_start_queue(ndev);
 	}
+	else if (lrw_st->state != LORA_START)
+		ret = -EBUSY;
 
-	if (status) {
-		mutex_unlock(&device_list_lock);
-		pr_debug("%s: nothing for minor %d\n",
-			 LORAWAN_MODULE_NAME, iminor(inode));
-
-		return status;
-	}
-
-	init_waitqueue_head(&(lrw_st->waitqueue));
-	/* Map the data location to the file data pointer */
-	filp->private_data = lrw_st;
-	mutex_unlock(&device_list_lock);
-
-	/* This a character device, so it is not seekable */
-	nonseekable_open(inode, filp);
-
-	return 0;
+	return ret;
 }
 
 static int
-file_close(struct inode *inode, struct file *filp)
+lrw_if_down(struct net_device *ndev)
 {
-	struct lrw_struct *lrw_st;
+	struct lrw_struct *lrw_st = NETDEV_2_LRW(ndev);
 
-	pr_debug("%s: close file\n", LORAWAN_MODULE_NAME);
+	pr_debug("%s: %s\n", LORAWAN_MODULE_NAME, __func__);
 
-	lrw_st = filp->private_data;
-
-	mutex_lock(&device_list_lock);
-	filp->private_data = NULL;
-	mutex_unlock(&device_list_lock);
+	if (lrw_st->state != LORA_STOP) {
+		netif_stop_queue(ndev);
+		lora_stop_hw(lrw_st);
+	}
 
 	return 0;
 }
@@ -322,77 +313,58 @@ file_read(struct file *filp, char __user *buf, size_t size, loff_t *pos)
 	return ret;
 }
 
-static ssize_t
-file_write(struct file *filp, const char __user *buf, size_t size, loff_t *pos)
+netdev_tx_t
+lrw_if_start_xmit(struct sk_buff *skb, struct net_device *ndev)
 {
-	struct lrw_struct *lrw_st;
+	struct lrw_struct *lrw_st = NETDEV_2_LRW(ndev);
 	struct lrw_session *ss;
-	struct sk_buff *tx_skb;
-	unsigned long rem;
-	int ret = 0;
+	netdev_tx_t ret = NETDEV_TX_OK;
 
-	pr_debug("%s: write file (size=%zu)\n", LORAWAN_MODULE_NAME, size);
+	pr_debug("%s: xmit skb (size=%u)\n", LORAWAN_MODULE_NAME, skb->len);
 
-	lrw_st = filp->private_data;
-	ss = NULL;
+	ss = lrw_alloc_ss(lrw_st);
+	if (!ss)
+		return NETDEV_TX_BUSY;
 
 	mutex_lock(&lrw_st->ss_list_lock);
 	if (ready2write(lrw_st)) {
-		ss = lrw_alloc_ss(lrw_st);
-		if (ss != NULL) {
-			list_add_tail(&ss->entry, &lrw_st->ss_list);
-			lrw_st->_cur_ss = ss;
-			lrw_st->fcnt_up += 1;
-			ss->fcnt_up = lrw_st->fcnt_up;
-			ss->fcnt_down = lrw_st->fcnt_down;
-		}
-		else {
-			ret = -ENOMEM;
-		}
+		list_add_tail(&ss->entry, &lrw_st->ss_list);
+		lrw_st->_cur_ss = ss;
+		lrw_st->fcnt_up += 1;
+		ss->fcnt_up = lrw_st->fcnt_up;
+		ss->fcnt_down = lrw_st->fcnt_down;
 	}
-	else {
-		ret = -EBUSY;
-	}
+	else
+		ret = NETDEV_TX_BUSY;
 	mutex_unlock(&lrw_st->ss_list_lock);
 
-	pr_debug("%s: write a new skb\n", LORAWAN_MODULE_NAME);
-	if (ss != NULL) {
-		tx_skb = dev_alloc_skb(1 + 7 + 16 + size + 4);
-		if (tx_skb != NULL) {
-			ss->state = LRW_INIT_SS;
-			ss->tx_skb = tx_skb;
-			skb_reserve(tx_skb, 1 + 7 + 16);
-			rem = copy_from_user(skb_put(tx_skb, size), buf, size);
-			ret = size - rem;
-			lrw_prepare_tx_frame(ss);
-			tasklet_schedule(&lrw_st->xmit_task);
-		}
-		else {
-			ret = -ENOMEM;
-		}
+	if (ret == NETDEV_TX_OK) {
+		pr_debug("%s: write a new skb\n", LORAWAN_MODULE_NAME);
+		ss->state = LRW_INIT_SS;
+		ss->tx_skb = skb;
+		lrw_prepare_tx_frame(ss);
+		tasklet_schedule(&lrw_st->xmit_task);
 	}
+	else
+		lrw_free_ss(ss);
 
 	return ret;
 }
 
-static long
-file_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
+static int
+lrw_if_ioctl(struct net_device *ndev, struct ifreq *ifr, int cmd)
 {
+	struct lrw_struct *lrw_st = NETDEV_2_LRW(ndev);
 	long ret;
-	void *pval;
-	struct lrw_struct *lrw_st;
 
 	pr_debug("%s: ioctl file (cmd=0x%X)\n", LORAWAN_MODULE_NAME, cmd);
-
-	pval = (void __user *)arg;
-	lrw_st = filp->private_data;
 
 	/* I/O control by each command */
 	switch (cmd) {
 	/* Set & read the state of the LoRa device */
-	case LRW_SET_STATE:
-		ret = lrw_set_hw_state(lrw_st, (u8 *)pval);
-		break;
+//	case LRW_SET_STATE:
+//		ret = lrw_set_hw_state(lrw_st, (u8 *)pval);
+//		break;
 //	case LRW_GET_STATE:
 //		if (lrw_st->ops->getState != NULL)
 //			ret = lrw_st->ops->getState(lrw_st, pval);
@@ -464,40 +436,20 @@ file_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 	return ret;
 }
 
-static unsigned int
-file_poll(struct file *filp, poll_table *wait)
+static int
+lrw_if_set_mac(struct net_device *ndev, void *p)
 {
-	struct lrw_struct *lrw_st;
-	unsigned int mask;
+	struct lrw_struct *lrw_st = NETDEV_2_LRW(ndev);
 
-	pr_debug("%s: poll file\n", LORAWAN_MODULE_NAME);
-
-	lrw_st = filp->private_data;
-
-	/* Register the file into wait queue for multiplexing */
-	poll_wait(filp, &lrw_st->waitqueue, wait);
-
-	/* Check ready to write / read */
-	mask = 0;
-	mutex_lock(&lrw_st->ss_list_lock);
-	if (ready2write(lrw_st))
-		mask |= POLLOUT | POLLWRNORM;
-	if (ready2read(lrw_st))
-		mask |= POLLIN | POLLRDNORM;
-	mutex_unlock(&lrw_st->ss_list_lock);
-
-	return mask;
+	return 0;
 }
 
-static struct file_operations lrw_fops = {
-	.owner		= THIS_MODULE,
-	.open 		= file_open,
-	.release	= file_close,
-	.read		= file_read,
-	.write		= file_write,
-	.unlocked_ioctl = file_ioctl,
-	.poll		= file_poll,
-	.llseek		= no_llseek,
+static const struct net_device_ops lrw_if_ops = {
+	.ndo_open = lrw_if_up,
+	.ndo_stop = lrw_if_down,
+	.ndo_start_xmit = lrw_if_start_xmit,
+	.ndo_do_ioctl = lrw_if_ioctl,
+	.ndo_set_mac_address = lrw_if_set_mac,
 };
 
 /**
@@ -509,47 +461,23 @@ static struct file_operations lrw_fops = {
 int
 lora_register_hw(struct lora_hw *hw)
 {
-	struct lrw_struct *lrw_st;
-	unsigned int minor;
-	int status;
+	struct lrw_struct *lrw_st = container_of(hw, struct lrw_struct, hw);
+	int ret;
 
 	pr_debug("%s: %s\n", LORAWAN_MODULE_NAME, __func__);
-	lrw_st = container_of(hw, struct lrw_struct, hw);
 
-	/* Check there is a space for new LoRa hardware */
-	mutex_lock(&minors_lock);
-	minor = find_first_zero_bit(minors, LORA_HW_AMOUNT);
-	if (minor < LORA_HW_AMOUNT)
-		set_bit(minor, minors);
-	mutex_unlock(&minors_lock);
-	if (minor >= LORA_HW_AMOUNT) {
-		status = -ENODEV;
-		goto lrw_register_hw_end;
-	}
+	/* Add a LoRa device node as a network device */
+	ret = lrw_add_hw(lrw_st);
+	if (ret < 0)
+		goto lora_register_hw_end;
 
-	/* Add a LoRa device node under /dev */
-	cdev_init(&lrw_st->lrw_cdev, &lrw_fops);
-	lrw_st->lrw_cdev.owner = THIS_MODULE;
-	lrw_st->devt = MKDEV(lrw_major, minor);
-	status = cdev_add(&lrw_st->lrw_cdev, lrw_st->devt, LORA_HW_AMOUNT);
-	if (status)
-		goto lrw_register_hw_end;
-	lrw_st->dev = device_create(lrw_sys_class, NULL, lrw_st->devt, lrw_st,
-				    "lora%d", minor);
-	status = PTR_ERR_OR_ZERO(lrw_st->dev);
+	device_initialize(&lrw_st->dev);
+	dev_set_name(&lrw_st->dev, netdev_name(lrw_st->ndev));
+	lrw_st->dev.class = lrw_sys_class;
+	lrw_st->dev.platform_data = lrw_st;
 
-lrw_register_hw_end:
-	if (status == 0) {
-		lrw_add_hw(lrw_st);
-		//lora_start_hw(lrw_st);
-	}
-	else {
-		mutex_lock(&minors_lock);
-		clear_bit(minor, minors);
-		mutex_unlock(&minors_lock);
-	}
-
-	return status;
+lora_register_hw_end:
+	return ret;
 }
 EXPORT_SYMBOL(lora_register_hw);
 
@@ -560,51 +488,26 @@ EXPORT_SYMBOL(lora_register_hw);
 void
 lora_unregister_hw(struct lora_hw *hw)
 {
-	struct lrw_struct *lrw_st;
-	int minor;
+	struct lrw_struct *lrw_st = container_of(hw, struct lrw_struct, hw);
 
-	lrw_st = container_of(hw, struct lrw_struct, hw);
-	minor = MINOR(lrw_st->devt);
+	pr_info("%s: unregister %s\n",
+		LORAWAN_MODULE_NAME, dev_name(&lrw_st->dev));
 
-	pr_info("%s: unregister lora%d\n", LORAWAN_MODULE_NAME, minor);
-
-	/* Delete the character device driver from system */
-	cdev_del(&(lrw_st->lrw_cdev));
-	device_destroy(lrw_sys_class, lrw_st->devt);
+	/* Stop and remove the LoRaWAM hardware from system */
 	if (lrw_st->state != LORA_STOP)
 		lora_stop_hw(lrw_st);
 	lrw_remove_hw(lrw_st);
-
-	mutex_lock(&minors_lock);
-	clear_bit(minor, minors);
-	mutex_unlock(&minors_lock);
 
 	return;
 }
 EXPORT_SYMBOL(lora_unregister_hw);
 
-static int
+static int __init
 lrw_init(void)
 {
-	dev_t devt;
-	int alloc_ret = -1;
 	int err;
 
 	pr_info("%s: module inserted\n", LORAWAN_MODULE_NAME);
-
-	/* Allocate a character device */
-	alloc_ret = alloc_chrdev_region(&devt,
-					0,
-					LORA_HW_AMOUNT,
-					LORAWAN_MODULE_NAME);
-	if (alloc_ret) {
-		pr_err("%s: Failed to allocate a character device\n",
-		       LORAWAN_MODULE_NAME);
-		err = alloc_ret;
-		goto lrw_init_error;
-	}
-
-	lrw_major = MAJOR(devt);
 
 	/* Create device class */
 	lrw_sys_class = class_create(THIS_MODULE, LORAWAN_MODULE_NAME);
@@ -612,28 +515,20 @@ lrw_init(void)
 		pr_err("%s: Failed to create a class of LoRaWAN\n",
 		       LORAWAN_MODULE_NAME);
 		err = PTR_ERR(lrw_sys_class);
-		goto lrw_init_error;
 	}
-	pr_debug("%s: class created\n", LORAWAN_MODULE_NAME);
+	else {
+		pr_debug("%s: class created\n", LORAWAN_MODULE_NAME);
+		err = 0;
+	}
 
-	return 0;
-
-lrw_init_error:
-	/* Release the allocated character device */
-	if (alloc_ret == 0)
-		unregister_chrdev_region(devt, LORA_HW_AMOUNT);
 	return err;
 }
 
-static void
+static void __exit
 lrw_exit(void)
 {
-	dev_t devt = MKDEV(lrw_major, 0);
-
 	/* Delete device class */
 	class_destroy(lrw_sys_class);
-	/* Unregister the allocated character device */
-	unregister_chrdev_region(devt, LORA_HW_AMOUNT);
 	pr_info("%s: module removed\n", LORAWAN_MODULE_NAME);
 
 	return;

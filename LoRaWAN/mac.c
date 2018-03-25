@@ -177,7 +177,7 @@ lrw_prepare_tx_frame(struct lrw_session *ss)
 	/* Push FPort */
 	if (skb->len) {
 		fport = ss->fport;
-		memcpy(skb_push(skb, 1), &fport, 1);
+		memcpy(skb_push(skb, LRW_FPORT_LEN), &fport, LRW_FPORT_LEN);
 	}
 
 	/* Push FCnt_Up */
@@ -190,12 +190,12 @@ lrw_prepare_tx_frame(struct lrw_session *ss)
 	memcpy(skb_push(skb, LRW_DEVADDR_LEN), ss->devaddr, LRW_DEVADDR_LEN);
 
 	/* Push MHDR */
-	memcpy(skb_push(skb, 1), &mhdr, 1);
+	memcpy(skb_push(skb, LRW_MHDR_LEN), &mhdr, LRW_MHDR_LEN);
 
 	/* Put MIC */
 	lrw_calc_mic(lrw_st->nwks_shash_tfm, LRW_UPLINK,
 		     ss->devaddr, ss->fcnt_up, skb->data, skb->len, mic);
-	memcpy(skb_put(skb, 4), mic, 4);
+	memcpy(skb_put(skb, LRW_MIC_LEN), mic, LRW_MIC_LEN);
 }
 
 void
@@ -219,7 +219,7 @@ lrw_parse_frame(struct lrw_session *ss, struct sk_buff *skb)
 
 	/* Get message type */
 	fhdr->mtype = skb->data[0];
-	skb_pull(skb, 1);
+	skb_pull(skb, LRW_MHDR_LEN);
 
 	/* Trim Device Address */
 	skb_pull(skb, 4);
@@ -247,7 +247,7 @@ lrw_parse_frame(struct lrw_session *ss, struct sk_buff *skb)
 	// TODO: Parse frame options
 
 	/* Remove message integrity code */
-	skb_trim(skb, skb->len - 4);
+	skb_trim(skb, skb->len - LRW_MIC_LEN);
 }
 
 struct lrw_session *
@@ -370,7 +370,7 @@ lora_rx_irqsave(struct lora_hw *hw, struct sk_buff *skb)
 	if (((mtype == LRW_UNCONFIRMED_DATA_DOWN)
 	      || (mtype == LRW_CONFIRMED_DATA_DOWN))
 	    // && activated
-	    && (memcmp(lrw_st->devaddr, skb->data + 1, 4) != 0)
+	    && (memcmp(lrw_st->devaddr, skb->data + LRW_MHDR_LEN, 4) != 0)
 	    && lrw_check_mic(lrw_st->nwks_shash_tfm, skb))
 		is_new_frame = true;
 	//else if ((need to be auto activated) && (mtype == LRW_JOIN_ACCEPT))
@@ -537,4 +537,3 @@ lrw_get_devaddr(struct lora_hw *hw, u8 *devaddr)
 	return 0;
 }
 EXPORT_SYMBOL(lrw_get_devaddr);
-

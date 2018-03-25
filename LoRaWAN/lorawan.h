@@ -43,6 +43,7 @@
 #include <linux/spinlock.h>
 #include <linux/skbuff.h>
 #include <linux/workqueue.h>
+#include <linux/netdevice.h>
 #include <crypto/hash.h>
 #include <crypto/skcipher.h>
 #include "lora.h"
@@ -60,6 +61,11 @@
 #define	LRW_RXTIMEOUT_SS	5
 #define	LRW_RXRECEIVED_SS	6
 #define	LRW_RETRANSMIT_SS	7
+
+#define	LRW_MHDR_LEN		1
+#define	LRW_FHDR_MAX_LEN	22
+#define	LRW_FPORT_LEN		1
+#define	LRW_MIC_LEN		4
 
 struct lrw_fhdr {
 	u8 mtype;
@@ -116,11 +122,9 @@ struct lrw_session {
  * @waitqueue:		The queue to be hung on the wait table for multiplexing
  */
 struct lrw_struct {
-	dev_t devt;
-	struct device *dev;
+	struct device dev;
 	struct lora_hw hw;
 	struct lora_operations *ops;
-	struct list_head device_entry;
 	struct list_head ss_list;
 	struct lrw_session *_cur_ss;
 	struct sk_buff_head rx_skb_list;
@@ -128,8 +132,6 @@ struct lrw_struct {
 	struct mutex ss_list_lock;
 	uint8_t users;
 	uint8_t role;
-	wait_queue_head_t waitqueue;
-	struct cdev lrw_cdev;
 	bool rx_should_ack;
 	u8 state;
 
@@ -146,9 +148,14 @@ struct lrw_struct {
 
 	struct tasklet_struct xmit_task;
 	struct work_struct rx_work;
+
+	struct net_device *ndev;
 };
 
+#define	NETDEV_2_LRW(ndev)	((struct lrw_struct *)netdev_priv(ndev))
+
 struct lrw_session * lrw_alloc_ss(struct lrw_struct *);
+void lrw_free_ss(struct lrw_session *);
 void lrw_del_ss(struct lrw_session *);
 int lora_start_hw(struct lrw_struct *);
 void lora_stop_hw(struct lrw_struct *);
