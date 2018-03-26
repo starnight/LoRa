@@ -40,8 +40,6 @@
 #define __LORA_H__
 
 #include <linux/module.h>
-#include <linux/cdev.h>
-#include <linux/fs.h>
 #include <linux/skbuff.h>
 
 /* List the role of the LoRaWAN hardware */
@@ -138,26 +136,6 @@ struct lora_operations {
 	int (*set_state)(struct lora_hw *, u8);
 	int (*get_state)(struct lora_hw *, u8);
 
-};
-
-/**
- * struct lrw_driver: Host side LoRa driver
- * @name:		Name of the driver to use with this device
- * @major:		Driver's major number
- * @minor_start:	Driver's minor number starts from
- * @num:		The max number of the devices which use this driver
- * @lrw_cdev:		The handle lets the devices act as character devices
- * @lrw_class:		The class for being registed into file system
- * @owner:		This driver owned by which kernel module
- */
-struct lrw_driver {
-	char *name;
-	int major;
-	int minor_start;
-	int num;
-	struct cdev lrw_cdev;
-	struct class *lrw_class;
-	struct module *owner;
 };
 
 struct lora_hw *lora_alloc_hw(size_t, struct lora_operations *);

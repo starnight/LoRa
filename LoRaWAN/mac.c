@@ -38,7 +38,6 @@
 
 #include <linux/init.h>
 #include <linux/module.h>
-#include <linux/cdev.h>
 #include <linux/device.h>
 #include <linux/poll.h>
 #include <asm/uaccess.h>
@@ -47,6 +46,7 @@
 #include <linux/slab.h>
 #include <linux/timer.h>
 #include <linux/interrupt.h>
+#include <linux/netdevice.h>
 
 #include "lora.h"
 #include "lorawan.h"
@@ -491,16 +491,14 @@ rx1_delay_isr(struct timer_list *timer)
 	lrw_st->ops->start_rx_window(&lrw_st->hw, ss->rx1_window + 20);
 }
 
-static void
+void
 lrw_sent_tx_work(struct lrw_struct *lrw_st, struct sk_buff *skb)
 {
-	struct lrw_session *ss;
+	struct lrw_session *ss = lrw_st->_cur_ss;
+	struct net_device *ndev;
 	unsigned long delay;
 
 	pr_debug("%s: %s\n", LORAWAN_MODULE_NAME, __func__);
-
-	/* Find the session in ss_list_entry with matched skb */
-	ss = lrw_st->_cur_ss;	
 
 	ss->state = LRW_XMITTED;
 
@@ -509,6 +507,11 @@ lrw_sent_tx_work(struct lrw_struct *lrw_st, struct sk_buff *skb)
 	delay = jiffies_64 + ss->rx_delay1 * HZ - 20 * HZ / 1000;
 	ss->timer.expires = delay;
 	add_timer(&ss->timer);
+
+	ndev = skb->dev;
+	ndev->stats.tx_packets++;
+	ndev->stats.tx_bytes += skb->len;
+	dev_consume_skb_any(skb);
 
 	/* Set LoRa hardware to IDLE state */
 	lrw_st->ops->set_state(&lrw_st->hw, LORA_STATE_IDLE);
