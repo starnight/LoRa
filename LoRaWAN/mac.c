@@ -307,19 +307,24 @@ lrw_rx_work(struct work_struct *work)
 	mutex_lock(&lrw_st->ss_list_lock);
 	lrw_st->fcnt_down = ss->rx_fhdr.fcnt;
 	lrw_st->_cur_ss = NULL;
+	mutex_unlock(&lrw_st->ss_list_lock);
 
-	if (ss->rx_skb->len == 0) {
-		/* Remove the session if it is no RX frame payload */
-		lrw_del_ss(ss);
-		mutex_unlock(&lrw_st->ss_list_lock);
-	}
-	else {
-		mutex_unlock(&lrw_st->ss_list_lock);
+	lrw_st->ndev->stats.rx_packets++;
+	lrw_st->ndev->stats.rx_bytes += ss->rx_skb->len;
 
+	if (ss->rx_skb->len > 0) {
 		spin_lock_bh(&ss->state_lock);
 		ss->state = LRW_RXRECEIVED_SS;
 		spin_unlock_bh(&ss->state_lock);
+
+		netif_receive_skb(skb);
+
+		ss->rx_skb = NULL;
 	}
+
+	mutex_lock(&lrw_st->ss_list_lock);
+	lrw_del_ss(ss);
+	mutex_unlock(&lrw_st->ss_list_lock);
 
 	return;
 

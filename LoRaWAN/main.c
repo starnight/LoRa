@@ -275,44 +275,6 @@ lrw_if_down(struct net_device *ndev)
 	return 0;
 }
 
-static ssize_t
-file_read(struct file *filp, char __user *buf, size_t size, loff_t *pos)
-{
-	struct lrw_struct *lrw_st;
-	struct lrw_session *ss;
-	struct sk_buff *skb;
-	size_t len;
-	ssize_t ret;
-
-	pr_debug("%s: read file (size=%zu)\n", LORAWAN_MODULE_NAME, size);
-
-	lrw_st = filp->private_data;
-
-	mutex_lock(&lrw_st->ss_list_lock);
-	if (ready2read(lrw_st)) {
-		ss = list_first_entry(&lrw_st->ss_list,
-				      struct lrw_session,
-				      entry);
-		skb = ss->rx_skb;
-		len = (size <= skb->len) ? size : skb->len;
-		if(!copy_to_user(buf, skb->data, len)) {
-			ret = len;
-			skb_pull(skb, len);
-			if (!skb->len)
-				lrw_del_ss(ss);
-		}
-		else {
-			ret = -EFAULT;
-		}
-	}
-	else {
-		ret = -EBUSY;
-	}
-	mutex_unlock(&lrw_st->ss_list_lock);
-
-	return ret;
-}
-
 netdev_tx_t
 lrw_if_start_xmit(struct sk_buff *skb, struct net_device *ndev)
 {
