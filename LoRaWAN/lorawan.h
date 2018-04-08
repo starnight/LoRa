@@ -107,32 +107,40 @@ struct lrw_session {
 };
 
 /**
- * struct lrw_struct: Master side proxy of an LoRa slave device
- * @devt:		It is a device search key
- * @lrw_device:	LoRa controller used with the device
- * @device_entry:	The entry going to be added into the device list
- * @ops:		Handle of LoRa operations interfaces
- * @tx_buf:		Pointer of the TX buffer
- * @rx_buf:		Pointer of the RX buffer
- * @tx_buflen:		The length of the TX buffer
- * @rx_buffer:		The length of the RX buffer
- * @bufmaxlen:		The max length of the TX and RX buffer
- * @users:		How many program use this LoRa device
- * @buf_lock:		The lock to protect the synchroniztion of this structure
- * @waitqueue:		The queue to be hung on the wait table for multiplexing
+ * lrw_struct - The full LoRaWAN hardware to the LoRa device.
+ *
+ * @dev:		this LoRa device registed in system
+ * @lora_hw:		the LoRa device of this LoRaWAN hardware
+ * @ops:		handle of LoRa operations interfaces
+ * @rx_skb_list:	the list of received frames
+ * @ss_list:		LoRaWAN session list of this LoRaWAN hardware
+ * @_cur_ss:		pointer of the current processing session
+ * @rx_should_ack:	represent the current session should be acked or not
+ * @role:		the role of this LoRaWAN hardware
+ * @state:		the state of this LoRaWAN hardware
+ * @devaddr:		the LoRaWAN device address of this LoRaWAN hardware
+ * @appky:		the Application key
+ * @nwkskey:		the Network session key
+ * @appskey:		the Application session key
+ * @nwks_shash_tfm:	the hash handler for LoRaWAN network session
+ * @nwks_skc_tfm:	the crypto handler for LoRaWAN network session
+ * @apps_skc_tfm:	the crypto handler for LoRaWAN application session
+ * @fcnt_up:		the counter of this LoRaWAN hardware's up frame
+ * @fcnt_down:		the counter of this LoRaWAN hardware's down frame
+ * @xmit_task:		the xmit task for the current LoRaWAN session
+ * @rx_work:		the RX work in workqueue for the current LoRaWAN session
+ * @ndev:		points to the emulating network device
  */
 struct lrw_struct {
 	struct device dev;
 	struct lora_hw hw;
 	struct lora_operations *ops;
-	struct list_head ss_list;
-	struct lrw_session *_cur_ss;
 	struct sk_buff_head rx_skb_list;
-	struct sk_buff_head sent_tx_skb_list;
+	struct list_head ss_list;
 	struct mutex ss_list_lock;
-	uint8_t users;
-	uint8_t role;
+	struct lrw_session *_cur_ss;
 	bool rx_should_ack;
+	uint8_t role;
 	u8 state;
 
 	u8 devaddr[LRW_DEVADDR_LEN];

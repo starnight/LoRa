@@ -52,14 +52,14 @@
 
 /* List the message types of LoRaWAN */
 #define	LRW_JOIN_REQUEST		0x0
-#define LRW_JOIN_ACCEPT			0x1
+#define	LRW_JOIN_ACCEPT			0x1
 #define	LRW_UNCONFIRMED_DATA_UP		0x2
 #define	LRW_UNCONFIRMED_DATA_DOWN	0x3
 #define	LRW_CONFIRMED_DATA_UP		0x4
 #define	LRW_CONFIRMED_DATA_DOWN		0x5
 #define	LRW_PROPRIETARY			0x7
 
-/* I/O control by each command. */
+/* I/O control by each command */
 #define LRW_IOC_MAGIC '\x74'
 
 #define LRW_SET_STATE			(_IOW(LRW_IOC_MAGIC,  0, int))
@@ -78,7 +78,7 @@
 #define LRW_GET_RSSI			(_IOR(LRW_IOC_MAGIC, 13, int))
 #define LRW_GET_SNR			(_IOR(LRW_IOC_MAGIC, 14, int))
 
-/* List the state of the LoRa hardware. */
+/* List the LoRa device's states of LoRaWAN hardware */
 #define	LORA_STOP			0
 #define	LORA_START			1
 #define	LORA_STATE_IDLE			2
@@ -87,6 +87,16 @@
 #define	LORA_STATE_RX2			5
 #define	LORA_STATE_CAD			6
 
+/**
+ * lora_hw - This structure holds the LoRa device of LoRaWAN hardware.
+ *
+ * @parent:		points to the parent device
+ * @priv:		points to the private data
+ * @channels:		bits array of RF channels could be used
+ * @tx_powers:		points to the emitting RF power array
+ * @tx_powers_size:	the size of emitting RF power array in bytes
+ * @transmit_power:	the current emitting RF power in mBm
+ */
 struct lora_hw {
 	struct device *parent;
 	void *priv;
@@ -97,33 +107,49 @@ struct lora_hw {
 	s32 transmit_power;
 };
 
-/* The structure lists the LoRa device's operations. */
+/**
+ * lora_operations - The structure lists the LoRa device/interface's operations.
+ * These are callback functions for the LoRaWAN module.  LoRa device driver
+ * should implement some of them according to the usage.  The unimplemented
+ * callback functions must be assigned as NULL.
+ *
+ * @start:
+ *	called when the interface is being up state
+ *
+ * @stop:
+ *	called when the interface is being down state
+ *
+ * @xmit_async:
+ *	called to xmit the data through the interface asynchronously
+ *
+ * @set_txpower:
+ *	called to set xmitting RF power in mBm of the interface
+ *
+ * @set_frq:
+ *	called to set carrier frequency Hz of the interface
+ *
+ * @set_bw:
+ *	called to set RF bandwidth in Hz of the interface
+ *
+ * @set_mod:
+ *	called to set the LoRa device's working mode: LoRa or FSK mode
+ *
+ * @set_sf:
+ *	called to set the CSS modulation's spreading factor of LoRa
+ *
+ * @start_rx_window:
+ *	called to ask the LoRa device open a receiving window
+ *
+ * @set_state:
+ *	called to set the LoRa device's working state
+ *
+ * @get_state:
+ *	called to get the LoRa device's current working state
+ */
 struct lora_operations {
-//	/* Set & get the carrier frequency. */
-//	long (*setFreq)(struct lora_hw *, void __user *);
-//	long (*getFreq)(struct lora_hw *, void __user *);
-//	/* Set & get the PA power. */
-//	long (*setPower)(struct lora_hw *, void __user *);
-//	long (*getPower)(struct lora_hw *, void __user *);
-//	/* Set & get the LNA gain. */
-//	long (*setLNA)(struct lora_hw *, void __user *);
-//	long (*getLNA)(struct lora_hw *, void __user *);
-//	/* Set LNA be auto gain control or manual. */
-//	long (*setLNAAGC)(struct lora_hw *, void __user *);
-//	/* Set & get the RF spreading factor. */
-//	long (*setSPRFactor)(struct lora_hw *, void __user *);
-//	long (*getSPRFactor)(struct lora_hw *, void __user *);
-//	/* Set & get the RF bandwith. */
-//	long (*setBW)(struct lora_hw *, void __user *);
-//	long (*getBW)(struct lora_hw *, void __user *);
-//	/* Get current RSSI. */
-//	long (*getRSSI)(struct lora_hw *, void __user *);
-//	/* Get last packet's SNR. */
-//	long (*getSNR)(struct lora_hw *, void __user *);
-
 	int (*start)(struct lora_hw *);
 	void (*stop)(struct lora_hw *);
-	/* Write to the LoRa device's communication. */
+
 	int (*xmit_async)(struct lora_hw *, struct sk_buff *);
 	int (*set_txpower)(struct lora_hw *, s32);
 	int (*set_frq)(struct lora_hw *, u32);
@@ -135,7 +161,6 @@ struct lora_operations {
 	/* Set & get the state of the LoRa device. */
 	int (*set_state)(struct lora_hw *, u8);
 	int (*get_state)(struct lora_hw *, u8);
-
 };
 
 struct lora_hw *lora_alloc_hw(size_t, struct lora_operations *);
@@ -145,10 +170,10 @@ void lora_unregister_hw(struct lora_hw *);
 void lora_rx_irqsave(struct lora_hw *, struct sk_buff *);
 void lora_xmit_complete(struct lora_hw *, struct sk_buff *);
 
-#define	LORA_APPKEY		0
-#define	LORA_NWKSKEY		1
-#define	LORA_APPSKEY		2
-#define	LORA_KEY_LEN		16
+#define	LORA_APPKEY			0
+#define	LORA_NWKSKEY			1
+#define	LORA_APPSKEY			2
+#define	LORA_KEY_LEN			16
 int lora_set_key(struct lora_hw *, u8, u8 *, size_t);
 int lrw_get_devaddr(struct lora_hw *, u8 *devaddr);
 

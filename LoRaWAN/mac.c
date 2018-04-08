@@ -358,6 +358,11 @@ lrw_check_mic(struct crypto_shash *tfm, struct sk_buff *skb)
 	return (!memcmp(cks, mic, 4));
 }
 
+/**
+ * lora_rx_irqsave - Tell LoRaWAN module that there is new received frame
+ * @hw:		the LoRa device
+ * @skb:	the new received frame
+ */
 void
 lora_rx_irqsave(struct lora_hw *hw, struct sk_buff *skb)
 {
@@ -522,6 +527,11 @@ lrw_sent_tx_work(struct lrw_struct *lrw_st, struct sk_buff *skb)
 	lrw_st->ops->set_state(&lrw_st->hw, LORA_STATE_IDLE);
 }
 
+/**
+ * lora_xmit_complete - Tell LoRaWAN module that the frame is xmitted completely
+ * @hw:		the LoRa device
+ * @skb:	the xmitted frame
+ */
 void
 lora_xmit_complete(struct lora_hw *hw, struct sk_buff *skb)
 {
@@ -534,6 +544,13 @@ lora_xmit_complete(struct lora_hw *hw, struct sk_buff *skb)
 }
 EXPORT_SYMBOL(lora_xmit_complete);
 
+/**
+ * lrw_get_devaddr - Get the device address of LoRaWAN
+ * @hw:		the LoRa device
+ * @devaddr:	the pointer of the space going to hold the address
+ *
+ * Return:	0 for success
+ */
 int
 lrw_get_devaddr(struct lora_hw *hw, u8 *devaddr)
 {

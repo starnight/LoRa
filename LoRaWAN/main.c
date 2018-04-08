@@ -61,6 +61,13 @@ lora_if_setup(struct net_device *ndev)
 	ndev->mtu = 20;
 }
 
+/**
+ * lora_alloc_hw - Allocate a memory space for the LoRa device
+ * @priv_data_len:	the private data size
+ * @lora_operations:	the implemented operations of the LoRa device
+ *
+ * Return:		address of the LoRa device or NULL for failed
+ */
 struct lora_hw *
 lora_alloc_hw(size_t priv_data_len, struct lora_operations *ops)
 {
@@ -113,6 +120,10 @@ lora_alloc_hw_err:
 }
 EXPORT_SYMBOL(lora_alloc_hw);
 
+/**
+ * lora_free_hw - Free the LoRa device's memory resource
+ * @hw:		the LoRa device going to be freed
+ */
 void
 lora_free_hw(struct lora_hw *hw)
 {
@@ -124,12 +135,13 @@ lora_free_hw(struct lora_hw *hw)
 EXPORT_SYMBOL(lora_free_hw);
 
 /**
- * lrw_register_ndev - Add a LoRaWAN hardware as a network device
+ * lrw_add_hw - Add a LoRaWAN hardware as a network device
  * @lrw_st:	the LoRa device going to be added
  *
  * Return:	0 / other number for success / failed
  */
 int
+
 lrw_add_hw(struct lrw_struct *lrw_st)
 {
 	struct net_device *ndev = lrw_st->ndev;
@@ -153,7 +165,7 @@ lrw_add_hw(struct lrw_struct *lrw_st)
 }
 
 /**
- * lrw_unregister_ndev - Remove a LoRaWAN hardware from a network device
+ * lrw_remove_hw - Remove a LoRaWAN hardware from a network device
  * @lrw_st:	the LoRa device going to be removed
  */
 void
@@ -415,8 +427,8 @@ static const struct net_device_ops lrw_if_ops = {
 };
 
 /**
- * lora_register_hw - Register there is a kind of LoRa driver
- * @driver:	LoRa driver going to be registered
+ * lora_register_hw - Register there is a kind of LoRa device
+ * @hw:		LoRa device going to be registered
  *
  * Return:	0 / negative number for success / error number
  */
@@ -445,7 +457,7 @@ EXPORT_SYMBOL(lora_register_hw);
 
 /**
  * lora_unregister_hw - Unregister the LoRa driver
- * @driver:	LoRa driver going to be unregistered
+ * @hw:		LoRa device going to be unregistered
  */
 void
 lora_unregister_hw(struct lora_hw *hw)
