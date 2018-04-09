@@ -67,6 +67,15 @@
 #define	LRW_FPORT_LEN		1
 #define	LRW_MIC_LEN		4
 
+/**
+ * lrw_fhdr - Hold the message's basic information of the frame
+ *
+ * @mtype:		this message's type
+ * @fctrl:		the frame control byte
+ * @fcnt:		this message's frame counter value
+ * @fopts:		this frame's options field
+ * @fopts_len:		the length of the fopts
+ */
 struct lrw_fhdr {
 	u8 mtype;
 	u8 fctrl;
@@ -75,6 +84,31 @@ struct lrw_fhdr {
 	u8 fopts_len;
 };
 
+/**
+ * lrw_session - LoRaWAN session for Class A end device
+ *
+ * @lrw_st:		points to the belonging lrw_st
+ * @entry:		the entry of the ss_list in lrw_struct
+ * @devaddr:		the LoRaWAN device address of this LoRaWAN hardware
+ * @fcnt_up:		uplink frame counter
+ * @fcnt_down:		downlink frame counter
+ * @fport:		the LoRaWAN data message's port field
+ * @tx_skb:		points to the TX skb, the frame
+ * @rx_skb:		points to the RX skb, the frame
+ * @tx_fhdr:		hold the message's basic information of the TX frame
+ * @rx_fhdr:		hold the message's basic information of the RX frame
+ * @tx_should_ack:	flag for determining the TX which should be acked or not
+ * @retry:		retry times for xmitting failed
+ * @state:		this session's current state
+ * @state_lock:		lock of the session's state
+ * @timer:		timing for this session and the state transition
+ * @timeout_work:	work if waiting acknowledge time out
+ * @rx_delay1:		RX1 delay time in seconds
+ * @rx_delay2:		RX2 delay time in seconds
+ * @rx1_window:		RX1 window opening time in mini-seconds
+ * @rx2_window:		RX2 window opening time in mini-seconds
+ * @ack_timeout:	time out time for waiting acknowledge in seconds
+ */
 struct lrw_session {
 	struct lrw_struct *lrw_st;
 	struct list_head entry;
@@ -95,15 +129,11 @@ struct lrw_session {
 
 	struct timer_list timer;
 	struct work_struct timeout_work;
-	u16 rx_delay1; // seconds
-	u16 rx_delay2; // seconds
-	u16 rx1_window; // mini-seconds
-	u16 rx2_window; // mini-seconds
-	u16 ack_timeout; // seconds
-
-	u8 *appkey;
-	u8 *nwkskey;
-	u8 *appskey;
+	u16 rx_delay1;
+	u16 rx_delay2;
+	u16 rx1_window;
+	u16 rx2_window;
+	u16 ack_timeout;
 };
 
 /**

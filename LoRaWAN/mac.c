@@ -67,9 +67,6 @@ lrw_alloc_ss(struct lrw_struct *lrw_st)
 	
 	ss->lrw_st = lrw_st;
 	memcpy(ss->devaddr, lrw_st->devaddr, LRW_DEVADDR_LEN);
-	ss->appkey = lrw_st->appkey;
-	ss->nwkskey = lrw_st->nwkskey;
-	ss->appskey = lrw_st->appskey;
 	INIT_LIST_HEAD(&ss->entry);
 
 	ss->tx_should_ack = false;
