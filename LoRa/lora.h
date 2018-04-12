@@ -43,21 +43,25 @@
 #include <linux/skbuff.h>
 
 /* List the role of the LoRaWAN hardware */
-#define	LRW_GATEWAY			0x0
-#define	LRW_CLASS_A_NODE		0x1
-#define	LRW_CLASS_B_NODE		0x2
-#define	LRW_CLASS_C_NODE		0x3
+enum {
+	LRW_GATEWAY,
+	LRW_CLASS_A_NODE,
+	LRW_CLASS_B_NODE,
+	LRW_CLASS_C_NODE,
+};
 
 #define	LRW_DEVADDR_LEN			4
 
 /* List the message types of LoRaWAN */
-#define	LRW_JOIN_REQUEST		0x0
-#define	LRW_JOIN_ACCEPT			0x1
-#define	LRW_UNCONFIRMED_DATA_UP		0x2
-#define	LRW_UNCONFIRMED_DATA_DOWN	0x3
-#define	LRW_CONFIRMED_DATA_UP		0x4
-#define	LRW_CONFIRMED_DATA_DOWN		0x5
-#define	LRW_PROPRIETARY			0x7
+enum {
+	LRW_JOIN_REQUEST,
+	LRW_JOIN_ACCEPT,
+	LRW_UNCONFIRMED_DATA_UP,
+	LRW_UNCONFIRMED_DATA_DOWN,
+	LRW_CONFIRMED_DATA_UP,
+	LRW_CONFIRMED_DATA_DOWN,
+	LRW_PROPRIETARY,
+};
 
 /* I/O control by each command */
 #define LRW_IOC_MAGIC '\x74'
@@ -79,13 +83,15 @@
 #define LRW_GET_SNR			(_IOR(LRW_IOC_MAGIC, 14, int))
 
 /* List the LoRa device's states of LoRaWAN hardware */
-#define	LORA_STOP			0
-#define	LORA_START			1
-#define	LORA_STATE_IDLE			2
-#define	LORA_STATE_TX			3
-#define	LORA_STATE_RX1			4
-#define	LORA_STATE_RX2			5
-#define	LORA_STATE_CAD			6
+enum {
+	LORA_STOP,
+	LORA_START,
+	LORA_STATE_IDLE,
+	LORA_STATE_TX,
+	LORA_STATE_RX1,
+	LORA_STATE_RX2,
+	LORA_STATE_CAD,
+};
 
 /**
  * lora_hw - This structure holds the LoRa device of LoRaWAN hardware.
@@ -170,9 +176,11 @@ void lora_unregister_hw(struct lora_hw *);
 void lora_rx_irqsave(struct lora_hw *, struct sk_buff *);
 void lora_xmit_complete(struct lora_hw *, struct sk_buff *);
 
-#define	LORA_APPKEY			0
-#define	LORA_NWKSKEY			1
-#define	LORA_APPSKEY			2
+enum {
+	LORA_APPKEY,
+	LORA_NWKSKEY,
+	LORA_APPSKEY,
+};
 #define	LORA_KEY_LEN			16
 int lora_set_key(struct lora_hw *, u8, u8 *, size_t);
 int lrw_get_devaddr(struct lora_hw *, u8 *devaddr);
