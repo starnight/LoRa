@@ -103,13 +103,13 @@ lora_alloc_hw(size_t priv_data_len, struct lora_operations *ops)
 
 	lrw_st = (struct lrw_struct *)netdev_priv(ndev);
 	lrw_st->ndev = ndev;
-	dev_net_set(ndev, &lrw_st->net);
 
 	lrw_st->state = LORA_STOP;
 	lrw_st->ops = ops;
 	lrw_st->hw.priv = (void *) lrw_st + sizeof(struct lrw_struct);
 
 	SET_NETDEV_DEV(ndev, &lrw_st->dev);
+	dev_net_set(ndev, &lrw_st->net);
 	ndev->flags |= IFF_NOARP;
 	ndev->features |= NETIF_F_HW_CSUM;
 
