@@ -162,6 +162,7 @@ struct lrw_session {
  * @xmit_task:		the xmit task for the current LoRaWAN session
  * @rx_work:		the RX work in workqueue for the current LoRaWAN session
  * @ndev:		points to the emulating network device
+ * @net:		the current network namespace of this LoRaWAN hardware
  */
 struct lrw_struct {
 	struct device dev;
@@ -190,6 +191,7 @@ struct lrw_struct {
 	struct work_struct rx_work;
 
 	struct net_device *ndev;
+	struct net net;
 };
 
 #define	NETDEV_2_LRW(ndev)	((struct lrw_struct *)netdev_priv(ndev))

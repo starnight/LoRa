@@ -103,6 +103,7 @@ lora_alloc_hw(size_t priv_data_len, struct lora_operations *ops)
 
 	lrw_st = (struct lrw_struct *)netdev_priv(ndev);
 	lrw_st->ndev = ndev;
+	dev_net_set(ndev, &lrw_st->net);
 
 	lrw_st->state = LORA_STOP;
 	lrw_st->ops = ops;
