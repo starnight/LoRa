@@ -108,8 +108,8 @@ lora_alloc_hw(size_t priv_data_len, struct lora_operations *ops)
 	lrw_st->ops = ops;
 	lrw_st->hw.priv = (void *) lrw_st + sizeof(struct lrw_struct);
 
-	SET_NETDEV_DEV(ndev, &lrw_st->dev);
-	dev_net_set(ndev, &lrw_st->net);
+	//SET_NETDEV_DEV(ndev, &lrw_st->dev);
+	//dev_net_set(ndev, &lrw_st->net);
 	ndev->flags |= IFF_NOARP;
 	ndev->features |= NETIF_F_HW_CSUM;
 
@@ -117,7 +117,7 @@ lora_alloc_hw(size_t priv_data_len, struct lora_operations *ops)
 
 lora_alloc_hw_err:
 	free_netdev(ndev);
-	return ERR_PTR(ret);
+return ERR_PTR(ret);
 }
 EXPORT_SYMBOL(lora_alloc_hw);
 
@@ -160,6 +160,7 @@ lrw_add_hw(struct lrw_struct *lrw_st)
 	tasklet_init(&lrw_st->xmit_task, lrw_xmit, (unsigned long) lrw_st);
 	INIT_WORK(&lrw_st->rx_work, lrw_rx_work);
 
+	write_pnet(&lrw_st->_net, &init_net);
 	ret = register_netdev(ndev);
 
 	return ret;
@@ -441,15 +442,17 @@ lora_register_hw(struct lora_hw *hw)
 
 	pr_debug("%s: %s\n", LORAWAN_MODULE_NAME, __func__);
 
-	/* Add a LoRa device node as a network device */
-	ret = lrw_add_hw(lrw_st);
-	if (ret < 0)
-		goto lora_register_hw_end;
-
 	device_initialize(&lrw_st->dev);
 	dev_set_name(&lrw_st->dev, netdev_name(lrw_st->ndev));
 	lrw_st->dev.class = lrw_sys_class;
 	lrw_st->dev.platform_data = lrw_st;
+
+	ret = device_add(&lrw_st->dev);
+	if (ret)
+		goto lora_register_hw_end;
+
+	/* Add a LoRa device node as a network device */
+	ret = lrw_add_hw(lrw_st);
 
 lora_register_hw_end:
 	return ret;
