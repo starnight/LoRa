@@ -452,6 +452,7 @@ lora_register_hw(struct lora_hw *hw)
 		goto lora_register_hw_end;
 
 	/* Add a LoRa device node as a network device */
+	lrw_st->ndev->netdev_ops = &lrw_if_ops;
 	ret = lrw_add_hw(lrw_st);
 
 lora_register_hw_end:
