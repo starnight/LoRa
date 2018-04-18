@@ -475,6 +475,7 @@ lora_unregister_hw(struct lora_hw *hw)
 	/* Stop and remove the LoRaWAM hardware from system */
 	if (lrw_st->state != LORA_STOP)
 		lora_stop_hw(lrw_st);
+	device_del(&lrw_st->dev);
 	lrw_remove_hw(lrw_st);
 
 	return;
