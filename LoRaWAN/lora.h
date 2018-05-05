@@ -185,4 +185,14 @@ enum {
 int lora_set_key(struct lora_hw *, u8, u8 *, size_t);
 int lrw_get_devaddr(struct lora_hw *, u8 *devaddr);
 
+/* Going to be defined in public headers in the future */
+#define	AF_LORAWAN	44		/* LoRaWAN sockets		*/
+#define	PF_LORAWAN	AF_LORAWAN
+#define	ETH_P_LORAWAN	0x00FA		/* LoRaWAN frame		*/
+#define	SOL_LORAWAN	283
+#define	ARPHRD_LORAWAN	830		/* LoRaWAN header		*/
+
+/* Need to find a way to define or assign */
+#define	LORAWAN_MTU	20
+
 #endif

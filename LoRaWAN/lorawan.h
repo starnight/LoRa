@@ -205,4 +205,26 @@ void lrw_prepare_tx_frame(struct lrw_session *);
 void lrw_xmit(unsigned long);
 void lrw_rx_work(struct work_struct *);
 
+int lrw_sock_init(void);
+void lrw_sock_exit(void);
+
+struct lrw_addr {
+	u8 devaddr[LRW_DEVADDR_LEN];
+};
+
+struct lrw_addr_sa {
+	int addr_type;
+	u8 devaddr[LRW_DEVADDR_LEN];
+};
+
+struct sockaddr_lorawan {
+	sa_family_t family; /* AF_LORAWAN */
+	struct lrw_addr_sa addr_sa;
+};
+
+struct lrw_mac_cb {
+	int rssi;
+	struct lrw_addr addr;
+};
+
 #endif

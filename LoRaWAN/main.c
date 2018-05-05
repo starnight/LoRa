@@ -117,7 +117,7 @@ lora_alloc_hw(size_t priv_data_len, struct lora_operations *ops)
 
 lora_alloc_hw_err:
 	free_netdev(ndev);
-return ERR_PTR(ret);
+	return ERR_PTR(ret);
 }
 EXPORT_SYMBOL(lora_alloc_hw);
 
@@ -184,7 +184,12 @@ lrw_set_hw_state(struct lrw_struct *lrw_st, void __user *arg)
 	u8 state;
 
 	pr_debug("%s: %s\n", LORAWAN_MODULE_NAME, __func__);
-	copy_from_user(&state, arg, 1);
+	ret = copy_from_user(&state, arg, 1);
+	if (ret) {
+		ret = -EACCES;
+		goto lrw_set_hw_state_end;
+	}
+
 	switch (state) {
 	case LORA_START:
 		if (lrw_st->state == LORA_STOP)
@@ -198,6 +203,7 @@ lrw_set_hw_state(struct lrw_struct *lrw_st, void __user *arg)
 		ret = -ENOTSUPP;
 	}
 
+lrw_set_hw_state_end:
 	return ret;
 }
 
@@ -495,12 +501,13 @@ lrw_init(void)
 		pr_err("%s: Failed to create a class of LoRaWAN\n",
 		       LORAWAN_MODULE_NAME);
 		err = PTR_ERR(lrw_sys_class);
-	}
-	else {
-		pr_debug("%s: class created\n", LORAWAN_MODULE_NAME);
-		err = 0;
+		goto lrw_init_end;
 	}
 
+	pr_debug("%s: class created\n", LORAWAN_MODULE_NAME);
+	err = 0;
+
+lrw_init_end:
 	return err;
 }
 
