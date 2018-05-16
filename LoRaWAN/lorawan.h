@@ -44,9 +44,11 @@
 #include <linux/skbuff.h>
 #include <linux/workqueue.h>
 #include <linux/netdevice.h>
+#include <uapi/linux/if_arp.h>
 #include <crypto/hash.h>
 #include <crypto/skcipher.h>
-#include "lora.h"
+
+#include <linux/lora.h>
 
 #define	LORAWAN_MODULE_NAME	"lorawan"
 
@@ -176,7 +178,9 @@ struct lrw_struct {
 	uint8_t role;
 	u8 state;
 
-	u8 devaddr[LRW_DEVADDR_LEN];
+	__le64 app_eui;
+	__le64 dev_eui;
+	__le32 devaddr;
 	u8 appkey[LORA_KEY_LEN];
 	u8 nwkskey[LORA_KEY_LEN];
 	u8 appskey[LORA_KEY_LEN];
@@ -208,23 +212,9 @@ void lrw_rx_work(struct work_struct *);
 int lrw_sock_init(void);
 void lrw_sock_exit(void);
 
-struct lrw_addr {
-	u8 devaddr[LRW_DEVADDR_LEN];
-};
-
-struct lrw_addr_sa {
-	int addr_type;
-	u8 devaddr[LRW_DEVADDR_LEN];
-};
-
-struct sockaddr_lorawan {
-	sa_family_t family; /* AF_LORAWAN */
-	struct lrw_addr_sa addr_sa;
-};
-
 struct lrw_mac_cb {
 	int rssi;
-	struct lrw_addr addr;
+	u32 devaddr;
 };
 
 #endif

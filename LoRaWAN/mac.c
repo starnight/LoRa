@@ -48,7 +48,7 @@
 #include <linux/interrupt.h>
 #include <linux/netdevice.h>
 
-#include "lora.h"
+#include <linux/lora.h>
 #include "lorawan.h"
 #include "lrwsec.h"
 
@@ -66,7 +66,7 @@ lrw_alloc_ss(struct lrw_struct *lrw_st)
 		goto lrw_alloc_ss_end;
 	
 	ss->lrw_st = lrw_st;
-	memcpy(ss->devaddr, lrw_st->devaddr, LRW_DEVADDR_LEN);
+	memcpy(ss->devaddr, &lrw_st->devaddr, LRW_DEVADDR_LEN);
 	INIT_LIST_HEAD(&ss->entry);
 
 	ss->tx_should_ack = false;
@@ -377,7 +377,7 @@ lora_rx_irqsave(struct lora_hw *hw, struct sk_buff *skb)
 	if (((mtype == LRW_UNCONFIRMED_DATA_DOWN)
 	      || (mtype == LRW_CONFIRMED_DATA_DOWN))
 	    // && activated
-	    && (memcmp(lrw_st->devaddr, skb->data + LRW_MHDR_LEN, 4) != 0)
+	    && (memcmp(&lrw_st->devaddr, skb->data + LRW_MHDR_LEN, 4) != 0)
 	    && lrw_check_mic(lrw_st->nwks_shash_tfm, skb))
 		is_new_frame = true;
 	//else if ((need to be auto activated) && (mtype == LRW_JOIN_ACCEPT))
@@ -540,22 +540,3 @@ lora_xmit_complete(struct lora_hw *hw, struct sk_buff *skb)
 	lrw_sent_tx_work(lrw_st, skb);
 }
 EXPORT_SYMBOL(lora_xmit_complete);
-
-/**
- * lrw_get_devaddr - Get the device address of LoRaWAN
- * @hw:		the LoRa device
- * @devaddr:	the pointer of the space going to hold the address
- *
- * Return:	0 for success
- */
-int
-lrw_get_devaddr(struct lora_hw *hw, u8 *devaddr)
-{
-	struct lrw_struct *lrw_st;
-
-	lrw_st = container_of(hw, struct lrw_struct, hw);
-	memcpy(devaddr, lrw_st->devaddr, LRW_DEVADDR_LEN);
-
-	return 0;
-}
-EXPORT_SYMBOL(lrw_get_devaddr);

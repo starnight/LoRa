@@ -43,8 +43,9 @@
 #include <linux/errno.h>
 #include <linux/list.h>
 #include <linux/interrupt.h>
+#include <net/rtnetlink.h>
 
-#include "lora.h"
+#include <linux/lora.h>
 #include "lorawan.h"
 
 #define	PHY_NAME		"lora"
@@ -54,9 +55,14 @@ static struct class *lrw_sys_class;
 static void
 lora_if_setup(struct net_device *ndev)
 {
+	ndev->addr_len = LRW_DEVADDR_LEN;
+	memset(ndev->broadcast, 0xFF, ndev->addr_len);
+	ndev->type = ARPHRD_LORAWAN;
+
 	ndev->hard_header_len = LRW_MHDR_LEN + LRW_FHDR_MAX_LEN + LRW_FPORT_LEN;
 	ndev->needed_tailroom = LRW_MIC_LEN;
-	// TODO: M is a dynamic value defined by Regional Parameters
+
+	// TODO: M should be a dynamic value defined by Regional Parameters
 	//ndev->mtu = M - ndev->hard_header_len;
 	ndev->mtu = 20;
 }
@@ -136,19 +142,114 @@ lora_free_hw(struct lora_hw *hw)
 EXPORT_SYMBOL(lora_free_hw);
 
 /**
+ * lora_set_deveui - Set the LoRa device's DevEUI
+ * @hw:		the LoRa device going to be set
+ * @eui:	the global end-device ID in IEEE EUI64 address space
+ */
+void
+lora_set_deveui(struct lora_hw *hw, __le64 eui)
+{
+	struct lrw_struct *lrw_st;
+
+	lrw_st = container_of(hw, struct lrw_struct, hw);
+	lrw_st->dev_eui = eui;
+}
+EXPORT_SYMBOL(lora_set_deveui);
+
+/**
+ * lora_get_deveui - Get the LoRa device's DevEUI
+ * @hw:		the LoRa device going to be got from
+ *
+ * Return:	the device's DevEUI in IEEE EUI64 address space
+ */
+__le64
+lora_get_deveui(struct lora_hw *hw)
+{
+	struct lrw_struct *lrw_st;
+
+	lrw_st = container_of(hw, struct lrw_struct, hw);
+	return lrw_st->dev_eui;
+}
+EXPORT_SYMBOL(lora_get_deveui);
+
+/**
+ * lora_set_appeui - Set the LoRa device's AppEUI
+ * @hw:		the LoRa device going to be set
+ * @eui:	the global end-device ID in IEEE EUI64 address space
+ */
+void
+lora_set_appeui(struct lora_hw *hw, __le64 eui)
+{
+	struct lrw_struct *lrw_st;
+
+	lrw_st = container_of(hw, struct lrw_struct, hw);
+	lrw_st->app_eui = eui;
+}
+EXPORT_SYMBOL(lora_set_appeui);
+
+/**
+ * lora_get_appeui - Get the LoRa device's AppEUI
+ * @hw:		the LoRa device going to be got from
+ *
+ * Return:	the device's AppEUI in IEEE EUI64 address space
+ */
+__le64
+lora_get_appeui(struct lora_hw *hw)
+{
+	struct lrw_struct *lrw_st;
+
+	lrw_st = container_of(hw, struct lrw_struct, hw);
+	return lrw_st->app_eui;
+}
+EXPORT_SYMBOL(lora_get_appeui);
+
+/**
+ * lora_set_devaddr - Set the LoRa device's address
+ * @hw:		the LoRa device going to be set
+ * @devaddr:	the device address
+ */
+void
+lora_set_devaddr(struct lora_hw *hw, __le32 devaddr)
+{
+	struct lrw_struct *lrw_st;
+
+	lrw_st = container_of(hw, struct lrw_struct, hw);
+	netdev_dbg(lrw_st->ndev, "%s: devaddr=%X\n",
+		   __func__, le32_to_cpu(devaddr));
+	lrw_st->devaddr = devaddr;
+}
+EXPORT_SYMBOL(lora_set_devaddr);
+
+/**
+ * lora_get_devaddr - Get the LoRa device's address
+ * @hw:		the LoRa device going to be got from
+ *
+ * Return:	the device address
+ */
+__le32
+lora_get_devaddr(struct lora_hw *hw)
+{
+	struct lrw_struct *lrw_st;
+
+	lrw_st = container_of(hw, struct lrw_struct, hw);
+	return lrw_st->devaddr;
+}
+EXPORT_SYMBOL(lora_get_devaddr);
+
+/**
  * lrw_add_hw - Add a LoRaWAN hardware as a network device
  * @lrw_st:	the LoRa device going to be added
  *
  * Return:	0 / other number for success / failed
  */
 int
-
 lrw_add_hw(struct lrw_struct *lrw_st)
 {
 	struct net_device *ndev = lrw_st->ndev;
+	__be32 be_addr;
 	int ret;
 
-	pr_debug("%s: %s\n", LORAWAN_MODULE_NAME, __func__);
+	netdev_dbg(ndev, "%s\n", __func__);
 
 	lrw_st->fcnt_up = 0;
 	lrw_st->fcnt_down = 0;
@@ -159,6 +260,10 @@ lrw_add_hw(struct lrw_struct *lrw_st)
 
 	tasklet_init(&lrw_st->xmit_task, lrw_xmit, (unsigned long) lrw_st);
 	INIT_WORK(&lrw_st->rx_work, lrw_rx_work);
+
+	be_addr = le32_to_be32(lrw_st->devaddr);
+	memcpy(ndev->perm_addr, &be_addr, ndev->addr_len);
+	memcpy(ndev->dev_addr, ndev->perm_addr, ndev->addr_len);
 
 	write_pnet(&lrw_st->_net, &init_net);
 	ret = register_netdev(ndev);
@@ -333,84 +438,48 @@ lrw_if_start_xmit(struct sk_buff *skb, struct net_device *ndev)
 	return ret;
 }
 
-static int
-lrw_if_ioctl(struct net_device *ndev, struct ifreq *ifr, int cmd)
+
+inline int
+lrw_if_get_addr(struct lrw_struct *lrw_st, struct sockaddr_lorawan *addr)
 {
-	struct lrw_struct *lrw_st = NETDEV_2_LRW(ndev);
-	long ret;
+	int ret = 0;
 
-	pr_debug("%s: ioctl file (cmd=0x%X)\n", LORAWAN_MODULE_NAME, cmd);
+	switch (addr->addr_in.addr_type) {
+	case LRW_ADDR_DEVADDR:
+		addr->addr_in.devaddr = le32_to_cpu(lrw_st->devaddr);
+		break;
+	case LRW_ADDR_DEVEUI:
+		addr->addr_in.dev_eui = le64_to_cpu(lrw_st->dev_eui);
+		break;
+	case LRW_ADDR_APPEUI:
+		addr->addr_in.app_eui = le64_to_cpu(lrw_st->app_eui);
+		break;
+	default:
+		ret = -ENOTSUPP;
+	}
 
-	/* I/O control by each command */
-	switch (cmd) {
-	/* Set & read the state of the LoRa device */
-//	case LRW_SET_STATE:
-//		ret = lrw_set_hw_state(lrw_st, (u8 *)pval);
-//		break;
-//	case LRW_GET_STATE:
-//		if (lrw_st->ops->getState != NULL)
-//			ret = lrw_st->ops->getState(lrw_st, pval);
-//		break;
-//	/* Set & get the carrier frequency */
-//	case LRW_SET_FREQUENCY:
-//		if (lrw_st->ops->setFreq != NULL)
-//			ret = lrw_st->ops->setFreq(lrw_st, pval);
-//		break;
-//	case LRW_GET_FREQUENCY:
-//		if (lrw_st->ops->getFreq != NULL)
-//			ret = lrw_st->ops->getFreq(lrw_st, pval);
-//		break;
-//	/* Set & get the PA power */
-//	case LRW_SET_POWER:
-//		if (lrw_st->ops->setPower != NULL)
-//			ret = lrw_st->ops->setPower(lrw_st, pval);
-//		break;
-//	case LRW_GET_POWER:
-//		if (lrw_st->ops->getPower != NULL)
-//			ret = lrw_st->ops->getPower(lrw_st, pval);
-//		break;
-//	/* Set & get the LNA gain */
-//	case LRW_SET_LNA:
-//		if (lrw_st->ops->setLNA != NULL)
-//			ret = lrw_st->ops->setLNA(lrw_st, pval);
-//		break;
-//	case LRW_GET_LNA:
-//		if (lrw_st->ops->getLNA != NULL)
-//			ret = lrw_st->ops->getLNA(lrw_st, pval);
-//		break;
-//	/* Set the LNA be auto gain control or manual */
-//	case LRW_SET_LNAAGC:
-//		if (lrw_st->ops->setLNAAGC != NULL)
-//			ret = lrw_st->ops->setLNAAGC(lrw_st, pval);
-//		break;
-//	/* Set & get the RF spreading factor */
-//	case LRW_SET_SPRFACTOR:
-//		if (lrw_st->ops->setSPRFactor != NULL)
-//			ret = lrw_st->ops->setSPRFactor(lrw_st, pval);
-//		break;
-//	case LRW_GET_SPRFACTOR:
-//		if (lrw_st->ops->getSPRFactor != NULL)
-//			ret = lrw_st->ops->getSPRFactor(lrw_st, pval);
-//		break;
-//	/* Set & get the RF bandwith */
-//	case LRW_SET_BANDWIDTH:
-//		if (lrw_st->ops->setBW != NULL)
-//			ret = lrw_st->ops->setBW(lrw_st, pval);
-//		break;
-//	case LRW_GET_BANDWIDTH:
-//		if (lrw_st->ops->getBW != NULL)
-//			ret = lrw_st->ops->getBW(lrw_st, pval);
-//		break;
-//	/* Get current RSSI */
-//	case LRW_GET_RSSI:
-//		if (lrw_st->ops->getRSSI != NULL)
-//			ret = lrw_st->ops->getRSSI(lrw_st, pval);
-//		break;
-//	/* Get last packet's SNR */
-//	case LRW_GET_SNR:
-//		if (lrw_st->ops->getSNR != NULL)
-//			ret = lrw_st->ops->getSNR(lrw_st, pval);
-//		break;
+	return ret;
+}
+
+inline int
+lrw_if_set_addr(struct lrw_struct *lrw_st, struct sockaddr_lorawan *addr)
+{
+	struct lora_hw *hw = &lrw_st->hw;
+	int ret = 0;
+
+	if (netif_running(lrw_st->ndev))
+		return -EBUSY;
+
+	switch (addr->addr_in.addr_type) {
+	case LRW_ADDR_DEVADDR:
+		lora_set_devaddr(hw, cpu_to_le32(addr->addr_in.devaddr));
+		break;
+	case LRW_ADDR_DEVEUI:
+		lora_set_deveui(hw, cpu_to_le32(addr->addr_in.dev_eui));
+		break;
+	case LRW_ADDR_APPEUI:
+		lora_set_appeui(hw, cpu_to_le32(addr->addr_in.app_eui));
+		break;
 	default:
 		ret = -ENOTSUPP;
 	}
@@ -419,9 +488,60 @@ lrw_if_ioctl(struct net_device *ndev, struct ifreq *ifr, int cmd)
 }
 
 static int
+lrw_if_ioctl(struct net_device *ndev, struct ifreq *ifr, int cmd)
+{
+	struct lrw_struct *lrw_st = NETDEV_2_LRW(ndev);
+	struct lora_hw *hw = &lrw_st->hw;
+	struct sockaddr_lorawan *addr;
+	s32 txpower;
+	int ret = 0;
+
+	netdev_dbg(ndev, "%s: ioctl file (cmd=0x%X)\n", __func__, cmd);
+
+	rtnl_lock();
+	/* I/O control by each command */
+	switch (cmd) {
+	/* Set & get the DevAddr, DevEUI and AppEUI */
+	case SIOCGIFADDR:
+		addr = (struct sockaddr_lorawan *)&ifr->ifr_addr;
+		ret = lrw_if_get_addr(lrw_st, addr);
+		break;
+	case SIOCSIFADDR:
+		addr = (struct sockaddr_lorawan *)&ifr->ifr_addr;
+		ret = lrw_if_set_addr(lrw_st, addr);
+		break;
+	/* Set & get the PA power */
+	case SIOCSLRWTXPWR:
+		get_user(txpower, (s32 __user *)ifr->ifr_data);
+		ret = lrw_st->ops->set_txpower(hw, txpower);
+		break;
+	case SIOCGLRWTXPWR:
+		txpower = lrw_st->hw.transmit_power;
+		ret = put_user(txpower, (s32 __user *)ifr->ifr_data);
+		break;
+	default:
+		ret = -ENOTSUPP;
+	}
+	rtnl_unlock();
+
+	return ret;
+}
+
+static int
 lrw_if_set_mac(struct net_device *ndev, void *p)
 {
 	struct lrw_struct *lrw_st = NETDEV_2_LRW(ndev);
+	struct sockaddr *addr = p;
+	__be32 *be_addr = (__be32 *)addr->sa_data;
+
+	netdev_dbg(ndev, "%s: AF_TYPE:%d set mac address %X\n",
+		   __func__, addr->sa_family, be32_to_cpu(*be_addr));
+
+	if (netif_running(ndev))
+		return -EBUSY;
+
+	lora_set_devaddr(&lrw_st->hw, be32_to_le32(*be_addr));
+	memcpy(ndev->dev_addr, be_addr, ndev->addr_len);
 
 	return 0;
 }
@@ -505,7 +625,9 @@ lrw_init(void)
 	}
 
 	pr_debug("%s: class created\n", LORAWAN_MODULE_NAME);
-	err = 0;
+
+	/* Initial LoRaWAN socket API */
+	err = lrw_sock_init();
 
 lrw_init_end:
 	return err;
@@ -514,6 +636,8 @@ lrw_init_end:
 static void __exit
 lrw_exit(void)
 {
+	/* Release LoRaWAN socket API */
+	lrw_sock_exit();
 	/* Delete device class */
 	class_destroy(lrw_sys_class);
 	pr_info("%s: module removed\n", LORAWAN_MODULE_NAME);

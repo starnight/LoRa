@@ -1,5 +1,6 @@
 #include <linux/list.h>
 #include <linux/net.h>
+#include <linux/if_arp.h>
 #include <linux/termios.h>	/* For TIOCOUTQ/INQ */
 #include <net/sock.h>
 
@@ -7,7 +8,7 @@
 
 struct dgram_sock {
 	struct sock sk;
-	struct lrw_addr src_addr;
+	u32 src_devaddr;
 
 	unsigned int bound:1;
 	unsigned int connected:1;
@@ -27,25 +28,26 @@ dgram_sk(const struct sock *sk)
 	return container_of(sk, struct dgram_sock, sk);
 }
 
-inline void
-lrw_addr_from_sa(struct lrw_addr *a, struct lrw_addr_sa *sa)
-{
-	memcpy(a->devaddr, sa->devaddr, LRW_DEVADDR_LEN);
-}
+//inline void
+//lrw_addr_from_sain(struct lrw_addr *a, struct lrw_addr_in *sa_in)
+//{
+//	memcpy(a->devaddr, sa_in->devaddr, LRW_DEVADDR_LEN);
+//}
 
-inline void
-lrw_addr_to_sa(struct lrw_addr_sa *sa, struct lrw_addr *a)
-{
-	memcpy(sa->devaddr, a->devaddr, LRW_DEVADDR_LEN);
-}
+//inline void
+//lrw_addr_to_sain(struct lrw_addr_in *sa_in, struct lrw_addr *a)
+//{
+//	memcpy(sa_in->devaddr, a->devaddr, LRW_DEVADDR_LEN);
+//}
 
 inline struct net_device *
-lrw_get_dev(struct net *net, struct lrw_addr *addr)
+lrw_get_dev_by_addr(struct net *net, u32 devaddr)
 {
 	struct net_device *ndev = NULL;
+	__be32 be_addr = cpu_to_be32(devaddr);
 
 	rcu_read_lock();
-	ndev = dev_getbyhwaddr_rcu(net, ARPHRD_LORAWAN, addr->devaddr);
+	ndev = dev_getbyhwaddr_rcu(net, ARPHRD_LORAWAN, (char *)&be_addr);
 	if (ndev)
 		dev_hold(ndev);
 	rcu_read_unlock();
@@ -78,7 +80,6 @@ static int
 dgram_bind(struct sock *sk, struct sockaddr *uaddr, int len)
 {
 	struct sockaddr_lorawan *addr = (struct sockaddr_lorawan *)uaddr;
-	struct lrw_addr haddr;
 	struct dgram_sock *ro = dgram_sk(sk);
 	struct net_device *ndev;
 	int ret;
@@ -93,8 +94,10 @@ dgram_bind(struct sock *sk, struct sockaddr *uaddr, int len)
 	if (addr->family != AF_LORAWAN)
 		goto dgram_bind_end;
 
-	lrw_addr_from_sa(&haddr, &addr->addr_sa);
-	ndev = lrw_get_dev(sock_net(sk), &haddr);
+	if (addr->addr_in.addr_type != LRW_ADDR_DEVADDR)
+		goto dgram_bind_end;
+
+	ndev = lrw_get_dev_by_addr(sock_net(sk), addr->addr_in.devaddr);
 	if (!ndev) {
 		ret = -ENODEV;
 		goto dgram_bind_end;
@@ -105,7 +108,7 @@ dgram_bind(struct sock *sk, struct sockaddr *uaddr, int len)
 		goto dgram_bind_end;
 	}
 
-	ro->src_addr = haddr;
+	ro->src_devaddr = addr->addr_in.devaddr;
 	ro->bound = 1;
 	ret = 0;
 
@@ -116,7 +119,7 @@ dgram_bind_end:
 
 inline int
 lrw_dev_hard_header(struct sk_buff *skb, struct net_device *ndev,
-		    const struct lrw_addr *saddr, size_t len)
+		    const u32 src_devaddr, size_t len)
 {
 	/* TODO: Prepare the LoRaWAN sending header here */
 	return 0;
@@ -131,7 +134,6 @@ dgram_sendmsg(struct sock *sk, struct msghdr *msg, size_t size)
 	size_t hlen;
 	size_t mtu;
 	size_t tlen;
-//	struct lrw_addr dst_addr;
 	int ret;
 
 	if (msg->msg_flags & MSG_OOB) {
@@ -147,7 +149,7 @@ dgram_sendmsg(struct sock *sk, struct msghdr *msg, size_t size)
 	if (!ro->bound)
 		ndev = dev_getfirstbyhwtype(sock_net(sk), ARPHRD_LORAWAN);
 	else
-		ndev = lrw_get_dev(sock_net(sk), &ro->src_addr);
+		ndev = lrw_get_dev_by_addr(sock_net(sk), ro->src_devaddr);
 
 	if (!ndev) {
 		pr_debug("no dev\n");
@@ -184,7 +186,7 @@ dgram_sendmsg(struct sock *sk, struct msghdr *msg, size_t size)
 //		dst_addr = ro->dst_addr;
 //	}
 
-	ret = lrw_dev_hard_header(skb, ndev, ro->bound ? &ro->src_addr : NULL, size);
+	ret = lrw_dev_hard_header(skb, ndev, ro->bound ? ro->src_devaddr : 0, size);
 	if (ret < 0)
 		goto dgram_sendmsg_no_skb;
 
@@ -239,7 +241,7 @@ dgram_recvmsg(struct sock *sk, struct msghdr *msg, size_t len,
 	if(saddr) {
 		memset(saddr, 0, sizeof(*saddr));
 		saddr->family = AF_LORAWAN;
-		lrw_addr_to_sa(&saddr->addr_sa, &mac_cb(skb)->addr);
+		saddr->addr_in.devaddr = mac_cb(skb)->devaddr;
 		*addr_len = sizeof(*saddr);
 	}
 
@@ -453,6 +455,7 @@ lrw_ndev_ioctl(struct sock *sk, struct ifreq __user *arg, unsigned int cmd)
 	int ret = -ENOIOCTLCMD;
 	struct net_device *ndev;
 
+	pr_debug("lorawan: %s: cmd %ud\n", __func__, cmd);
 	if (copy_from_user(&ifr, arg, sizeof(struct ifreq)))
 		return -EFAULT;
 
@@ -461,6 +464,7 @@ lrw_ndev_ioctl(struct sock *sk, struct ifreq __user *arg, unsigned int cmd)
 	dev_load(sock_net(sk), ifr.ifr_name);
 	ndev = dev_get_by_name(sock_net(sk), ifr.ifr_name);
 
+	netdev_dbg(ndev, "%s: cmd %ud\n", __func__, cmd);
 	if (!ndev)
 		return -ENODEV;
 
@@ -478,19 +482,21 @@ static int
 lrw_sock_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 {
 	struct sock *sk = sock->sk;
+	struct net_device *ndev = sk->sk_dst_cache->dev;
 
+	netdev_dbg(ndev, "%s: cmd %ud\n", __func__, cmd);
 	switch (cmd) {
 	case SIOCGSTAMP:
 		return sock_get_timestamp(sk, (struct timeval __user *)arg);
 	case SIOCGSTAMPNS:
 		return sock_get_timestampns(sk, (struct timespec __user *)arg);
-	case SIOCGIFADDR:
-	case SIOCSIFADDR:
-		return lrw_ndev_ioctl(sk, (struct ifreq __user *)arg, cmd);
-	default:
+	case SIOCOUTQ:
+	case SIOCINQ:
 		if (!sk->sk_prot->ioctl)
 			return -ENOIOCTLCMD;
 		return sk->sk_prot->ioctl(sk, cmd, arg);
+	default:
+		return lrw_ndev_ioctl(sk, (struct ifreq __user *)arg, cmd);
 	}
 }
 
@@ -574,15 +580,13 @@ lrw_dgram_deliver(struct net_device *ndev, struct sk_buff *skb)
 	struct lrw_struct *lrw_st = NETDEV_2_LRW(ndev);
 	struct sock *sk;
 	struct dgram_sock *ro;
-	u8 *haddr;
 	bool found = false;
 	int ret = NET_RX_SUCCESS;
 
 	read_lock(&dgram_lock);
 	sk_for_each(sk, &dgram_head) {
 		ro = dgram_sk(sk);
-		haddr = ro->src_addr.devaddr;
-		if (memcmp(haddr, lrw_st->devaddr, LRW_DEVADDR_LEN) == 0) {
+		if(cpu_to_le32(ro->src_devaddr) == lrw_st->devaddr) {
 			found = true;
 			break;
 		}

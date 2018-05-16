@@ -41,6 +41,7 @@
 
 #include <linux/module.h>
 #include <linux/skbuff.h>
+#include <linux/random.h>
 
 /* List the role of the LoRaWAN hardware */
 enum {
@@ -50,7 +51,7 @@ enum {
 	LRW_CLASS_C_NODE,
 };
 
-#define	LRW_DEVADDR_LEN			4
+#define	LRW_DEVADDR_LEN		(sizeof(__le32))
 
 /* List the message types of LoRaWAN */
 enum {
@@ -63,24 +64,63 @@ enum {
 	LRW_PROPRIETARY,
 };
 
-/* I/O control by each command */
-#define LRW_IOC_MAGIC '\x74'
+enum {
+	LRW_ADDR_APPEUI,
+	LRW_ADDR_DEVEUI,
+	LRW_ADDR_DEVADDR,
+};
 
-#define LRW_SET_STATE			(_IOW(LRW_IOC_MAGIC,  0, int))
-#define LRW_GET_STATE			(_IOR(LRW_IOC_MAGIC,  1, int))
-#define LRW_SET_FREQUENCY		(_IOW(LRW_IOC_MAGIC,  2, int))
-#define LRW_GET_FREQUENCY		(_IOR(LRW_IOC_MAGIC,  3, int))
-#define LRW_SET_POWER			(_IOW(LRW_IOC_MAGIC,  4, int))
-#define LRW_GET_POWER			(_IOR(LRW_IOC_MAGIC,  5, int))
-#define LRW_SET_LNA			(_IOW(LRW_IOC_MAGIC,  6, int))
-#define LRW_GET_LNA			(_IOR(LRW_IOC_MAGIC,  7, int))
-#define LRW_SET_LNAAGC			(_IOR(LRW_IOC_MAGIC,  8, int))
-#define LRW_SET_SPRFACTOR		(_IOW(LRW_IOC_MAGIC,  9, int))
-#define LRW_GET_SPRFACTOR		(_IOR(LRW_IOC_MAGIC, 10, int))
-#define LRW_SET_BANDWIDTH		(_IOW(LRW_IOC_MAGIC, 11, int))
-#define LRW_GET_BANDWIDTH		(_IOR(LRW_IOC_MAGIC, 12, int))
-#define LRW_GET_RSSI			(_IOR(LRW_IOC_MAGIC, 13, int))
-#define LRW_GET_SNR			(_IOR(LRW_IOC_MAGIC, 14, int))
+struct lrw_addr_in {
+	int addr_type;
+	union {
+		u64 app_eui;
+		u64 dev_eui;
+		u32 devaddr;
+	};
+};
+
+struct sockaddr_lorawan {
+	sa_family_t family; /* AF_LORAWAN */
+	struct lrw_addr_in addr_in;
+};
+
+/* DEV ioctl() commands */
+
+enum LRW_IOC_CMDS {
+	SIOCGLRWSTATE = SIOCDEVPRIVATE,
+	SIOCSLRWSTATE,
+	SIOCGLRWFREQ,
+	SIOCSLRWFREQ,
+	SIOCGLRWBW,
+	SIOCSLRWBW,
+	SIOCGLRWTXPWR,
+	SIOCSLRWTXPWR,
+	SIOCGLRWSPRF,
+	SIOCSLRWSPRF,
+	SIOCGLRWLNA,
+	SIOCSLRWLNA,
+	SIOCGLRWRSSI,
+	SIOCGLRWSNR,
+};
+
+/* I/O control by each command */
+//#define LRW_IOC_MAGIC '\x74'
+//
+//#define LRW_SET_STATE			(_IOW(LRW_IOC_MAGIC,  0, int))
+//#define LRW_GET_STATE			(_IOR(LRW_IOC_MAGIC,  1, int))
+//#define LRW_SET_FREQUENCY		(_IOW(LRW_IOC_MAGIC,  2, int))
+//#define LRW_GET_FREQUENCY		(_IOR(LRW_IOC_MAGIC,  3, int))
+//#define LRW_SET_POWER			(_IOW(LRW_IOC_MAGIC,  4, int))
+//#define LRW_GET_POWER			(_IOR(LRW_IOC_MAGIC,  5, int))
+//#define LRW_SET_LNA			(_IOW(LRW_IOC_MAGIC,  6, int))
+//#define LRW_GET_LNA			(_IOR(LRW_IOC_MAGIC,  7, int))
+//#define LRW_SET_LNAAGC			(_IOR(LRW_IOC_MAGIC,  8, int))
+//#define LRW_SET_SPRFACTOR		(_IOW(LRW_IOC_MAGIC,  9, int))
+//#define LRW_GET_SPRFACTOR		(_IOR(LRW_IOC_MAGIC, 10, int))
+//#define LRW_SET_BANDWIDTH		(_IOW(LRW_IOC_MAGIC, 11, int))
+//#define LRW_GET_BANDWIDTH		(_IOR(LRW_IOC_MAGIC, 12, int))
+//#define LRW_GET_RSSI			(_IOR(LRW_IOC_MAGIC, 13, int))
+//#define LRW_GET_SNR			(_IOR(LRW_IOC_MAGIC, 14, int))
 
 /* List the LoRa device's states of LoRaWAN hardware */
 enum {
@@ -176,13 +216,33 @@ void lora_unregister_hw(struct lora_hw *);
 void lora_rx_irqsave(struct lora_hw *, struct sk_buff *);
 void lora_xmit_complete(struct lora_hw *, struct sk_buff *);
 
+static inline void lora_random_addr(__le64 *addr)
+{
+	get_random_bytes(addr, sizeof(__le64));
+}
+
+void lora_set_deveui(struct lora_hw *, __le64);
+__le64 lora_get_deveui(struct lora_hw *);
+void lora_set_appeui(struct lora_hw *, __le64);
+__le64 lora_get_appeui(struct lora_hw *);
+void lora_set_devaddr(struct lora_hw *, __le32);
+__le32 lora_get_devaddr(struct lora_hw *);
+
 enum {
 	LORA_APPKEY,
 	LORA_NWKSKEY,
 	LORA_APPSKEY,
 };
-#define	LORA_KEY_LEN			16
+#define	LORA_KEY_LEN		16
 int lora_set_key(struct lora_hw *, u8, u8 *, size_t);
 int lrw_get_devaddr(struct lora_hw *, u8 *devaddr);
+
+/* Need to find a way to define or assign */
+#define	LORAWAN_MTU		20
+
+#define	le32_to_be32(n)		(cpu_to_be32(le32_to_cpu(n)))
+#define	be32_to_le32(n)		(cpu_to_le32(be32_to_cpu(n)))
+#define	le64_to_be64(n)		(cpu_to_be64(le64_to_cpu(n)))
+#define	be64_to_le64(n)		(cpu_to_le64(be64_to_cpu(n)))
 
 #endif
