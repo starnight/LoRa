@@ -59,7 +59,7 @@ lrw_alloc_ss(struct lrw_struct *lrw_st)
 {
 	struct lrw_session *ss;
 
-	pr_debug("%s: %s\n", LORAWAN_MODULE_NAME, __func__);
+	netdev_dbg(lrw_st->ndev, "%s\n", __func__);
 
 	ss = kzalloc(sizeof(struct lrw_session), GFP_KERNEL);
 	if (!ss)
@@ -81,15 +81,21 @@ lrw_alloc_ss_end:
 void
 lrw_free_ss(struct lrw_session *ss)
 {
-	kfree_skb(ss->tx_skb);
-	kfree_skb(ss->rx_skb);
+	netdev_dbg(ss->lrw_st->ndev, "%s\n", __func__);
+	if (ss->tx_skb)
+		consume_skb(ss->tx_skb);
+	netdev_dbg(ss->lrw_st->ndev, "%s: free rx skb\n", __func__);
+	if (ss->rx_skb)
+		consume_skb(ss->rx_skb);
 
+	netdev_dbg(ss->lrw_st->ndev, "%s: free ss\n", __func__);
 	kfree(ss);
 }
 
 void
 lrw_del_ss(struct lrw_session *ss)
 {
+	netdev_dbg(ss->lrw_st->ndev, "%s\n", __func__);
 	list_del(&ss->entry);
 	lrw_free_ss(ss);
 }
@@ -111,7 +117,7 @@ lrw_del_all_ss(struct lrw_struct *lrw_st)
 int
 lora_start_hw(struct lrw_struct *lrw_st)
 {
-	pr_debug("%s: %s\n", LORAWAN_MODULE_NAME, __func__);
+	netdev_dbg(lrw_st->ndev, "%s\n", __func__);
 	lrw_st->nwks_shash_tfm = lrw_mic_key_setup(lrw_st->nwkskey,
 						   LORA_KEY_LEN);
 	lrw_st->nwks_skc_tfm = lrw_encrypt_key_setup(lrw_st->nwkskey,
@@ -127,23 +133,23 @@ lora_start_hw(struct lrw_struct *lrw_st)
 void
 lora_stop_hw(struct lrw_struct *lrw_st)
 {
-	pr_debug("%s: %s\n", LORAWAN_MODULE_NAME, __func__);
+	netdev_dbg(lrw_st->ndev, "%s\n", __func__);
 	lrw_st->state = LORA_STOP;
-	pr_debug("%s: going to stop hardware\n", LORAWAN_MODULE_NAME);
+	netdev_dbg(lrw_st->ndev, "%s: going to stop hardware\n", __func__);
 	lrw_st->ops->stop(&lrw_st->hw);
 
-	pr_debug("%s: going to kill tasks & flush works", LORAWAN_MODULE_NAME);
+	netdev_dbg(lrw_st->ndev, "%s: going to kill tasks & flush works", __func__);
 	tasklet_kill(&lrw_st->xmit_task);
 	flush_work(&lrw_st->rx_work);
 
-	pr_debug("%s: going to delete all session\n", LORAWAN_MODULE_NAME);
+	netdev_dbg(lrw_st->ndev, "%s: going to delete all session\n", __func__);
 	lrw_del_all_ss(lrw_st);
 
-	pr_debug("%s: going to free mic tfm\n", LORAWAN_MODULE_NAME);
+	netdev_dbg(lrw_st->ndev, "%s: going to free mic tfm\n", __func__);
 	lrw_mic_key_free(lrw_st->nwks_shash_tfm);
-	pr_debug("%s: going to free nwks tfm\n", LORAWAN_MODULE_NAME);
+	netdev_dbg(lrw_st->ndev, "%s: going to free nwks tfm\n", __func__);
 	lrw_encrypt_key_free(lrw_st->nwks_skc_tfm);
-	pr_debug("%s: going to free apps tfm\n", LORAWAN_MODULE_NAME);
+	netdev_dbg(lrw_st->ndev, "%s: going to free apps tfm\n", __func__);
 	lrw_encrypt_key_free(lrw_st->apps_skc_tfm);
 }
 
@@ -155,7 +161,7 @@ lrw_prepare_tx_frame(struct lrw_session *ss)
 	u8 mhdr, fctrl, fport;
 	u8 mic[4];
 
-	pr_debug("%s: %s\n", LORAWAN_MODULE_NAME, __func__);
+	netdev_dbg(lrw_st->ndev, "%s\n", __func__);
 
 	mhdr = LRW_UNCONFIRMED_DATA_UP << 5;
 	if ((mhdr & (0x6 << 5)) == (0x4 << 5))
@@ -201,7 +207,7 @@ lrw_xmit(unsigned long data)
 	struct lrw_struct *lrw_st = (struct lrw_struct *) data;
 	struct lrw_session *ss = lrw_st->_cur_ss;
 
-	pr_debug("%s: %s\n", LORAWAN_MODULE_NAME, __func__);
+	netdev_dbg(lrw_st->ndev, "%s\n", __func__);
 	ss->state = LRW_XMITTING_SS;
 	lrw_st->ops->xmit_async(&lrw_st->hw, ss->tx_skb);
 }
@@ -254,7 +260,7 @@ lrw_rx_skb_2_session(struct lrw_struct *lrw_st, struct sk_buff *rx_skb)
 	u16 fcnt;
 	__le16 *p_fcnt;
 
-	pr_debug("%s: %s\n", LORAWAN_MODULE_NAME, __func__);
+	netdev_dbg(lrw_st->ndev, "%s\n", __func__);
 
 	p_fcnt = (__le16 *)(rx_skb->data + 6);
 	fcnt = le16_to_cpu(*p_fcnt);
@@ -278,9 +284,10 @@ lrw_rx_work(struct work_struct *work)
 	struct lrw_session *ss;
 	struct sk_buff *skb;
 
-	pr_debug("%s: %s\n", LORAWAN_MODULE_NAME, __func__);
-
 	lrw_st = container_of(work, struct lrw_struct, rx_work);
+
+	netdev_dbg(lrw_st->ndev, "%s\n", __func__);
+
 	skb = lrw_st->rx_skb_list.next;
 	skb_dequeue(&lrw_st->rx_skb_list);
 
@@ -363,13 +370,12 @@ lrw_check_mic(struct crypto_shash *tfm, struct sk_buff *skb)
 void
 lora_rx_irqsave(struct lora_hw *hw, struct sk_buff *skb)
 {
-	struct lrw_struct *lrw_st;
+	struct lrw_struct *lrw_st = container_of(hw, struct lrw_struct, hw);
 	u8 mtype;
 	bool is_new_frame;
 
-	pr_debug("%s: %s\n", LORAWAN_MODULE_NAME, __func__);
+	netdev_dbg(lrw_st->ndev, "%s\n", __func__);
 
-	lrw_st = container_of(hw, struct lrw_struct, hw);
 	mtype = skb->data[0] >> 5;
 	is_new_frame = 0;
 
@@ -399,7 +405,7 @@ lrw_rexmit(struct timer_list *timer)
 	struct lrw_session *ss = container_of(timer, struct lrw_session, timer);
 	struct lrw_struct *lrw_st = ss->lrw_st;
 
-	pr_debug("%s: %s\n", LORAWAN_MODULE_NAME, __func__);
+	netdev_dbg(lrw_st->ndev, "%s\n", __func__);
 
 	lrw_xmit((unsigned long) lrw_st);
 }
@@ -407,14 +413,13 @@ lrw_rexmit(struct timer_list *timer)
 static void
 rx_timeout_work(struct work_struct *work)
 {
-	struct lrw_struct *lrw_st;
 	struct lrw_session *ss;
-
-	pr_debug("%s: %s\n", LORAWAN_MODULE_NAME, __func__);
+	struct lrw_struct *lrw_st;
 
 	ss = container_of(work, struct lrw_session, timeout_work);
 	lrw_st = ss->lrw_st;
 
+	netdev_dbg(lrw_st->ndev, "%s\n", __func__);
 	mutex_lock(&lrw_st->ss_list_lock);
 	lrw_st->_cur_ss = NULL;
 	lrw_del_ss(ss);
@@ -425,8 +430,9 @@ static void
 rx2_timeout_isr(struct timer_list *timer)
 {
 	struct lrw_session *ss = container_of(timer, struct lrw_session, timer);
+	struct lrw_struct *lrw_st = ss->lrw_st;
 
-	pr_debug("%s: %s\n", LORAWAN_MODULE_NAME, __func__);
+	netdev_dbg(lrw_st->ndev, "%s\n", __func__);
 
 	/* Check TX is acked or not */
 	if (!ss->tx_should_ack) {
@@ -435,10 +441,13 @@ rx2_timeout_isr(struct timer_list *timer)
 			ss->state = LRW_RXTIMEOUT_SS;
 		spin_unlock_bh(&ss->state_lock);
 
-		if (ss->state == LRW_RXTIMEOUT_SS)
+		if (ss->state == LRW_RXTIMEOUT_SS) {
+			netdev_dbg(lrw_st->ndev, "%s: rx time out\n", __func__);
 			goto rx2_timeout_isr_no_retry_rx_frame;
-		else
+		}
+		else {
 			return;
+		}
 	}
 
 	/* Check the session need to be retransmitted or not */
@@ -465,7 +474,7 @@ rx2_delay_isr(struct timer_list *timer)
 	struct lrw_struct *lrw_st = ss->lrw_st;
 	unsigned long delay;
 
-	pr_debug("%s: %s\n", LORAWAN_MODULE_NAME, __func__);
+	netdev_dbg(lrw_st->ndev, "%s\n", __func__);
 
 	/* Start timer for RX2 window */
 	ss->timer.function = rx2_timeout_isr;
@@ -485,7 +494,7 @@ rx1_delay_isr(struct timer_list *timer)
 	struct lrw_struct *lrw_st = ss->lrw_st;
 	unsigned long delay;
 
-	pr_debug("%s: %s\n", LORAWAN_MODULE_NAME, __func__);
+	netdev_dbg(lrw_st->ndev, "%s\n", __func__);
 
 	/* Start timer for RX_Delay2 - RX_Delay2 */
 	ss->timer.function = rx2_delay_isr;
@@ -505,7 +514,7 @@ lrw_sent_tx_work(struct lrw_struct *lrw_st, struct sk_buff *skb)
 	struct net_device *ndev;
 	unsigned long delay;
 
-	pr_debug("%s: %s\n", LORAWAN_MODULE_NAME, __func__);
+	netdev_dbg(lrw_st->ndev, "%s\n", __func__);
 
 	ss->state = LRW_XMITTED;
 
@@ -519,6 +528,7 @@ lrw_sent_tx_work(struct lrw_struct *lrw_st, struct sk_buff *skb)
 	ndev->stats.tx_packets++;
 	ndev->stats.tx_bytes += skb->len;
 	dev_consume_skb_any(skb);
+	ss->tx_skb = NULL;
 
 	/* Set LoRa hardware to IDLE state */
 	lrw_st->ops->set_state(&lrw_st->hw, LORA_STATE_IDLE);
@@ -532,11 +542,10 @@ lrw_sent_tx_work(struct lrw_struct *lrw_st, struct sk_buff *skb)
 void
 lora_xmit_complete(struct lora_hw *hw, struct sk_buff *skb)
 {
-	struct lrw_struct *lrw_st;
+	struct lrw_struct *lrw_st = container_of(hw, struct lrw_struct, hw);
 
-	pr_debug("%s: %s\n", LORAWAN_MODULE_NAME, __func__);
+	netdev_dbg(lrw_st->ndev, "%s\n", __func__);
 
-	lrw_st = container_of(hw, struct lrw_struct, hw);
 	lrw_sent_tx_work(lrw_st, skb);
 }
 EXPORT_SYMBOL(lora_xmit_complete);

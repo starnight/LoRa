@@ -46,7 +46,7 @@
 #include <linux/interrupt.h>
 #include <linux/platform_device.h>
 
-#include "lora.h"
+#include <linux/lora.h>
 
 #define	FAKELR_DRIVER_NAME	"fakelr"
 
@@ -74,6 +74,7 @@ fakelr_stop(struct lora_hw *hw)
 static int
 fakelr_xmit_async(struct lora_hw *hw, struct sk_buff *skb)
 {
+	dev_dbg(hw->parent, "%s\n", __func__);
 	print_hex_dump(KERN_DEBUG, "", DUMP_PREFIX_OFFSET, 16, 8, skb->data, skb->len, true);
 	lora_xmit_complete(hw, skb);
 
@@ -83,42 +84,49 @@ fakelr_xmit_async(struct lora_hw *hw, struct sk_buff *skb)
 static int
 fakelr_set_txpower(struct lora_hw *hw, s32 pwr)
 {
+	dev_dbg(hw->parent, "%s: pwr=%d\n", __func__, pwr);
 	return 0;
 }
 
 static int
 fakelr_set_frq(struct lora_hw *hw, u32 frq)
 {
+	dev_dbg(hw->parent, "%s: frq=%ud\n", __func__, frq);
 	return 0;
 }
 
 static int
 fakelr_set_bw(struct lora_hw *hw, u32 bw)
 {
+	dev_dbg(hw->parent, "%s: bw=%ud\n", __func__, bw);
 	return 0;
 }
 
 static int
 fakelr_set_mod(struct lora_hw *hw, u8 mod)
 {
+	dev_dbg(hw->parent, "%s: mod=%ud\n", __func__, mod);
 	return 0;
 }
 
 static int
 fakelr_set_sf(struct lora_hw *hw, u8 sf)
 {
+	dev_dbg(hw->parent, "%s: sf=%ud\n", __func__, sf);
 	return 0;
 }
 
 static int
 fakelr_start_rx_window(struct lora_hw *hw, u32 t)
 {
+	dev_dbg(hw->parent, "%s: t=%ud\n", __func__, t);
 	return 0;
 }
 
 static int
 fakelr_set_state(struct lora_hw *hw, u8 state)
 {
+	dev_dbg(hw->parent, "%s: state=%ud\n", __func__, state);
 	return 0;
 }
 
@@ -140,6 +148,7 @@ fakelr_add_one(struct device *dev)
 {
 	struct lora_hw *hw;
 	struct fakelr_phy *phy;
+	__le32 addr = cpu_to_le32(0x01020304);
 	int err;
 
 	/* Allocate a LoRa hardware */
@@ -152,6 +161,8 @@ fakelr_add_one(struct device *dev)
 	hw->parent = dev;
 	phy = (struct fakelr_phy *)hw->priv;
 	phy->hw = hw;
+
+	lora_set_devaddr(hw, addr);
 
 	/* Register the LoRa hardware */
 	err = lora_register_hw(hw);

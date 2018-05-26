@@ -97,11 +97,13 @@ dgram_bind(struct sock *sk, struct sockaddr *uaddr, int len)
 	if (addr->addr_in.addr_type != LRW_ADDR_DEVADDR)
 		goto dgram_bind_end;
 
+	pr_debug("lorawan: %s: bind address %X\n", __func__, addr->addr_in.devaddr);
 	ndev = lrw_get_dev_by_addr(sock_net(sk), addr->addr_in.devaddr);
 	if (!ndev) {
 		ret = -ENODEV;
 		goto dgram_bind_end;
 	}
+	netdev_dbg(ndev, "%s: get ndev\n", __func__);
 
 	if (ndev->type != ARPHRD_LORAWAN) {
 		ret = -ENODEV;
@@ -111,6 +113,8 @@ dgram_bind(struct sock *sk, struct sockaddr *uaddr, int len)
 	ro->src_devaddr = addr->addr_in.devaddr;
 	ro->bound = 1;
 	ret = 0;
+	dev_put(ndev);
+	pr_debug("lorawan: %s: bound address %X\n", __func__, ro->src_devaddr);
 
 dgram_bind_end:
 	release_sock(sk);
@@ -136,23 +140,26 @@ dgram_sendmsg(struct sock *sk, struct msghdr *msg, size_t size)
 	size_t tlen;
 	int ret;
 
+	pr_debug("%s: %s: going to send %d bytes", LORAWAN_MODULE_NAME, __func__, size);
 	if (msg->msg_flags & MSG_OOB) {
-		pr_debug("msg->msg_flags = 0x%x\n", msg->msg_flags);
+		pr_debug("%s: msg->msg_flags = 0x%x\n", LORAWAN_MODULE_NAME, msg->msg_flags);
 		return -EOPNOTSUPP;
 	}
 
+	pr_debug("%s: %s: check msg_name\n", LORAWAN_MODULE_NAME, __func__);
 	if (!ro->connected && !msg->msg_name)
 		return -EDESTADDRREQ;
 	else if (ro->connected && msg->msg_name)
 		return -EISCONN;
 
+	pr_debug("%s: %s: check bound\n", LORAWAN_MODULE_NAME, __func__);
 	if (!ro->bound)
 		ndev = dev_getfirstbyhwtype(sock_net(sk), ARPHRD_LORAWAN);
 	else
 		ndev = lrw_get_dev_by_addr(sock_net(sk), ro->src_devaddr);
 
 	if (!ndev) {
-		pr_debug("no dev\n");
+		pr_debug("%s: no dev\n", LORAWAN_MODULE_NAME);
 		ret = -ENXIO;
 		goto dgram_sendmsg_end;
 	}
@@ -160,11 +167,12 @@ dgram_sendmsg(struct sock *sk, struct msghdr *msg, size_t size)
 	/* TODO: MTU should be the regional defined */
 	mtu = LORAWAN_MTU;
 	if (size > mtu){
-		pr_debug("size = %zu, mtu = %zu\n", size, mtu);
+		netdev_dbg(ndev, "size = %zu, mtu = %zu\n", size, mtu);
 		ret = -EMSGSIZE;
 		goto dgram_sendmsg_end;
 	}
 
+	netdev_dbg(ndev, "%s: create skb\n", __func__);
 	hlen = LL_RESERVED_SPACE(ndev);
 	tlen = ndev->needed_tailroom;
 	skb = sock_alloc_send_skb(sk, hlen + tlen + size,
@@ -197,10 +205,11 @@ dgram_sendmsg(struct sock *sk, struct msghdr *msg, size_t size)
 	skb->dev = ndev;
 	skb->protocol = htons(ETH_P_LORAWAN);
 
+	netdev_dbg(ndev, "%s: push skb to xmit queue\n", __func__);
 	ret = dev_queue_xmit(skb);
 	if (ret > 0)
 		ret = net_xmit_errno(ret);
-
+	netdev_dbg(ndev, "%s: pushed skb to xmit queue with ret=%d\n", __func__, ret);
 	dev_put(ndev);
 
 	return ret ?: size;
@@ -260,6 +269,7 @@ dgram_recvmsg_end:
 static int
 dgram_hash(struct sock *sk)
 {
+	pr_debug("lorawan: %s\n", __func__);
 	write_lock_bh(&dgram_lock);
 	sk_add_node(sk, &dgram_head);
 	sock_prot_inuse_add(sock_net(sk), sk->sk_prot, 1);
@@ -271,6 +281,7 @@ dgram_hash(struct sock *sk)
 static void
 dgram_unhash(struct sock *sk)
 {
+	pr_debug("lorawan: %s\n", __func__);
 	write_lock_bh(&dgram_lock);
 	if (sk_del_node_init(sk))
 		sock_prot_inuse_add(sock_net(sk), sk->sk_prot, -1);
@@ -311,7 +322,9 @@ dgram_ioctl(struct sock *sk, int cmd, unsigned long arg)
 	struct sk_buff *skb;
 	int amount;
 	int err;
+	struct net_device *ndev = sk->sk_dst_cache->dev;
 
+	netdev_dbg(ndev, "%s: ioctl file (cmd=0x%X)\n", __func__, cmd);
 	switch (cmd) {
 	case SIOCOUTQ:
 		amount = sk_wmem_alloc_get(sk);
@@ -426,7 +439,9 @@ static int
 lrw_sock_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 {
 	struct sock *sk = sock->sk;
+	struct sockaddr_lorawan *addr = (struct sockaddr_lorawan *)uaddr;
 
+	pr_debug("lorawan: %s: bind address %X\n", __func__, addr->addr_in.devaddr);
 	if (sk->sk_prot->bind)
 		return sk->sk_prot->bind(sk, uaddr, addr_len);
 
@@ -482,9 +497,10 @@ static int
 lrw_sock_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 {
 	struct sock *sk = sock->sk;
-	struct net_device *ndev = sk->sk_dst_cache->dev;
+	//struct net_device *ndev = sk->sk_dst_cache->dev;
 
-	netdev_dbg(ndev, "%s: cmd %ud\n", __func__, cmd);
+	//netdev_dbg(ndev, "%s: cmd %ud\n", __func__, cmd);
+	pr_debug("lorawan: %s: cmd %ud\n", __func__, cmd);
 	switch (cmd) {
 	case SIOCGSTAMP:
 		return sock_get_timestamp(sk, (struct timeval __user *)arg);
@@ -505,6 +521,7 @@ lrw_sock_sendmsg(struct socket *sock, struct msghdr *msg, size_t len)
 {
 	struct sock *sk = sock->sk;
 
+	pr_debug("%s: going to send %d bytes\n", __func__, len);
 	return sk->sk_prot->sendmsg(sk, msg, len);
 }
 

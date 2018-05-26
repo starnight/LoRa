@@ -498,7 +498,6 @@ lrw_if_ioctl(struct net_device *ndev, struct ifreq *ifr, int cmd)
 
 	netdev_dbg(ndev, "%s: ioctl file (cmd=0x%X)\n", __func__, cmd);
 
-	rtnl_lock();
 	/* I/O control by each command */
 	switch (cmd) {
 	/* Set & get the DevAddr, DevEUI and AppEUI */
@@ -522,7 +521,6 @@ lrw_if_ioctl(struct net_device *ndev, struct ifreq *ifr, int cmd)
 	default:
 		ret = -ENOTSUPP;
 	}
-	rtnl_unlock();
 
 	return ret;
 }
