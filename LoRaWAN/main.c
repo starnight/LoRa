@@ -341,39 +341,13 @@ ready2read(struct lrw_struct *lrw_st)
 	return status;
 }
 
-int
-lora_set_key(struct lora_hw *hw, u8 type, u8 *key, size_t l)
-{
-	int ret;
-	struct lrw_struct *lrw_st;
-
-	lrw_st = container_of(hw, struct lrw_struct, hw);
-
-	ret = 0;
-	switch (type) {
-	case LORA_APPKEY:
-		memcpy(lrw_st->appkey, key, LORA_KEY_LEN);
-		break;
-	case LORA_NWKSKEY:
-		memcpy(lrw_st->nwkskey, key, LORA_KEY_LEN);
-		break;
-	case LORA_APPSKEY:
-		memcpy(lrw_st->appskey, key, LORA_KEY_LEN);
-		break;
-	default:
-		ret = -1;
-	}
-
-	return ret;
-}
-
 static int
 lrw_if_up(struct net_device *ndev)
 {
 	struct lrw_struct *lrw_st = NETDEV_2_LRW(ndev);
 	int ret = 0;
 
-	pr_debug("%s: %s\n", LORAWAN_MODULE_NAME, __func__);
+	netdev_dbg(ndev, "%s\n", __func__);
 
 	if (lrw_st->state == LORA_STOP) {
 		ret = lora_start_hw(lrw_st);
@@ -390,7 +364,7 @@ lrw_if_down(struct net_device *ndev)
 {
 	struct lrw_struct *lrw_st = NETDEV_2_LRW(ndev);
 
-	pr_debug("%s: %s\n", LORAWAN_MODULE_NAME, __func__);
+	netdev_dbg(ndev, "%s\n", __func__);
 
 	if (lrw_st->state != LORA_STOP) {
 		netif_stop_queue(ndev);
@@ -487,12 +461,78 @@ lrw_if_set_addr(struct lrw_struct *lrw_st, struct sockaddr_lorawan *addr)
 	return ret;
 }
 
+inline void
+swap_bytes(u8 *dst, u8 *src, size_t l)
+{
+	/* Human reading is big-endian, but LoRaWAN is little-endian */
+	unsigned int i;
+	for (i = 0; i < l; i++)
+		dst[i] = src[l - i - 1];
+}
+
+int
+lora_set_key(struct lora_hw *hw, u8 type, u8 *key, size_t key_len)
+{
+	struct lrw_struct *lrw_st;
+	int ret = 0;
+
+	lrw_st = container_of(hw, struct lrw_struct, hw);
+
+	netdev_dbg(lrw_st->ndev, "%s: type=%d\n", __func__, type);
+	if (lrw_st->state != LORA_STOP)
+		return -EINVAL;
+
+	print_hex_dump(KERN_DEBUG, "", DUMP_PREFIX_OFFSET, 16, 1, key, key_len, true);
+	switch (type) {
+	case LORA_APPKEY:
+		swap_bytes(lrw_st->appkey, key, key_len);
+		break;
+	case LORA_NWKSKEY:
+		swap_bytes(lrw_st->nwkskey, key, key_len);
+		break;
+	case LORA_APPSKEY:
+		swap_bytes(lrw_st->appskey, key, key_len);
+		break;
+	default:
+		ret = -ENOTSUPP;
+	}
+
+	return ret;
+}
+EXPORT_SYMBOL(lora_set_key);
+
+int
+lora_get_key(struct lora_hw *hw, u8 type, u8 *key, size_t key_len)
+{
+	struct lrw_struct *lrw_st;
+	int ret = 0;
+
+	lrw_st = container_of(hw, struct lrw_struct, hw);
+
+	netdev_dbg(lrw_st->ndev, "%s: type=%d\n", __func__, type);
+	switch (type) {
+	case LORA_APPKEY:
+		swap_bytes(key, lrw_st->appkey, key_len);
+		break;
+	case LORA_NWKSKEY:
+		swap_bytes(key, lrw_st->nwkskey, key_len);
+		break;
+	case LORA_APPSKEY:
+		swap_bytes(key, lrw_st->appskey, key_len);
+		break;
+	default:
+		ret = -ENOTSUPP;
+	}
+
+	return ret;
+}
+
 static int
 lrw_if_ioctl(struct net_device *ndev, struct ifreq *ifr, int cmd)
 {
 	struct lrw_struct *lrw_st = NETDEV_2_LRW(ndev);
-	struct lora_hw *hw = &lrw_st->hw;
 	struct sockaddr_lorawan *addr;
+	struct lora_key lr_key;
 	s32 txpower;
 	int ret = 0;
 
@@ -501,18 +541,40 @@ lrw_if_ioctl(struct net_device *ndev, struct ifreq *ifr, int cmd)
 	/* I/O control by each command */
 	switch (cmd) {
 	/* Set & get the DevAddr, DevEUI and AppEUI */
-	case SIOCGIFADDR:
-		addr = (struct sockaddr_lorawan *)&ifr->ifr_addr;
-		ret = lrw_if_get_addr(lrw_st, addr);
-		break;
 	case SIOCSIFADDR:
 		addr = (struct sockaddr_lorawan *)&ifr->ifr_addr;
 		ret = lrw_if_set_addr(lrw_st, addr);
 		break;
+	case SIOCGIFADDR:
+		addr = (struct sockaddr_lorawan *)&ifr->ifr_addr;
+		ret = lrw_if_get_addr(lrw_st, addr);
+		break;
+	/* Set & get the key */
+	case SIOCSLRWKEY:
+		if (copy_from_user(&lr_key, ifr->ifr_data, sizeof(lr_key))) {
+			ret = -EFAULT;
+			break;
+		}
+		ret = lora_set_key(&lrw_st->hw,
+				   lr_key.type, lr_key.key, LORA_KEY_LEN);
+		break;
+	case SIOCGLRWKEY:
+		if (copy_from_user(&lr_key, ifr->ifr_data, sizeof(lr_key))) {
+			ret = -EFAULT;
+			break;
+		}
+		ret = lora_get_key(&lrw_st->hw,
+				   lr_key.type, lr_key.key, LORA_KEY_LEN);
+		if (ret)
+			break;
+
+		if (copy_to_user(ifr->ifr_data, &lr_key, sizeof(lr_key)))
+			ret = -EFAULT;
+		break;
 	/* Set & get the PA power */
 	case SIOCSLRWTXPWR:
 		get_user(txpower, (s32 __user *)ifr->ifr_data);
-		ret = lrw_st->ops->set_txpower(hw, txpower);
+		ret = lrw_st->ops->set_txpower(&lrw_st->hw, txpower);
 		break;
 	case SIOCGLRWTXPWR:
 		txpower = lrw_st->hw.transmit_power;

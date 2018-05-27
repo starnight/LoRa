@@ -75,7 +75,7 @@ static int
 fakelr_xmit_async(struct lora_hw *hw, struct sk_buff *skb)
 {
 	dev_dbg(hw->parent, "%s\n", __func__);
-	print_hex_dump(KERN_DEBUG, "", DUMP_PREFIX_OFFSET, 16, 8, skb->data, skb->len, true);
+	print_hex_dump(KERN_DEBUG, "", DUMP_PREFIX_OFFSET, 16, 1, skb->data, skb->len, true);
 	lora_xmit_complete(hw, skb);
 
 	return 0;
@@ -149,6 +149,7 @@ fakelr_add_one(struct device *dev)
 	struct lora_hw *hw;
 	struct fakelr_phy *phy;
 	__le32 addr = cpu_to_le32(0x01020304);
+	u8 appkey[] = {0x0, 0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8, 0x9, 0xA, 0xB, 0xC, 0xD, 0xE, 0xF};
 	int err;
 
 	/* Allocate a LoRa hardware */
@@ -163,6 +164,7 @@ fakelr_add_one(struct device *dev)
 	phy->hw = hw;
 
 	lora_set_devaddr(hw, addr);
+	lora_set_key(hw, LORA_APPKEY, appkey, LORA_KEY_LEN);
 
 	/* Register the LoRa hardware */
 	err = lora_register_hw(hw);

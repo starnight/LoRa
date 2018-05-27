@@ -85,10 +85,11 @@ struct sockaddr_lorawan {
 };
 
 /* DEV ioctl() commands */
-
 enum LRW_IOC_CMDS {
 	SIOCGLRWSTATE = SIOCDEVPRIVATE,
 	SIOCSLRWSTATE,
+	SIOCGLRWKEY,
+	SIOCSLRWKEY,
 	SIOCGLRWFREQ,
 	SIOCSLRWFREQ,
 	SIOCGLRWBW,
@@ -233,7 +234,14 @@ enum {
 	LORA_NWKSKEY,
 	LORA_APPSKEY,
 };
+
 #define	LORA_KEY_LEN		16
+
+struct lora_key {
+	int type;
+	u8 key[LORA_KEY_LEN];
+};
+
 int lora_set_key(struct lora_hw *, u8, u8 *, size_t);
 int lrw_get_devaddr(struct lora_hw *, u8 *devaddr);
 
