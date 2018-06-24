@@ -318,7 +318,7 @@ ready2write(struct lrw_struct *lrw_st)
 	bool status = false;
 
 	pr_debug("%s: %s\n", LORAWAN_MODULE_NAME, __func__);
-	if ((!lrw_st->_cur_ss) && (lrw_st->state != LORA_STOP))
+	if ((!lrw_st->_cur_ss) && (lrw_st->state == LORA_STATE_IDLE))
 		status = true;
 
 	return status;
@@ -345,7 +345,7 @@ static int
 lrw_if_up(struct net_device *ndev)
 {
 	struct lrw_struct *lrw_st = NETDEV_2_LRW(ndev);
-	int ret = 0;
+	int ret = -EBUSY;
 
 	netdev_dbg(ndev, "%s\n", __func__);
 
@@ -353,8 +353,6 @@ lrw_if_up(struct net_device *ndev)
 		ret = lora_start_hw(lrw_st);
 		netif_start_queue(ndev);
 	}
-	else if (lrw_st->state != LORA_START)
-		ret = -EBUSY;
 
 	return ret;
 }
@@ -390,6 +388,7 @@ lrw_if_start_xmit(struct sk_buff *skb, struct net_device *ndev)
 	mutex_lock(&lrw_st->ss_list_lock);
 	if (ready2write(lrw_st)) {
 		list_add_tail(&ss->entry, &lrw_st->ss_list);
+		lrw_st->state = LORA_STATE_TX;
 		lrw_st->_cur_ss = ss;
 		lrw_st->fcnt_up += 1;
 		ss->fcnt_up = lrw_st->fcnt_up;

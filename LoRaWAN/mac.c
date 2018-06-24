@@ -114,9 +114,17 @@ lrw_del_all_ss(struct lrw_struct *lrw_st)
 	mutex_unlock(&lrw_st->ss_list_lock);
 }
 
+void
+lora_ready_hw(struct lrw_struct *lrw_st)
+{
+	lrw_st->state = LORA_STATE_IDLE;
+}
+
 int
 lora_start_hw(struct lrw_struct *lrw_st)
 {
+	int ret = 0;
+
 	netdev_dbg(lrw_st->ndev, "%s\n", __func__);
 	lrw_st->nwks_shash_tfm = lrw_mic_key_setup(lrw_st->nwkskey,
 						   LORA_KEY_LEN);
@@ -124,10 +132,12 @@ lora_start_hw(struct lrw_struct *lrw_st)
 						     LORA_KEY_LEN);
 	lrw_st->apps_skc_tfm = lrw_encrypt_key_setup(lrw_st->appskey,
 						     LORA_KEY_LEN);
-	lrw_st->ops->start(&lrw_st->hw);
 	lrw_st->state = LORA_START;
+	ret = lrw_st->ops->start(&lrw_st->hw);
+	if (!ret)
+		lora_ready_hw(lrw_st);
 
-	return 0;
+	return ret;
 }
 
 void
@@ -328,6 +338,7 @@ lrw_rx_work(struct work_struct *work)
 
 	mutex_lock(&lrw_st->ss_list_lock);
 	lrw_del_ss(ss);
+	lrw_st->state = LORA_STATE_IDLE;
 	mutex_unlock(&lrw_st->ss_list_lock);
 
 	return;
@@ -407,6 +418,7 @@ lrw_rexmit(struct timer_list *timer)
 
 	netdev_dbg(lrw_st->ndev, "%s\n", __func__);
 
+	lrw_st->state = LORA_STATE_TX;
 	lrw_xmit((unsigned long) lrw_st);
 }
 
@@ -422,6 +434,7 @@ rx_timeout_work(struct work_struct *work)
 	netdev_dbg(lrw_st->ndev, "%s\n", __func__);
 	mutex_lock(&lrw_st->ss_list_lock);
 	lrw_st->_cur_ss = NULL;
+	lrw_st->state = LORA_STATE_IDLE;
 	lrw_del_ss(ss);
 	mutex_unlock(&lrw_st->ss_list_lock);
 }
@@ -529,9 +542,6 @@ lrw_sent_tx_work(struct lrw_struct *lrw_st, struct sk_buff *skb)
 	ndev->stats.tx_bytes += skb->len;
 	dev_consume_skb_any(skb);
 	ss->tx_skb = NULL;
-
-	/* Set LoRa hardware to IDLE state */
-	lrw_st->ops->set_state(&lrw_st->hw, LORA_STATE_IDLE);
 }
 
 /**
@@ -547,5 +557,6 @@ lora_xmit_complete(struct lora_hw *hw, struct sk_buff *skb)
 	netdev_dbg(lrw_st->ndev, "%s\n", __func__);
 
 	lrw_sent_tx_work(lrw_st, skb);
+	lrw_st->state = LORA_STATE_RX;
 }
 EXPORT_SYMBOL(lora_xmit_complete);
