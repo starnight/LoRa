@@ -318,11 +318,6 @@ lrw_rx_work(struct work_struct *work)
 	del_timer(&ss->timer);
 	lrw_st->rx_should_ack = (ss->rx_fhdr.mtype & 0xC0) == 0x40;
 
-	mutex_lock(&lrw_st->ss_list_lock);
-	lrw_st->fcnt_down = ss->rx_fhdr.fcnt;
-	lrw_st->_cur_ss = NULL;
-	mutex_unlock(&lrw_st->ss_list_lock);
-
 	lrw_st->ndev->stats.rx_packets++;
 	lrw_st->ndev->stats.rx_bytes += ss->rx_skb->len;
 
@@ -337,6 +332,8 @@ lrw_rx_work(struct work_struct *work)
 	}
 
 	mutex_lock(&lrw_st->ss_list_lock);
+	lrw_st->fcnt_down = ss->rx_fhdr.fcnt;
+	lrw_st->_cur_ss = NULL;
 	lrw_del_ss(ss);
 	lrw_st->state = LORA_STATE_IDLE;
 	mutex_unlock(&lrw_st->ss_list_lock);

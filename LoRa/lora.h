@@ -51,6 +51,28 @@ enum {
 	LRW_CLASS_C_NODE,
 };
 
+/* List the regions */
+enum {
+	LRW_EU863_870,
+	LRW_US902_928,
+	LRW_CN779_787,
+	LRW_EU443,
+	LRW_AU915_928,
+	LRW_CN470_510,
+	LRW_AS923,
+	LRW_KR920_923,
+	LRW_INDIA865_867,
+	LRW_MAX_REGION,
+};
+
+enum {
+	LRW_LORA,
+	LRW_FSK,
+};
+
+#define	LRW_UPLINK		0
+#define	LRW_DOWNLINK		1
+
 #define	LRW_DEVADDR_LEN		(sizeof(__le32))
 
 /* List the message types of LoRaWAN */
@@ -61,6 +83,7 @@ enum {
 	LRW_UNCONFIRMED_DATA_DOWN,
 	LRW_CONFIRMED_DATA_UP,
 	LRW_CONFIRMED_DATA_DOWN,
+	LRW_RFU,
 	LRW_PROPRIETARY,
 };
 
@@ -213,6 +236,7 @@ struct lora_hw *lora_alloc_hw(size_t, struct lora_operations *);
 void lora_free_hw(struct lora_hw *);
 int lora_register_hw(struct lora_hw *);
 void lora_unregister_hw(struct lora_hw *);
+int lora_set_region(struct lora_hw *, u8);
 void lora_rx_irqsave(struct lora_hw *, struct sk_buff *);
 void lora_xmit_complete(struct lora_hw *, struct sk_buff *);
 

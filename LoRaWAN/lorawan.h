@@ -49,11 +49,9 @@
 #include <crypto/skcipher.h>
 
 #include <linux/lora.h>
+#include "lrwreg.h"
 
 #define	LORAWAN_MODULE_NAME	"lorawan"
-
-#define	LRW_UPLINK		0
-#define	LRW_DOWNLINK		1
 
 enum {
 	LRW_INIT_SS,
@@ -133,11 +131,11 @@ struct lrw_session {
 
 	struct timer_list timer;
 	struct work_struct timeout_work;
-	u16 rx_delay1;
-	u16 rx_delay2;
-	u16 rx1_window;
-	u16 rx2_window;
-	u16 ack_timeout;
+	unsigned long rx_delay1;
+	unsigned long rx_delay2;
+	unsigned long rx1_window;
+	unsigned long rx2_window;
+	unsigned long ack_timeout;
 };
 
 /**
@@ -170,6 +168,8 @@ struct lrw_struct {
 	struct device dev;
 	struct lora_hw hw;
 	struct lora_operations *ops;
+	struct lrw_region_parm *region;
+
 	struct sk_buff_head rx_skb_list;
 	struct list_head ss_list;
 	struct mutex ss_list_lock;

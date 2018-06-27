@@ -114,6 +114,8 @@ lora_alloc_hw(size_t priv_data_len, struct lora_operations *ops)
 	lrw_st->ops = ops;
 	lrw_st->hw.priv = (void *) lrw_st + sizeof(struct lrw_struct);
 
+	lora_set_region(&lrw_st->hw, LRW_AS923);
+
 	//SET_NETDEV_DEV(ndev, &lrw_st->dev);
 	//dev_net_set(ndev, &lrw_st->net);
 	ndev->flags |= IFF_NOARP;
@@ -140,6 +142,18 @@ lora_free_hw(struct lora_hw *hw)
 	free_netdev(lrw_st->ndev);
 }
 EXPORT_SYMBOL(lora_free_hw);
+
+int
+lora_set_region(struct lora_hw *hw, u8 region)
+{
+	struct lrw_struct *lrw_st;
+
+	lrw_st = container_of(hw, struct lrw_struct, hw);
+	lrw_st->region = lrw_get_reg_parm(region);
+
+	return (lrw_st->region) ? 0 : -EINVAL;
+}
+EXPORT_SYMBOL(lora_set_region);
 
 /**
  * lora_set_deveui - Set the LoRa device's DevEUI
@@ -390,7 +404,6 @@ lrw_if_start_xmit(struct sk_buff *skb, struct net_device *ndev)
 		list_add_tail(&ss->entry, &lrw_st->ss_list);
 		lrw_st->state = LORA_STATE_TX;
 		lrw_st->_cur_ss = ss;
-		lrw_st->fcnt_up += 1;
 		ss->fcnt_up = lrw_st->fcnt_up;
 		ss->fcnt_down = lrw_st->fcnt_down;
 	}
@@ -410,7 +423,6 @@ lrw_if_start_xmit(struct sk_buff *skb, struct net_device *ndev)
 
 	return ret;
 }
-
 
 inline int
 lrw_if_get_addr(struct lrw_struct *lrw_st, struct sockaddr_lorawan *addr)
