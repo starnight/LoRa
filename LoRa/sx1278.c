@@ -1132,7 +1132,7 @@ sx1278_ieee_get_rf_config(struct ieee802154_hw *hw, struct rf_frq *rf)
 		rf->carrier = carrier_frq;
 
 	/* Set the LoRa chip's RF bandwidth. */
-	if (of_property_read_u32(of_node, "rf-bandwidth", &rf->carrier))
+	if (of_property_read_u32(of_node, "rf-bandwidth", &rf->bw))
 		rf->bw = bandwidth;
 
 	/* Set the LoRa chip's min & max RF channel if OF is defined. */
