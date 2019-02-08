@@ -1449,9 +1449,9 @@ sx1278_timer_irqwork(struct work_struct *work)
  * @arg:	the general argument for this callback function
  */
 static void
-sx1278_timer_isr(unsigned long arg)
+sx1278_timer_isr(struct timer_list *timer)
 {
-	struct sx1278_phy *phy = (struct sx1278_phy *)arg;
+	struct sx1278_phy *phy = container_of(timer, struct sx1278_phy, timer);
 
 	schedule_work(&phy->irqwork);
 }
@@ -1513,10 +1513,8 @@ sx1278_ieee_add_one(struct sx1278_phy *phy)
 
 	INIT_WORK(&phy->irqwork, sx1278_timer_irqwork);
 
-	init_timer(&phy->timer);
+	timer_setup(&phy->timer, sx1278_timer_isr, 0);
 	phy->timer.expires = jiffies_64 + HZ;
-	phy->timer.function = sx1278_timer_isr;
-	phy->timer.data = (unsigned long)phy;
 
 	spin_lock_init(&phy->buf_lock);
 
