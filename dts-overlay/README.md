@@ -30,3 +30,13 @@
 		minimal-RF-channel = /bits/ 8 <11>;
 		maximum-RF-channel = /bits/ 8 <11>;
 	};
+
+## Build Device Tree Overlay
+1. Build: `make`
+2. Install the DT overlay: `make install` or copy the built DT overlay to
+   `/boot/overlays/rpi-lora-spi.dtbo` on the target board manually.  (The
+   system's DT overlay folder path may be variant.  It is according to the
+   distribution's loader.)
+3. Make sure the SPI interface and DT overlay is enabled.  For example, check
+   the [/boot/config.txt](https://www.raspberrypi.org/documentation/configuration/config-txt/) in Raspberry Pi.
+   PS. [Device Trees, overlays, and parameters](https://www.raspberrypi.org/documentation/configuration/device-tree.md)
