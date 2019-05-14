@@ -183,3 +183,17 @@ void set_crc(int fd, uint32_t agc)
 {
 	ioctl(fd, LORA_SET_CRC, &agc);
 }
+
+/* Set & get LoRa package's coding rate. */
+void set_codingrate(int fd, uint32_t codingrate)
+{
+	ioctl(fd, LORA_SET_CODINGRATE, &codingrate);
+}
+
+uint32_t get_codingrate(int fd) {
+	uint32_t codingrate;
+
+	ioctl(fd, LORA_GET_CODINGRATE, &codingrate);
+
+	return codingrate;
+}

@@ -1617,6 +1617,59 @@ loraspi_setCRC(struct lora_struct *lrdata, void __user *arg)
 }
 
 /**
+ * loraspi_setcodingrate - Set LoRa package's coding rate
+ * @lrdata:	LoRa device
+ * @arg:	the buffer holding the LoRa package's coding rate value in user space
+ *
+ * Return:	0 / other values for success / error
+ */
+static long
+loraspi_setcodingrate(struct lora_struct *lrdata, void __user *arg)
+{
+	struct regmap *rm;
+	int status;
+	uint32_t codingrate32;
+	uint8_t codingrate;
+
+	rm = lrdata->lora_device;
+	status = copy_from_user(&codingrate32, arg, sizeof(uint32_t));
+
+	codingrate = codingrate32;
+	mutex_lock(&(lrdata->buf_lock));
+	sx127X_setLoRaCR(rm, codingrate);
+	mutex_unlock(&(lrdata->buf_lock));
+
+	return 0;
+}
+
+/**
+ * loraspi_getcodingrate - Get LoRa package's coding rate
+ * @lrdata:	LoRa device
+ * @arg:	the buffer going to hold the LoRa package's coding rate value in user space
+ *
+ * Return:	0 / other values for success / error
+ */
+static long
+loraspi_getcodingrate(struct lora_struct *lrdata, void __user *arg)
+{
+	struct regmap *rm;
+	int status;
+	uint32_t codingrate32;
+	uint8_t codingrate;
+
+	rm = lrdata->lora_device;
+
+	mutex_lock(&(lrdata->buf_lock));
+	codingrate = sx127X_getLoRaCR(rm);
+	mutex_unlock(&(lrdata->buf_lock));
+
+	codingrate32 = codingrate;
+	status = copy_to_user(arg, &codingrate32, sizeof(uint32_t));
+
+	return 0;
+}
+
+/**
  * loraspi_ready2write - Is ready to be written
  * @lrdata:	LoRa device
  *
@@ -1684,6 +1737,8 @@ struct lora_operations lrops = {
 	.getRSSI = loraspi_getrssi,
 	.getSNR = loraspi_getsnr,
 	.setCRC = loraspi_setCRC,
+	.setCodingRate = loraspi_setcodingrate,
+	.getCodingRate = loraspi_getcodingrate,
 	.ready2write = loraspi_ready2write,
 	.ready2read = loraspi_ready2read,
 };

@@ -63,6 +63,8 @@
 #define LORA_GET_RSSI		(_IOR(LORA_IOC_MAGIC, 13, int))
 #define LORA_GET_SNR		(_IOR(LORA_IOC_MAGIC, 14, int))
 #define LORA_SET_CRC		(_IOW(LORA_IOC_MAGIC, 15, int))
+#define LORA_SET_CODINGRATE	(_IOW(LORA_IOC_MAGIC, 16, int))
+#define LORA_GET_CODINGRATE	(_IOR(LORA_IOC_MAGIC, 17, int))
 
 /* List the state of the LoRa device. */
 #define LORA_STATE_SLEEP	0
@@ -101,6 +103,9 @@ struct lora_operations {
 	long (*getSNR)(struct lora_struct *, void __user *);
 	/* Enable CRC generation and check on received payload. */
 	long (*setCRC)(struct lora_struct *, void __user *);
+	/* Set & get LoRa package's coding rate. */
+	long (*setCodingRate)(struct lora_struct *, void __user *);
+	long (*getCodingRate)(struct lora_struct *, void __user *);
 	/* Read from the LoRa device's communication. */
 	ssize_t (*read)(struct lora_struct *, const char __user *, size_t);
 	/* Write to the LoRa device's communication. */

@@ -265,6 +265,15 @@ file_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		if (lrdata->ops->setCRC != NULL)
 			ret = lrdata->ops->setCRC(lrdata, pval);
 		break;
+	/* Set & get LoRa package's coding rate. */
+	case LORA_SET_CODINGRATE:
+		if (lrdata->ops->setCodingRate != NULL)
+			ret = lrdata->ops->setCodingRate(lrdata, pval);
+		break;
+	case LORA_GET_CODINGRATE:
+		if (lrdata->ops->getCodingRate != NULL)
+			ret = lrdata->ops->getCodingRate(lrdata, pval);
+		break;
 	default:
 		ret = -ENOTTY;
 	}
