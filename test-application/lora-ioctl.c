@@ -203,3 +203,9 @@ void set_implicit(int fd, uint32_t implicit)
 {
 	ioctl(fd, LORA_SET_IMPLICIT, &implicit);
 }
+
+/* Set LoRa packages in Explicit / Implicit Header Mode. */
+void set_ldro(int fd, uint32_t ldro)
+{
+	ioctl(fd, LORA_SET_LDRO, &ldro);
+}

@@ -904,6 +904,21 @@ sx127X_setBoost(struct regmap *rm, uint8_t yesno)
 }
 
 /**
+ * sx127X_setLoRaLDRO - Set RF low data rate optimize
+ * @rm:		the device as a regmap to communicate with
+ * @yesno:	1 / 0 for check / not check
+ */
+void
+sx127X_setLoRaLDRO(struct regmap *rm, int32_t yesno)
+{
+	uint8_t mcf3;
+
+	regmap_raw_read(rm, SX127X_REG_MODEM_CONFIG3, &mcf3, 1);
+	mcf3 = (yesno) ? (mcf3 | 0x08) : (mcf3 & (~0x08));
+	regmap_raw_write(rm, SX127X_REG_MODEM_CONFIG3, &mcf3, 1);
+}
+
+/**
  * sx127X_startLoRaMode - Start the device and set it in LoRa mode
  * @rm:		the device as a regmap to communicate with
  */
@@ -1696,6 +1711,32 @@ loraspi_setImplicit(struct lora_struct *lrdata, void __user *arg)
 }
 
 /**
+ * loraspi_setLDRO - Set RF low data rate optimize
+ * @lrdata:	LoRa device
+ * @arg:	the buffer holding the check or not check in user space
+ *
+ * Return:	0 / other values for success / error
+ */
+static long
+loraspi_setLDRO(struct lora_struct *lrdata, void __user *arg)
+{
+	struct regmap *rm;
+	int status;
+	uint32_t ldro32;
+	uint8_t ldro;
+
+	rm = lrdata->lora_device;
+	status = copy_from_user(&ldro32, arg, sizeof(uint32_t));
+
+	ldro = (ldro32 == 1) ? 1 : 0;
+	mutex_lock(&(lrdata->buf_lock));
+	sx127X_setLoRaLDRO(rm, ldro);
+	mutex_unlock(&(lrdata->buf_lock));
+
+	return 0;
+}
+
+/**
  * loraspi_ready2write - Is ready to be written
  * @lrdata:	LoRa device
  *
@@ -1766,6 +1807,7 @@ struct lora_operations lrops = {
 	.setCodingRate = loraspi_setcodingrate,
 	.getCodingRate = loraspi_getcodingrate,
 	.setImplicit = loraspi_setImplicit,
+	.setLDRO = loraspi_setLDRO,
 	.ready2write = loraspi_ready2write,
 	.ready2read = loraspi_ready2read,
 };

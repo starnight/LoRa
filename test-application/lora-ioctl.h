@@ -63,6 +63,7 @@
 #define LORA_SET_CODINGRATE	(_IOW(LORA_IOC_MAGIC, 16, int))
 #define LORA_GET_CODINGRATE	(_IOR(LORA_IOC_MAGIC, 17, int))
 #define LORA_SET_IMPLICIT	(_IOW(LORA_IOC_MAGIC, 18, int))
+#define LORA_SET_LDRO		(_IOW(LORA_IOC_MAGIC, 19, int))
 
 /* List the state of the LoRa device. */
 #define LORA_STATE_SLEEP	0
@@ -119,5 +120,8 @@ uint32_t get_codingrate(int fd);
 
 /* Set LoRa packages in Explicit / Implicit Header Mode. */
 void set_implicit(int fd, uint32_t implicit);
+
+/* Set RF low data rate optimize. */
+void set_ldro(int fd, uint32_t ldro);
 
 #endif

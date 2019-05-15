@@ -279,6 +279,11 @@ file_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		if (lrdata->ops->setImplicit != NULL)
 			ret = lrdata->ops->setImplicit(lrdata, pval);
 		break;
+	/* Set RF low data rate optimize. */
+	case LORA_SET_LDRO:
+		if (lrdata->ops->setLDRO != NULL)
+			ret = lrdata->ops->setLDRO(lrdata, pval);
+		break;
 	default:
 		ret = -ENOTTY;
 	}
