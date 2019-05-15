@@ -1737,6 +1737,55 @@ loraspi_setLDRO(struct lora_struct *lrdata, void __user *arg)
 }
 
 /**
+ * loraspi_setPreambleLen - Set LoRa preamble length
+ * @lrdata:	LoRa device
+ * @arg:	the buffer holding the LoRa preamble length value in user space
+ *
+ * Return:	0 / other values for success / error
+ */
+static long
+loraspi_setPreambleLen(struct lora_struct *lrdata, void __user *arg)
+{
+	struct regmap *rm;
+	int status;
+	uint32_t len;
+
+	rm = lrdata->lora_device;
+	status = copy_from_user(&len, arg, sizeof(uint32_t));
+
+	mutex_lock(&(lrdata->buf_lock));
+	sx127X_setLoRaPreambleLen(rm, len);
+	mutex_unlock(&(lrdata->buf_lock));
+
+	return 0;
+}
+
+/**
+ * loraspi_getPreambleLen - Get LoRa preamble length
+ * @lrdata:	LoRa device
+ * @arg:	the buffer going to hold the LoRa preamble length value in user space
+ *
+ * Return:	0 / other values for success / error
+ */
+static long
+loraspi_getPreambleLen(struct lora_struct *lrdata, void __user *arg)
+{
+	struct regmap *rm;
+	int status;
+	uint32_t len;
+
+	rm = lrdata->lora_device;
+
+	mutex_lock(&(lrdata->buf_lock));
+	len = sx127X_getLoRaCR(rm);
+	mutex_unlock(&(lrdata->buf_lock));
+
+	status = copy_to_user(arg, &len, sizeof(uint32_t));
+
+	return 0;
+}
+
+/**
  * loraspi_ready2write - Is ready to be written
  * @lrdata:	LoRa device
  *
@@ -1807,6 +1856,8 @@ struct lora_operations lrops = {
 	.setCodingRate = loraspi_setcodingrate,
 	.getCodingRate = loraspi_getcodingrate,
 	.setImplicit = loraspi_setImplicit,
+	.setPreambleLen = loraspi_setPreambleLen,
+	.getPreambleLen = loraspi_getPreambleLen,
 	.setLDRO = loraspi_setLDRO,
 	.ready2write = loraspi_ready2write,
 	.ready2read = loraspi_ready2read,

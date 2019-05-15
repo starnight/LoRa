@@ -284,6 +284,15 @@ file_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		if (lrdata->ops->setLDRO != NULL)
 			ret = lrdata->ops->setLDRO(lrdata, pval);
 		break;
+	/* Set & get LoRa preamble length. */
+	case LORA_SET_PREAMBLE:
+		if (lrdata->ops->setPreambleLen != NULL)
+			ret = lrdata->ops->setPreambleLen(lrdata, pval);
+		break;
+	case LORA_GET_PREAMBLE:
+		if (lrdata->ops->getPreambleLen != NULL)
+			ret = lrdata->ops->getPreambleLen(lrdata, pval);
+		break;
 	default:
 		ret = -ENOTTY;
 	}

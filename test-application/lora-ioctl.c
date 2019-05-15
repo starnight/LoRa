@@ -209,3 +209,17 @@ void set_ldro(int fd, uint32_t ldro)
 {
 	ioctl(fd, LORA_SET_LDRO, &ldro);
 }
+
+/* Set & get LoRa preamble length. */
+void set_preamblelen(int fd, uint32_t preamblelen)
+{
+	ioctl(fd, LORA_SET_PREAMBLE, &preamblelen);
+}
+
+uint32_t get_preamblelen(int fd) {
+	uint32_t preamblelen;
+
+	ioctl(fd, LORA_GET_PREAMBLE, &preamblelen);
+
+	return preamblelen;
+}
