@@ -1670,6 +1670,32 @@ loraspi_getcodingrate(struct lora_struct *lrdata, void __user *arg)
 }
 
 /**
+ * loraspi_setImplicit - Set LoRa packages in Explicit / Implicit Header Mode
+ * @lrdata:	LoRa device
+ * @arg:	the buffer holding the check or not check in user space
+ *
+ * Return:	0 / other values for success / error
+ */
+static long
+loraspi_setImplicit(struct lora_struct *lrdata, void __user *arg)
+{
+	struct regmap *rm;
+	int status;
+	uint32_t implicit32;
+	uint8_t implicit;
+
+	rm = lrdata->lora_device;
+	status = copy_from_user(&implicit32, arg, sizeof(uint32_t));
+
+	implicit = (implicit32 == 1) ? 1 : 0;
+	mutex_lock(&(lrdata->buf_lock));
+	sx127X_setLoRaImplicit(rm, implicit);
+	mutex_unlock(&(lrdata->buf_lock));
+
+	return 0;
+}
+
+/**
  * loraspi_ready2write - Is ready to be written
  * @lrdata:	LoRa device
  *
@@ -1739,6 +1765,7 @@ struct lora_operations lrops = {
 	.setCRC = loraspi_setCRC,
 	.setCodingRate = loraspi_setcodingrate,
 	.getCodingRate = loraspi_getcodingrate,
+	.setImplicit = loraspi_setImplicit,
 	.ready2write = loraspi_ready2write,
 	.ready2read = loraspi_ready2read,
 };

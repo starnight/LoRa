@@ -62,6 +62,7 @@
 #define LORA_SET_CRC		(_IOW(LORA_IOC_MAGIC, 15, int))
 #define LORA_SET_CODINGRATE	(_IOW(LORA_IOC_MAGIC, 16, int))
 #define LORA_GET_CODINGRATE	(_IOR(LORA_IOC_MAGIC, 17, int))
+#define LORA_SET_IMPLICIT	(_IOW(LORA_IOC_MAGIC, 18, int))
 
 /* List the state of the LoRa device. */
 #define LORA_STATE_SLEEP	0
@@ -115,5 +116,8 @@ void set_crc(int fd, uint32_t crc);
 /* Set & get LoRa package's coding rate. */
 void set_codingrate(int fd, uint32_t codingrate);
 uint32_t get_codingrate(int fd);
+
+/* Set LoRa packages in Explicit / Implicit Header Mode. */
+void set_implicit(int fd, uint32_t implicit);
 
 #endif

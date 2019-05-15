@@ -197,3 +197,9 @@ uint32_t get_codingrate(int fd) {
 
 	return codingrate;
 }
+
+/* Set LoRa packages in Explicit / Implicit Header Mode. */
+void set_implicit(int fd, uint32_t implicit)
+{
+	ioctl(fd, LORA_SET_IMPLICIT, &implicit);
+}

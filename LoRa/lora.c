@@ -274,6 +274,11 @@ file_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		if (lrdata->ops->getCodingRate != NULL)
 			ret = lrdata->ops->getCodingRate(lrdata, pval);
 		break;
+	/* Set LoRa packages in Explicit / Implicit Header Mode. */
+	case LORA_SET_IMPLICIT:
+		if (lrdata->ops->setImplicit != NULL)
+			ret = lrdata->ops->setImplicit(lrdata, pval);
+		break;
 	default:
 		ret = -ENOTTY;
 	}
