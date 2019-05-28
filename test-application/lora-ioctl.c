@@ -127,6 +127,21 @@ int32_t get_power(int fd)
 	return power;
 }
 
+/* Set & get the RF power rise/fall time of ramp up/down. */
+void set_paramp(int fd, uint32_t us)
+{
+	ioctl(fd, LORA_SET_PARAMP, &us);
+}
+
+uint32_t get_paramp(int fd)
+{
+	uint32_t us;
+
+	ioctl(fd, LORA_GET_PARAMP, &us);
+
+	return us;
+}
+
 /* Set & get LNA gain. */
 void set_lna(int fd, int32_t lna)
 {

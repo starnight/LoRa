@@ -366,6 +366,64 @@ sx127X_getLoRaPower(struct regmap *rm)
 	return pout;
 }
 
+const uint32_t ramp_us[] = {
+	3400,
+	2000,
+	1000,
+	 500,
+	 250,
+	 125,
+	 100,
+	  62,
+	  50,
+	  40,
+	  31,
+	  25,
+	  20,
+	  15,
+	  12,
+	  10
+};
+
+/**
+ * sx127X_setLoRaPaRamp - Set RF power rise/fall time of ramp up/down
+ * @rm:		the device as a regmap to communicate with
+ * @us:		RF power rise/fall time going to be assigned in us
+ */
+void
+sx127X_setLoRaPaRamp(struct regmap *rm, uint32_t us)
+{
+	uint8_t i;
+	uint8_t paramp;
+
+	for (i = 0; i < 15; i++) {
+		if (ramp_us[i] <= us)
+			break;
+	}
+
+	regmap_raw_read(rm, SX127X_REG_PA_RAMP, &paramp, 1);
+	paramp = (paramp & 0xF0) | i;
+	regmap_raw_write(rm, SX127X_REG_PA_RAMP, &paramp, 1);
+}
+
+/**
+ * sx127X_getLoRaPaRamp - Get RF power rise/fall time of ramp up/down
+ * @rm:		the device as a regmap to communicate with
+ *
+ * Return:	RF power rise/fall time in us
+ */
+uint32_t
+sx127X_getLoRaPaRamp(struct regmap *rm)
+{
+	uint8_t paramp;
+	uint8_t us;
+
+	regmap_raw_read(rm, SX127X_REG_PA_RAMP, &paramp, 1);
+	us = paramp & 0x0F;
+
+	return ramp_us[us];
+}
+
 int8_t lna_gain[] = {
 	 0,
 	-6,
@@ -1377,6 +1435,55 @@ loraspi_getpower(struct lora_struct *lrdata, void __user *arg)
 }
 
 /**
+ * loraspi_setparamp - Set the RF power rise/fall time of ramp up/down
+ * @lrdata:	LoRa device
+ * @arg:	the buffer holding the RF power rise/fall time value in user space
+ *
+ * Return:	0 / other values for success / error
+ */
+static long
+loraspi_setparamp(struct lora_struct *lrdata, void __user *arg)
+{
+	struct regmap *rm;
+	int status;
+	uint32_t paramp;
+
+	rm = lrdata->lora_device;
+	status = copy_from_user(&paramp, arg, sizeof(uint32_t));
+
+	mutex_lock(&(lrdata->buf_lock));
+	sx127X_setLoRaPaRamp(rm, paramp);
+	mutex_unlock(&(lrdata->buf_lock));
+
+	return 0;
+}
+
+/**
+ * loraspi_getparamp - Get the RF power rise/fall time of ramp up/down
+ * @lrdata:	LoRa device
+ * @arg:	the buffer going to hold the RF power rise/fall time value in user space
+ *
+ * Return:	0 / other values for success / error
+ */
+static long
+loraspi_getparamp(struct lora_struct *lrdata, void __user *arg)
+{
+	struct regmap *rm;
+	int status;
+	uint32_t paramp;
+
+	rm = lrdata->lora_device;
+
+	mutex_lock(&(lrdata->buf_lock));
+	paramp = sx127X_getLoRaPaRamp(rm);
+	mutex_unlock(&(lrdata->buf_lock));
+
+	status = copy_to_user(arg, &paramp, sizeof(uint32_t));
+
+	return 0;
+}
+
+/**
  * loraspi_setLNA - Set the LNA gain
  * @lrdata:	LoRa device
  * @arg:	the buffer holding the LNA gain value in user space
@@ -1843,6 +1950,8 @@ struct lora_operations lrops = {
 	.getFreq = loraspi_getfreq,
 	.setPower = loraspi_setpower,
 	.getPower = loraspi_getpower,
+	.setPaRamp = loraspi_setparamp,
+	.getPaRamp = loraspi_getparamp,
 	.setLNA = loraspi_setLNA,
 	.getLNA = loraspi_getLNA,
 	.setLNAAGC = loraspi_setLNAAGC,

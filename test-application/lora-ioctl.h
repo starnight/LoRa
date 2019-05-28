@@ -66,6 +66,8 @@
 #define LORA_SET_LDRO		(_IOW(LORA_IOC_MAGIC, 19, int))
 #define LORA_SET_PREAMBLE	(_IOW(LORA_IOC_MAGIC, 20, int))
 #define LORA_GET_PREAMBLE	(_IOR(LORA_IOC_MAGIC, 21, int))
+#define LORA_SET_PARAMP		(_IOW(LORA_IOC_MAGIC, 22, int))
+#define LORA_GET_PARAMP		(_IOR(LORA_IOC_MAGIC, 23, int))
 
 /* List the state of the LoRa device. */
 #define LORA_STATE_SLEEP	0
@@ -97,6 +99,10 @@ int32_t get_snr(int fd);
 /* Set & get output power. */
 void set_power(int fd, int32_t power);
 int32_t get_power(int fd);
+
+/* Set & get the RF power rise/fall time of ramp up/down. */
+void set_paramp(int fd, uint32_t us);
+uint32_t get_paramp(int fd);
 
 /* Set & get LNA gain. */
 void set_lna(int fd, int32_t lna);

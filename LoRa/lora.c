@@ -218,6 +218,15 @@ file_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		if (lrdata->ops->getPower != NULL)
 			ret = lrdata->ops->getPower(lrdata, pval);
 		break;
+	/* Set & get the RF power rise/fall time of ramp up/down. */
+	case LORA_SET_PARAMP:
+		if (lrdata->ops->setPaRamp != NULL)
+			ret = lrdata->ops->setPaRamp(lrdata, pval);
+		break;
+	case LORA_GET_PARAMP:
+		if (lrdata->ops->getPaRamp != NULL)
+			ret = lrdata->ops->getPaRamp(lrdata, pval);
+		break;
 	/* Set & get the LNA gain. */
 	case LORA_SET_LNA:
 		if (lrdata->ops->setLNA != NULL)
