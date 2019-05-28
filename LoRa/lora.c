@@ -64,7 +64,7 @@ file_open(struct inode *inode, struct file *filp)
 	int status = -ENXIO;
 
 	pr_debug("lora: open file\n");
-	
+
 	mutex_lock(&device_list_lock);
 	/* Find the lora data in device_entry with matched dev_t in inode. */
 	list_for_each_entry(lrdata, &device_list, device_entry) {
@@ -123,17 +123,17 @@ static int
 file_close(struct inode *inode, struct file *filp)
 {
 	struct lora_struct *lrdata;
-	
+
 	pr_debug("lora: close file\n");
-	
+
 	lrdata = filp->private_data;
 
 	mutex_lock(&device_list_lock);
 	filp->private_data = NULL;
-	
+
 	if (lrdata->users > 0)
 		lrdata->users--;
-	
+
 	/* Last close */
 	if (lrdata->users == 0) {
 		kfree(lrdata->rx_buf);
@@ -447,7 +447,7 @@ int
 lora_unregister_driver(struct lora_driver *driver)
 {
 	dev_t dev = MKDEV(driver->major, driver->minor_start);
-	
+
 	pr_debug("lora: unregister %s\n", driver->name);
 	/* Delete device class. */
 	class_destroy(driver->lora_class);

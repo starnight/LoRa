@@ -178,7 +178,7 @@ sx127X_readVersion(struct regmap *rm)
  *
  * Return:	LoRa device's register value
  */
-uint8_t 
+uint8_t
 sx127X_getMode(struct regmap *rm)
 {
 	uint8_t op_mode;
@@ -593,7 +593,7 @@ const uint32_t hz[] = {
 };
 
 /**
- * sx127X_getLoRaBW - Set RF bandwidth
+ * sx127X_setLoRaBW - Set RF bandwidth
  * @rm:		the device as a regmap to communicate with
  * @bw:		RF bandwidth going to be assigned in Hz
  */
@@ -662,7 +662,7 @@ sx127X_getLoRaCR(struct regmap *rm)
 
 	regmap_raw_read(rm, SX127X_REG_MODEM_CONFIG1, &mcf1, 1);
 	cr = 0x40 + ((mcf1 & 0x0E) >> 1) + 4;
-	
+
 	return cr;
 }
 
