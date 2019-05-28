@@ -585,7 +585,7 @@ sx127X_setLoRaCR(struct regmap *rm, uint8_t cr)
 	uint8_t mcf1;
 
 	regmap_raw_read(rm, SX127X_REG_MODEM_CONFIG1, &mcf1, 1);
-	mcf1 = (mcf1 & 0x0E) | (((cr & 0xF) - 4) << 1);
+	mcf1 = (mcf1 & 0xFE) | (((cr & 0xF) - 4) << 1);
 	regmap_raw_write(rm, SX127X_REG_MODEM_CONFIG1, &mcf1, 1);
 }
 
