@@ -142,6 +142,21 @@ uint32_t get_paramp(int fd)
 	return us;
 }
 
+/* Set & get the RF max current of overload current protection (OCP) for PA. */
+void set_ocpimax(int fd, uint32_t mA)
+{
+	ioctl(fd, LORA_SET_OCPIMAX, &mA);
+}
+
+uint32_t get_ocpimax(int fd)
+{
+	uint32_t mA;
+
+	ioctl(fd, LORA_GET_OCPIMAX, &mA);
+
+	return mA;
+}
+
 /* Set & get LNA gain. */
 void set_lna(int fd, int32_t lna)
 {

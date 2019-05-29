@@ -68,6 +68,8 @@
 #define LORA_GET_PREAMBLE	(_IOR(LORA_IOC_MAGIC, 21, int))
 #define LORA_SET_PARAMP		(_IOW(LORA_IOC_MAGIC, 22, int))
 #define LORA_GET_PARAMP		(_IOR(LORA_IOC_MAGIC, 23, int))
+#define LORA_SET_OCPIMAX	(_IOW(LORA_IOC_MAGIC, 24, int))
+#define LORA_GET_OCPIMAX	(_IOR(LORA_IOC_MAGIC, 25, int))
 
 /* List the state of the LoRa device. */
 #define LORA_STATE_SLEEP	0
@@ -103,6 +105,10 @@ int32_t get_power(int fd);
 /* Set & get the RF power rise/fall time of ramp up/down. */
 void set_paramp(int fd, uint32_t us);
 uint32_t get_paramp(int fd);
+
+/* Set & get the RF max current of overload current protection (OCP) for PA. */
+void set_ocpimax(int fd, uint32_t mA);
+uint32_t get_ocpimax(int fd);
 
 /* Set & get LNA gain. */
 void set_lna(int fd, int32_t lna);

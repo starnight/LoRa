@@ -227,6 +227,15 @@ file_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		if (lrdata->ops->getPaRamp != NULL)
 			ret = lrdata->ops->getPaRamp(lrdata, pval);
 		break;
+	/* Set & get the RF max current of overload current protection (OCP) for PA. */
+	case LORA_SET_OCPIMAX:
+		if (lrdata->ops->setOcpImax != NULL)
+			ret = lrdata->ops->setOcpImax(lrdata, pval);
+		break;
+	case LORA_GET_OCPIMAX:
+		if (lrdata->ops->getOcpImax != NULL)
+			ret = lrdata->ops->getOcpImax(lrdata, pval);
+		break;
 	/* Set & get the LNA gain. */
 	case LORA_SET_LNA:
 		if (lrdata->ops->setLNA != NULL)

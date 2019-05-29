@@ -424,6 +424,76 @@ sx127X_getLoRaPaRamp(struct regmap *rm)
 	return ramp_us[us];
 }
 
+const uint32_t ocp_ma[] = {
+     45,
+     50,
+     55,
+     60,
+     65,
+     70,
+     75,
+     80,
+     85,
+     90,
+     95,
+    100,
+    105,
+    110,
+    115,
+    120,
+    130,
+    140,
+    150,
+    160,
+    170,
+    180,
+    190,
+    200,
+    210,
+    220,
+    230,
+    240
+};
+
+/**
+ * sx127X_setLoRaOcpImax - Set RF max current of overload current protection (OCP) for PA
+ * @rm:		the device as a regmap to communicate with
+ * @mA:		RF max current going to be assigned in mA
+ */
+void
+sx127X_setLoRaOcpImax(struct regmap *rm, uint32_t mA)
+{
+	uint8_t i;
+	uint8_t ocp;
+
+	for (i = 0; i < 0x1B; i++) {
+		if (ocp_ma[i] >= mA)
+			break;
+	}
+
+	regmap_raw_read(rm, SX127X_REG_OCP, &ocp, 1);
+	ocp = (ocp & 0xE0) | i;
+	regmap_raw_write(rm, SX127X_REG_OCP, &ocp, 1);
+}
+
+/**
+ * sx127X_getLoRaOcpImax - Get RF max current of overload current protection (OCP) for PA
+ * @rm:		the device as a regmap to communicate with
+ *
+ * Return:	RF max current in mA
+ */
+uint32_t
+sx127X_getLoRaOcpImax(struct regmap *rm)
+{
+	uint8_t ocp;
+	uint8_t mA;
+
+	regmap_raw_read(rm, SX127X_REG_OCP, &ocp, 1);
+	mA = ocp & 0x1F;
+
+	return ocp_ma[mA];
+}
+
 int8_t lna_gain[] = {
 	 0,
 	-6,
@@ -1484,6 +1554,55 @@ loraspi_getparamp(struct lora_struct *lrdata, void __user *arg)
 }
 
 /**
+ * loraspi_setocpimax - Set the RF max current of overload current protection (OCP) for PA
+ * @lrdata:	LoRa device
+ * @arg:	the buffer holding the RF max current value in user space
+ *
+ * Return:	0 / other values for success / error
+ */
+static long
+loraspi_setocpimax(struct lora_struct *lrdata, void __user *arg)
+{
+	struct regmap *rm;
+	int status;
+	uint32_t imax;
+
+	rm = lrdata->lora_device;
+	status = copy_from_user(&imax, arg, sizeof(uint32_t));
+
+	mutex_lock(&(lrdata->buf_lock));
+	sx127X_setLoRaOcpImax(rm, imax);
+	mutex_unlock(&(lrdata->buf_lock));
+
+	return 0;
+}
+
+/**
+ * loraspi_getbandwidth - Get the RF max current of overload current protection (OCP) for PA
+ * @lrdata:	LoRa device
+ * @arg:	the buffer going to hold the RF max current value in user space
+ *
+ * Return:	0 / other values for success / error
+ */
+static long
+loraspi_getocpimax(struct lora_struct *lrdata, void __user *arg)
+{
+	struct regmap *rm;
+	int status;
+	uint32_t imax;
+
+	rm = lrdata->lora_device;
+
+	mutex_lock(&(lrdata->buf_lock));
+	imax = sx127X_getLoRaOcpImax(rm);
+	mutex_unlock(&(lrdata->buf_lock));
+
+	status = copy_to_user(arg, &imax, sizeof(uint32_t));
+
+	return 0;
+}
+
+/**
  * loraspi_setLNA - Set the LNA gain
  * @lrdata:	LoRa device
  * @arg:	the buffer holding the LNA gain value in user space
@@ -1952,6 +2071,8 @@ struct lora_operations lrops = {
 	.getPower = loraspi_getpower,
 	.setPaRamp = loraspi_setparamp,
 	.getPaRamp = loraspi_getparamp,
+	.setOcpImax = loraspi_setocpimax,
+	.getOcpImax = loraspi_getocpimax,
 	.setLNA = loraspi_setLNA,
 	.getLNA = loraspi_getLNA,
 	.setLNAAGC = loraspi_setLNAAGC,

@@ -71,6 +71,8 @@
 #define LORA_GET_PREAMBLE	(_IOR(LORA_IOC_MAGIC, 21, int))
 #define LORA_SET_PARAMP		(_IOW(LORA_IOC_MAGIC, 22, int))
 #define LORA_GET_PARAMP		(_IOR(LORA_IOC_MAGIC, 23, int))
+#define LORA_SET_OCPIMAX	(_IOW(LORA_IOC_MAGIC, 24, int))
+#define LORA_GET_OCPIMAX	(_IOR(LORA_IOC_MAGIC, 25, int))
 
 /* List the state of the LoRa device. */
 #define LORA_STATE_SLEEP	0
@@ -95,6 +97,9 @@ struct lora_operations {
 	/* Set & get the RF power rise/fall time of ramp up/down. */
 	long (*setPaRamp)(struct lora_struct *, void __user *);
 	long (*getPaRamp)(struct lora_struct *, void __user *);
+	/* Set & get the RF max current of overload current protection (OCP) for PA. */
+	long (*setOcpImax)(struct lora_struct *, void __user *);
+	long (*getOcpImax)(struct lora_struct *, void __user *);
 	/* Set & get the LNA gain. */
 	long (*setLNA)(struct lora_struct *, void __user *);
 	long (*getLNA)(struct lora_struct *, void __user *);
