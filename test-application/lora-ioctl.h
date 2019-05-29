@@ -70,6 +70,7 @@
 #define LORA_GET_PARAMP		(_IOR(LORA_IOC_MAGIC, 23, int))
 #define LORA_SET_OCPIMAX	(_IOW(LORA_IOC_MAGIC, 24, int))
 #define LORA_GET_OCPIMAX	(_IOR(LORA_IOC_MAGIC, 25, int))
+#define LORA_SET_LNABOOSTHF	(_IOW(LORA_IOC_MAGIC, 26, int))
 
 /* List the state of the LoRa device. */
 #define LORA_STATE_SLEEP	0
@@ -116,6 +117,9 @@ int32_t get_lna(int fd);
 
 /* Set LNA be auto gain control or manual. */
 void set_lnaagc(int fd, uint32_t agc);
+
+/* Set low noise amplifier (LNA) boost in High Frequency (RFI_HF) to 150% LNA current. */
+void set_lnaboosthf(int fd, uint32_t boost);
 
 /* Set & get the RF spreading factor. */
 void set_sprfactor(int fd, uint32_t sprf);

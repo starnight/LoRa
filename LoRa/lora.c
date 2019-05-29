@@ -250,6 +250,11 @@ file_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		if (lrdata->ops->setLNAAGC != NULL)
 			ret = lrdata->ops->setLNAAGC(lrdata, pval);
 		break;
+	/* Set RF low noise amplifier (LNA) boost in High Frequency (RFI_HF) to 150% LNA current. */
+	case LORA_SET_LNABOOSTHF:
+		if (lrdata->ops->setLnaBoostHf != NULL)
+			ret = lrdata->ops->setLnaBoostHf(lrdata, pval);
+		break;
 	/* Set & get the RF spreading factor. */
 	case LORA_SET_SPRFACTOR:
 		if (lrdata->ops->setSPRFactor != NULL)

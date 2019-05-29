@@ -178,6 +178,12 @@ void set_lnaagc(int fd, uint32_t agc)
 	ioctl(fd, LORA_SET_LNAAGC, &agc);
 }
 
+/* Set low noise amplifier (LNA) boost in High Frequency (RFI_HF) to 150% LNA current. */
+void set_lnaboosthf(int fd, uint32_t boost)
+{
+	ioctl(fd, LORA_SET_LNABOOSTHF, &boost);
+}
+
 /* Set & get the RF spreading factor. */
 void set_sprfactor(int fd, uint32_t sprf)
 {

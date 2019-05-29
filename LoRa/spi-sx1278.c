@@ -562,6 +562,21 @@ sx127X_setLoRaLNAAGC(struct regmap *rm, int32_t yesno)
 }
 
 /**
+ * sx127X_setLnaBoostHf - Set RF low noise amplifier (LNA) boost in High Frequency (RFI_HF) to 150% LNA current
+ * @rm:		the device as a regmap to communicate with
+ * @yesno:	1 / 0 for boost / not boost
+ */
+void
+sx127X_setLoRaLnaBoostHf(struct regmap *rm, uint8_t yesno)
+{
+	uint8_t lnacf;
+
+	regmap_raw_read(rm, SX127X_REG_LNA, &lnacf, 1);
+	lnacf = (yesno) ? lnacf | 0x3 : lnacf & 0xFC;
+	regmap_raw_write(rm, SX127X_REG_LNA, &lnacf, 1);
+}
+
+/**
  * sx127X_getLoRaAllFlag - Get all of the LoRa device's IRQ flags' current state
  * @rm:		the device as a regmap to communicate with
  *
@@ -1684,6 +1699,32 @@ loraspi_setLNAAGC(struct lora_struct *lrdata, void __user *arg)
 }
 
 /**
+ * loraspi_setLnaBoostHf - Set RF low noise amplifier (LNA) boost in High Frequency (RFI_HF) to 150% LNA current
+ * @lrdata:	LoRa device
+ * @arg:	the buffer holding the check or not check in user space
+ *
+ * Return:	0 / other values for success / error
+ */
+static long
+loraspi_setLnaBoostHf(struct lora_struct *lrdata, void __user *arg)
+{
+	struct regmap *rm;
+	int status;
+	uint32_t boost32;
+	uint8_t boost;
+
+	rm = lrdata->lora_device;
+	status = copy_from_user(&boost32, arg, sizeof(uint32_t));
+
+	boost = (boost32 == 1) ? 1 : 0;
+	mutex_lock(&(lrdata->buf_lock));
+	sx127X_setLoRaLnaBoostHf(rm, boost);
+	mutex_unlock(&(lrdata->buf_lock));
+
+	return 0;
+}
+
+/**
  * loraspi_setsprfactor - Set the RF spreading factor
  * @lrdata:	LoRa device
  * @arg:	the buffer holding the spreading factor in user space
@@ -2076,6 +2117,7 @@ struct lora_operations lrops = {
 	.setLNA = loraspi_setLNA,
 	.getLNA = loraspi_getLNA,
 	.setLNAAGC = loraspi_setLNAAGC,
+	.setLnaBoostHf = loraspi_setLnaBoostHf,
 	.setSPRFactor = loraspi_setsprfactor,
 	.getSPRFactor = loraspi_getsprfactor,
 	.setBW = loraspi_setbandwidth,
