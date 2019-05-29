@@ -235,6 +235,7 @@ sx127X_setLoRaFreq(struct regmap *rm, uint32_t fr)
 	uint8_t buf[3];
 	int i;
 	uint32_t f_xosc;
+	uint8_t op_mode;
 
 #ifdef CONFIG_OF
 	/* Set the LoRa module's crystal oscillator's clock if OF is defined. */
@@ -258,6 +259,19 @@ sx127X_setLoRaFreq(struct regmap *rm, uint32_t fr)
 	}
 
 	regmap_raw_write(rm, SX127X_REG_FRF_MSB, buf, 3);
+
+	regmap_raw_read(rm, SX127X_REG_OP_MODE, &op_mode, 1);
+	if (fr < 525000000) { // Low Frequency Mode (access to LF test registers)
+		if ((op_mode & 0x08) != 0x08) {
+			op_mode |= 0x08;
+			regmap_raw_write(rm, SX127X_REG_OP_MODE, &op_mode, 1);
+		}
+	} else { // High Frequency Mode (access to HF test registers)
+		if (op_mode & 0x08) {
+			op_mode &= 0xF7;
+			regmap_raw_write(rm, SX127X_REG_OP_MODE, &op_mode, 1);
+		}
+	}
 }
 
 /**
