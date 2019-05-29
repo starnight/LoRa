@@ -177,3 +177,9 @@ uint32_t get_bw(int fd)
 
 	return bw;
 }
+
+/* Enable CRC generation and check on received payload. */
+void set_crc(int fd, uint32_t agc)
+{
+	ioctl(fd, LORA_SET_CRC, &agc);
+}

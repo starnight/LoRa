@@ -1591,6 +1591,32 @@ loraspi_getsnr(struct lora_struct *lrdata, void __user *arg)
 }
 
 /**
+ * loraspi_setCRC - Enable CRC generation and check on received payload
+ * @lrdata:	LoRa device
+ * @arg:	the buffer holding the check or not check in user space
+ *
+ * Return:	0 / other values for success / error
+ */
+static long
+loraspi_setCRC(struct lora_struct *lrdata, void __user *arg)
+{
+	struct regmap *rm;
+	int status;
+	uint32_t crc32;
+	uint8_t crc;
+
+	rm = lrdata->lora_device;
+	status = copy_from_user(&crc32, arg, sizeof(uint32_t));
+
+	crc = (crc32 == 1) ? 1 : 0;
+	mutex_lock(&(lrdata->buf_lock));
+	sx127X_setLoRaCRC(rm, crc);
+	mutex_unlock(&(lrdata->buf_lock));
+
+	return 0;
+}
+
+/**
  * loraspi_ready2write - Is ready to be written
  * @lrdata:	LoRa device
  *
@@ -1657,6 +1683,7 @@ struct lora_operations lrops = {
 	.getBW = loraspi_getbandwidth,
 	.getRSSI = loraspi_getrssi,
 	.getSNR = loraspi_getsnr,
+	.setCRC = loraspi_setCRC,
 	.ready2write = loraspi_ready2write,
 	.ready2read = loraspi_ready2read,
 };

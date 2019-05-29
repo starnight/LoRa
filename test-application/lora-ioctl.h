@@ -59,6 +59,7 @@
 #define LORA_GET_BANDWIDTH	(_IOR(LORA_IOC_MAGIC, 12, int))
 #define LORA_GET_RSSI		(_IOR(LORA_IOC_MAGIC, 13, int))
 #define LORA_GET_SNR		(_IOR(LORA_IOC_MAGIC, 14, int))
+#define LORA_SET_CRC		(_IOW(LORA_IOC_MAGIC, 15, int))
 
 /* List the state of the LoRa device. */
 #define LORA_STATE_SLEEP	0
@@ -105,5 +106,8 @@ uint32_t get_sprfactor(int fd);
 /* Set & get the RF bandwidth. */
 void set_bw(int fd, uint32_t bw);
 uint32_t get_bw(int fd);
+
+/* Enable CRC generation and check on received payload. */
+void set_crc(int fd, uint32_t crc);
 
 #endif

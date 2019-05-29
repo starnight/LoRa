@@ -260,6 +260,11 @@ file_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		if (lrdata->ops->getSNR != NULL)
 			ret = lrdata->ops->getSNR(lrdata, pval);
 		break;
+	/* Enable CRC generation and check on received payload. */
+	case LORA_SET_CRC:
+		if (lrdata->ops->setCRC != NULL)
+			ret = lrdata->ops->setCRC(lrdata, pval);
+		break;
 	default:
 		ret = -ENOTTY;
 	}
