@@ -127,6 +127,42 @@ int32_t get_power(int fd)
 	return power;
 }
 
+/* Set high power +20 dBm capability on PA_BOOST pin. */
+void set_pmax20dbm(int fd, uint32_t pmax20dbm)
+{
+	ioctl(fd, LORA_SET_PMAX20DBM, &pmax20dbm);
+}
+
+/* Set & get the RF power rise/fall time of ramp up/down. */
+void set_paramp(int fd, uint32_t us)
+{
+	ioctl(fd, LORA_SET_PARAMP, &us);
+}
+
+uint32_t get_paramp(int fd)
+{
+	uint32_t us;
+
+	ioctl(fd, LORA_GET_PARAMP, &us);
+
+	return us;
+}
+
+/* Set & get the RF max current of overload current protection (OCP) for PA. */
+void set_ocpimax(int fd, uint32_t mA)
+{
+	ioctl(fd, LORA_SET_OCPIMAX, &mA);
+}
+
+uint32_t get_ocpimax(int fd)
+{
+	uint32_t mA;
+
+	ioctl(fd, LORA_GET_OCPIMAX, &mA);
+
+	return mA;
+}
+
 /* Set & get LNA gain. */
 void set_lna(int fd, int32_t lna)
 {
@@ -146,6 +182,12 @@ int32_t get_lna(int fd)
 void set_lnaagc(int fd, uint32_t agc)
 {
 	ioctl(fd, LORA_SET_LNAAGC, &agc);
+}
+
+/* Set low noise amplifier (LNA) boost in High Frequency (RFI_HF) to 150% LNA current. */
+void set_lnaboosthf(int fd, uint32_t boost)
+{
+	ioctl(fd, LORA_SET_LNABOOSTHF, &boost);
 }
 
 /* Set & get the RF spreading factor. */
@@ -176,4 +218,50 @@ uint32_t get_bw(int fd)
 	ioctl(fd, LORA_GET_BANDWIDTH, &bw);
 
 	return bw;
+}
+
+/* Enable CRC generation and check on received payload. */
+void set_crc(int fd, uint32_t agc)
+{
+	ioctl(fd, LORA_SET_CRC, &agc);
+}
+
+/* Set & get LoRa package's coding rate. */
+void set_codingrate(int fd, uint32_t codingrate)
+{
+	ioctl(fd, LORA_SET_CODINGRATE, &codingrate);
+}
+
+uint32_t get_codingrate(int fd) {
+	uint32_t codingrate;
+
+	ioctl(fd, LORA_GET_CODINGRATE, &codingrate);
+
+	return codingrate;
+}
+
+/* Set LoRa packages in Explicit / Implicit Header Mode. */
+void set_implicit(int fd, uint32_t implicit)
+{
+	ioctl(fd, LORA_SET_IMPLICIT, &implicit);
+}
+
+/* Set LoRa packages in Explicit / Implicit Header Mode. */
+void set_ldro(int fd, uint32_t ldro)
+{
+	ioctl(fd, LORA_SET_LDRO, &ldro);
+}
+
+/* Set & get LoRa preamble length. */
+void set_preamblelen(int fd, uint32_t preamblelen)
+{
+	ioctl(fd, LORA_SET_PREAMBLE, &preamblelen);
+}
+
+uint32_t get_preamblelen(int fd) {
+	uint32_t preamblelen;
+
+	ioctl(fd, LORA_GET_PREAMBLE, &preamblelen);
+
+	return preamblelen;
 }

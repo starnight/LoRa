@@ -64,7 +64,7 @@ file_open(struct inode *inode, struct file *filp)
 	int status = -ENXIO;
 
 	pr_debug("lora: open file\n");
-	
+
 	mutex_lock(&device_list_lock);
 	/* Find the lora data in device_entry with matched dev_t in inode. */
 	list_for_each_entry(lrdata, &device_list, device_entry) {
@@ -123,17 +123,17 @@ static int
 file_close(struct inode *inode, struct file *filp)
 {
 	struct lora_struct *lrdata;
-	
+
 	pr_debug("lora: close file\n");
-	
+
 	lrdata = filp->private_data;
 
 	mutex_lock(&device_list_lock);
 	filp->private_data = NULL;
-	
+
 	if (lrdata->users > 0)
 		lrdata->users--;
-	
+
 	/* Last close */
 	if (lrdata->users == 0) {
 		kfree(lrdata->rx_buf);
@@ -218,6 +218,29 @@ file_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		if (lrdata->ops->getPower != NULL)
 			ret = lrdata->ops->getPower(lrdata, pval);
 		break;
+	/* Set high power +20 dBm capability on PA_BOOST pin. */
+	case LORA_SET_PMAX20DBM:
+		if (lrdata->ops->setPmax20dBm != NULL)
+			ret = lrdata->ops->setPmax20dBm(lrdata, pval);
+		break;
+	/* Set & get the RF power rise/fall time of ramp up/down. */
+	case LORA_SET_PARAMP:
+		if (lrdata->ops->setPaRamp != NULL)
+			ret = lrdata->ops->setPaRamp(lrdata, pval);
+		break;
+	case LORA_GET_PARAMP:
+		if (lrdata->ops->getPaRamp != NULL)
+			ret = lrdata->ops->getPaRamp(lrdata, pval);
+		break;
+	/* Set & get the RF max current of overload current protection (OCP) for PA. */
+	case LORA_SET_OCPIMAX:
+		if (lrdata->ops->setOcpImax != NULL)
+			ret = lrdata->ops->setOcpImax(lrdata, pval);
+		break;
+	case LORA_GET_OCPIMAX:
+		if (lrdata->ops->getOcpImax != NULL)
+			ret = lrdata->ops->getOcpImax(lrdata, pval);
+		break;
 	/* Set & get the LNA gain. */
 	case LORA_SET_LNA:
 		if (lrdata->ops->setLNA != NULL)
@@ -231,6 +254,11 @@ file_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 	case LORA_SET_LNAAGC:
 		if (lrdata->ops->setLNAAGC != NULL)
 			ret = lrdata->ops->setLNAAGC(lrdata, pval);
+		break;
+	/* Set RF low noise amplifier (LNA) boost in High Frequency (RFI_HF) to 150% LNA current. */
+	case LORA_SET_LNABOOSTHF:
+		if (lrdata->ops->setLnaBoostHf != NULL)
+			ret = lrdata->ops->setLnaBoostHf(lrdata, pval);
 		break;
 	/* Set & get the RF spreading factor. */
 	case LORA_SET_SPRFACTOR:
@@ -259,6 +287,39 @@ file_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 	case LORA_GET_SNR:
 		if (lrdata->ops->getSNR != NULL)
 			ret = lrdata->ops->getSNR(lrdata, pval);
+		break;
+	/* Enable CRC generation and check on received payload. */
+	case LORA_SET_CRC:
+		if (lrdata->ops->setCRC != NULL)
+			ret = lrdata->ops->setCRC(lrdata, pval);
+		break;
+	/* Set & get LoRa package's coding rate. */
+	case LORA_SET_CODINGRATE:
+		if (lrdata->ops->setCodingRate != NULL)
+			ret = lrdata->ops->setCodingRate(lrdata, pval);
+		break;
+	case LORA_GET_CODINGRATE:
+		if (lrdata->ops->getCodingRate != NULL)
+			ret = lrdata->ops->getCodingRate(lrdata, pval);
+		break;
+	/* Set LoRa packages in Explicit / Implicit Header Mode. */
+	case LORA_SET_IMPLICIT:
+		if (lrdata->ops->setImplicit != NULL)
+			ret = lrdata->ops->setImplicit(lrdata, pval);
+		break;
+	/* Set RF low data rate optimize. */
+	case LORA_SET_LDRO:
+		if (lrdata->ops->setLDRO != NULL)
+			ret = lrdata->ops->setLDRO(lrdata, pval);
+		break;
+	/* Set & get LoRa preamble length. */
+	case LORA_SET_PREAMBLE:
+		if (lrdata->ops->setPreambleLen != NULL)
+			ret = lrdata->ops->setPreambleLen(lrdata, pval);
+		break;
+	case LORA_GET_PREAMBLE:
+		if (lrdata->ops->getPreambleLen != NULL)
+			ret = lrdata->ops->getPreambleLen(lrdata, pval);
 		break;
 	default:
 		ret = -ENOTTY;
@@ -405,7 +466,7 @@ int
 lora_unregister_driver(struct lora_driver *driver)
 {
 	dev_t dev = MKDEV(driver->major, driver->minor_start);
-	
+
 	pr_debug("lora: unregister %s\n", driver->name);
 	/* Delete device class. */
 	class_destroy(driver->lora_class);

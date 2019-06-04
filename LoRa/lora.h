@@ -55,13 +55,26 @@
 #define LORA_GET_POWER		(_IOR(LORA_IOC_MAGIC,  5, int))
 #define LORA_SET_LNA		(_IOW(LORA_IOC_MAGIC,  6, int))
 #define LORA_GET_LNA		(_IOR(LORA_IOC_MAGIC,  7, int))
-#define LORA_SET_LNAAGC		(_IOR(LORA_IOC_MAGIC,  8, int))
+#define LORA_SET_LNAAGC		(_IOW(LORA_IOC_MAGIC,  8, int))
 #define LORA_SET_SPRFACTOR	(_IOW(LORA_IOC_MAGIC,  9, int))
 #define LORA_GET_SPRFACTOR	(_IOR(LORA_IOC_MAGIC, 10, int))
 #define LORA_SET_BANDWIDTH	(_IOW(LORA_IOC_MAGIC, 11, int))
 #define LORA_GET_BANDWIDTH	(_IOR(LORA_IOC_MAGIC, 12, int))
 #define LORA_GET_RSSI		(_IOR(LORA_IOC_MAGIC, 13, int))
 #define LORA_GET_SNR		(_IOR(LORA_IOC_MAGIC, 14, int))
+#define LORA_SET_CRC		(_IOW(LORA_IOC_MAGIC, 15, int))
+#define LORA_SET_CODINGRATE	(_IOW(LORA_IOC_MAGIC, 16, int))
+#define LORA_GET_CODINGRATE	(_IOR(LORA_IOC_MAGIC, 17, int))
+#define LORA_SET_IMPLICIT	(_IOW(LORA_IOC_MAGIC, 18, int))
+#define LORA_SET_LDRO		(_IOW(LORA_IOC_MAGIC, 19, int))
+#define LORA_SET_PREAMBLE	(_IOW(LORA_IOC_MAGIC, 20, int))
+#define LORA_GET_PREAMBLE	(_IOR(LORA_IOC_MAGIC, 21, int))
+#define LORA_SET_PARAMP		(_IOW(LORA_IOC_MAGIC, 22, int))
+#define LORA_GET_PARAMP		(_IOR(LORA_IOC_MAGIC, 23, int))
+#define LORA_SET_OCPIMAX	(_IOW(LORA_IOC_MAGIC, 24, int))
+#define LORA_GET_OCPIMAX	(_IOR(LORA_IOC_MAGIC, 25, int))
+#define LORA_SET_LNABOOSTHF	(_IOW(LORA_IOC_MAGIC, 26, int))
+#define LORA_SET_PMAX20DBM	(_IOW(LORA_IOC_MAGIC, 27, int))
 
 /* List the state of the LoRa device. */
 #define LORA_STATE_SLEEP	0
@@ -83,11 +96,21 @@ struct lora_operations {
 	/* Set & get the PA power. */
 	long (*setPower)(struct lora_struct *, void __user *);
 	long (*getPower)(struct lora_struct *, void __user *);
+	/* Set high power +20 dBm capability on PA_BOOST pin. */
+	long (*setPmax20dBm)(struct lora_struct *, void __user *);
+	/* Set & get the RF power rise/fall time of ramp up/down. */
+	long (*setPaRamp)(struct lora_struct *, void __user *);
+	long (*getPaRamp)(struct lora_struct *, void __user *);
+	/* Set & get the RF max current of overload current protection (OCP) for PA. */
+	long (*setOcpImax)(struct lora_struct *, void __user *);
+	long (*getOcpImax)(struct lora_struct *, void __user *);
 	/* Set & get the LNA gain. */
 	long (*setLNA)(struct lora_struct *, void __user *);
 	long (*getLNA)(struct lora_struct *, void __user *);
 	/* Set LNA be auto gain control or manual. */
 	long (*setLNAAGC)(struct lora_struct *, void __user *);
+	/* Set low noise amplifier (LNA) boost in High Frequency (RFI_HF) to 150% LNA current. */
+	long (*setLnaBoostHf)(struct lora_struct *, void __user *);
 	/* Set & get the RF spreading factor. */
 	long (*setSPRFactor)(struct lora_struct *, void __user *);
 	long (*getSPRFactor)(struct lora_struct *, void __user *);
@@ -98,6 +121,18 @@ struct lora_operations {
 	long (*getRSSI)(struct lora_struct *, void __user *);
 	/* Get last packet's SNR. */
 	long (*getSNR)(struct lora_struct *, void __user *);
+	/* Enable CRC generation and check on received payload. */
+	long (*setCRC)(struct lora_struct *, void __user *);
+	/* Set & get LoRa package's coding rate. */
+	long (*setCodingRate)(struct lora_struct *, void __user *);
+	long (*getCodingRate)(struct lora_struct *, void __user *);
+	/* Set LoRa packages in Explicit / Implicit Header Mode. */
+	long (*setImplicit)(struct lora_struct *, void __user *);
+	/* Set RF low data rate optimize. */
+	long (*setLDRO)(struct lora_struct *, void __user *);
+	/* Set & get LoRa preamble length. */
+	long (*setPreambleLen)(struct lora_struct *, void __user *);
+	long (*getPreambleLen)(struct lora_struct *, void __user *);
 	/* Read from the LoRa device's communication. */
 	ssize_t (*read)(struct lora_struct *, const char __user *, size_t);
 	/* Write to the LoRa device's communication. */

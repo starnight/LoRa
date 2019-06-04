@@ -178,7 +178,7 @@ sx127X_readVersion(struct regmap *rm)
  *
  * Return:	LoRa device's register value
  */
-uint8_t 
+uint8_t
 sx127X_getMode(struct regmap *rm)
 {
 	uint8_t op_mode;
@@ -235,6 +235,7 @@ sx127X_setLoRaFreq(struct regmap *rm, uint32_t fr)
 	uint8_t buf[3];
 	int i;
 	uint32_t f_xosc;
+	uint8_t op_mode;
 
 #ifdef CONFIG_OF
 	/* Set the LoRa module's crystal oscillator's clock if OF is defined. */
@@ -258,6 +259,19 @@ sx127X_setLoRaFreq(struct regmap *rm, uint32_t fr)
 	}
 
 	regmap_raw_write(rm, SX127X_REG_FRF_MSB, buf, 3);
+
+	regmap_raw_read(rm, SX127X_REG_OP_MODE, &op_mode, 1);
+	if (fr < 525000000) { // Low Frequency Mode (access to LF test registers)
+		if ((op_mode & 0x08) != 0x08) {
+			op_mode |= 0x08;
+			regmap_raw_write(rm, SX127X_REG_OP_MODE, &op_mode, 1);
+		}
+	} else { // High Frequency Mode (access to HF test registers)
+		if (op_mode & 0x08) {
+			op_mode &= 0xF7;
+			regmap_raw_write(rm, SX127X_REG_OP_MODE, &op_mode, 1);
+		}
+	}
 }
 
 /**
@@ -366,6 +380,148 @@ sx127X_getLoRaPower(struct regmap *rm)
 	return pout;
 }
 
+/**
+ * sx127X_setLoRaPmax20dBm - Set RF high power +20 dBm capability on PA_BOOST pin
+ * @rm:		the device as a regmap to communicate with
+ * @yesno:	1 / 0 for 20dBm / 17dBm
+ */
+void
+sx127X_setLoRaPmax20dBm(struct regmap *rm, uint8_t yesno)
+{
+	uint8_t padac;
+
+	padac = (yesno) ? 0x87 : 0x84;
+	regmap_raw_write(rm, SX127X_REG_PA_DAC, &padac, 1);
+}
+
+const uint32_t ramp_us[] = {
+	3400,
+	2000,
+	1000,
+	 500,
+	 250,
+	 125,
+	 100,
+	  62,
+	  50,
+	  40,
+	  31,
+	  25,
+	  20,
+	  15,
+	  12,
+	  10
+};
+
+/**
+ * sx127X_setLoRaPaRamp - Set RF power rise/fall time of ramp up/down
+ * @rm:		the device as a regmap to communicate with
+ * @us:		RF power rise/fall time going to be assigned in us
+ */
+void
+sx127X_setLoRaPaRamp(struct regmap *rm, uint32_t us)
+{
+	uint8_t i;
+	uint8_t paramp;
+
+	for (i = 0; i < 15; i++) {
+		if (ramp_us[i] <= us)
+			break;
+	}
+
+	regmap_raw_read(rm, SX127X_REG_PA_RAMP, &paramp, 1);
+	paramp = (paramp & 0xF0) | i;
+	regmap_raw_write(rm, SX127X_REG_PA_RAMP, &paramp, 1);
+}
+
+/**
+ * sx127X_getLoRaPaRamp - Get RF power rise/fall time of ramp up/down
+ * @rm:		the device as a regmap to communicate with
+ *
+ * Return:	RF power rise/fall time in us
+ */
+uint32_t
+sx127X_getLoRaPaRamp(struct regmap *rm)
+{
+	uint8_t paramp;
+	uint8_t us;
+
+	regmap_raw_read(rm, SX127X_REG_PA_RAMP, &paramp, 1);
+	us = paramp & 0x0F;
+
+	return ramp_us[us];
+}
+
+const uint32_t ocp_ma[] = {
+     45,
+     50,
+     55,
+     60,
+     65,
+     70,
+     75,
+     80,
+     85,
+     90,
+     95,
+    100,
+    105,
+    110,
+    115,
+    120,
+    130,
+    140,
+    150,
+    160,
+    170,
+    180,
+    190,
+    200,
+    210,
+    220,
+    230,
+    240
+};
+
+/**
+ * sx127X_setLoRaOcpImax - Set RF max current of overload current protection (OCP) for PA
+ * @rm:		the device as a regmap to communicate with
+ * @mA:		RF max current going to be assigned in mA
+ */
+void
+sx127X_setLoRaOcpImax(struct regmap *rm, uint32_t mA)
+{
+	uint8_t i;
+	uint8_t ocp;
+
+	for (i = 0; i < 0x1B; i++) {
+		if (ocp_ma[i] >= mA)
+			break;
+	}
+
+	regmap_raw_read(rm, SX127X_REG_OCP, &ocp, 1);
+	ocp = (ocp & 0xE0) | i;
+	regmap_raw_write(rm, SX127X_REG_OCP, &ocp, 1);
+}
+
+/**
+ * sx127X_getLoRaOcpImax - Get RF max current of overload current protection (OCP) for PA
+ * @rm:		the device as a regmap to communicate with
+ *
+ * Return:	RF max current in mA
+ */
+uint32_t
+sx127X_getLoRaOcpImax(struct regmap *rm)
+{
+	uint8_t ocp;
+	uint8_t mA;
+
+	regmap_raw_read(rm, SX127X_REG_OCP, &ocp, 1);
+	mA = ocp & 0x1F;
+
+	return ocp_ma[mA];
+}
+
 int8_t lna_gain[] = {
 	 0,
 	-6,
@@ -431,6 +587,21 @@ sx127X_setLoRaLNAAGC(struct regmap *rm, int32_t yesno)
 	regmap_raw_read(rm, SX127X_REG_MODEM_CONFIG3, &mcf3, 1);
 	mcf3 = (yesno) ? (mcf3 | 0x04) : (mcf3 & (~0x04));
 	regmap_raw_write(rm, SX127X_REG_MODEM_CONFIG3, &mcf3, 1);
+}
+
+/**
+ * sx127X_setLnaBoostHf - Set RF low noise amplifier (LNA) boost in High Frequency (RFI_HF) to 150% LNA current
+ * @rm:		the device as a regmap to communicate with
+ * @yesno:	1 / 0 for boost / not boost
+ */
+void
+sx127X_setLoRaLnaBoostHf(struct regmap *rm, uint8_t yesno)
+{
+	uint8_t lnacf;
+
+	regmap_raw_read(rm, SX127X_REG_LNA, &lnacf, 1);
+	lnacf = (yesno) ? lnacf | 0x3 : lnacf & 0xFC;
+	regmap_raw_write(rm, SX127X_REG_LNA, &lnacf, 1);
 }
 
 /**
@@ -535,7 +706,7 @@ const uint32_t hz[] = {
 };
 
 /**
- * sx127X_getLoRaBW - Set RF bandwidth
+ * sx127X_setLoRaBW - Set RF bandwidth
  * @rm:		the device as a regmap to communicate with
  * @bw:		RF bandwidth going to be assigned in Hz
  */
@@ -585,7 +756,7 @@ sx127X_setLoRaCR(struct regmap *rm, uint8_t cr)
 	uint8_t mcf1;
 
 	regmap_raw_read(rm, SX127X_REG_MODEM_CONFIG1, &mcf1, 1);
-	mcf1 = (mcf1 & 0x0E) | (((cr & 0xF) - 4) << 1);
+	mcf1 = (mcf1 & 0xFE) | (((cr & 0xF) - 4) << 1);
 	regmap_raw_write(rm, SX127X_REG_MODEM_CONFIG1, &mcf1, 1);
 }
 
@@ -604,7 +775,7 @@ sx127X_getLoRaCR(struct regmap *rm)
 
 	regmap_raw_read(rm, SX127X_REG_MODEM_CONFIG1, &mcf1, 1);
 	cr = 0x40 + ((mcf1 & 0x0E) >> 1) + 4;
-	
+
 	return cr;
 }
 
@@ -901,6 +1072,21 @@ sx127X_setBoost(struct regmap *rm, uint8_t yesno)
 	regmap_raw_read(rm, SX127X_REG_PA_CONFIG, &pacf, 1);
 	pacf = (yesno) ? pacf | (1 << 7) : pacf & (~(1 << 7));
 	regmap_raw_write(rm, SX127X_REG_PA_CONFIG, &pacf, 1);
+}
+
+/**
+ * sx127X_setLoRaLDRO - Set RF low data rate optimize
+ * @rm:		the device as a regmap to communicate with
+ * @yesno:	1 / 0 for check / not check
+ */
+void
+sx127X_setLoRaLDRO(struct regmap *rm, int32_t yesno)
+{
+	uint8_t mcf3;
+
+	regmap_raw_read(rm, SX127X_REG_MODEM_CONFIG3, &mcf3, 1);
+	mcf3 = (yesno) ? (mcf3 | 0x08) : (mcf3 & (~0x08));
+	regmap_raw_write(rm, SX127X_REG_MODEM_CONFIG3, &mcf3, 1);
 }
 
 /**
@@ -1362,6 +1548,130 @@ loraspi_getpower(struct lora_struct *lrdata, void __user *arg)
 }
 
 /**
+ * loraspi_setPmax20dBm - Set RF high power +20 dBm capability on PA_BOOST pin
+ * @lrdata:	LoRa device
+ * @arg:	the buffer holding the check or not check in user space
+ *
+ * Return:	0 / other values for success / error
+ */
+static long
+loraspi_setPmax20dBm(struct lora_struct *lrdata, void __user *arg)
+{
+	struct regmap *rm;
+	int status;
+	uint32_t pmax20dBm32;
+	uint8_t pmax20dBm;
+
+	rm = lrdata->lora_device;
+	status = copy_from_user(&pmax20dBm32, arg, sizeof(uint32_t));
+
+	pmax20dBm = (pmax20dBm32 == 1) ? 1 : 0;
+	mutex_lock(&(lrdata->buf_lock));
+	sx127X_setLoRaPmax20dBm(rm, pmax20dBm);
+	mutex_unlock(&(lrdata->buf_lock));
+
+	return 0;
+}
+
+/**
+ * loraspi_setparamp - Set the RF power rise/fall time of ramp up/down
+ * @lrdata:	LoRa device
+ * @arg:	the buffer holding the RF power rise/fall time value in user space
+ *
+ * Return:	0 / other values for success / error
+ */
+static long
+loraspi_setparamp(struct lora_struct *lrdata, void __user *arg)
+{
+	struct regmap *rm;
+	int status;
+	uint32_t paramp;
+
+	rm = lrdata->lora_device;
+	status = copy_from_user(&paramp, arg, sizeof(uint32_t));
+
+	mutex_lock(&(lrdata->buf_lock));
+	sx127X_setLoRaPaRamp(rm, paramp);
+	mutex_unlock(&(lrdata->buf_lock));
+
+	return 0;
+}
+
+/**
+ * loraspi_getparamp - Get the RF power rise/fall time of ramp up/down
+ * @lrdata:	LoRa device
+ * @arg:	the buffer going to hold the RF power rise/fall time value in user space
+ *
+ * Return:	0 / other values for success / error
+ */
+static long
+loraspi_getparamp(struct lora_struct *lrdata, void __user *arg)
+{
+	struct regmap *rm;
+	int status;
+	uint32_t paramp;
+
+	rm = lrdata->lora_device;
+
+	mutex_lock(&(lrdata->buf_lock));
+	paramp = sx127X_getLoRaPaRamp(rm);
+	mutex_unlock(&(lrdata->buf_lock));
+
+	status = copy_to_user(arg, &paramp, sizeof(uint32_t));
+
+	return 0;
+}
+
+/**
+ * loraspi_setocpimax - Set the RF max current of overload current protection (OCP) for PA
+ * @lrdata:	LoRa device
+ * @arg:	the buffer holding the RF max current value in user space
+ *
+ * Return:	0 / other values for success / error
+ */
+static long
+loraspi_setocpimax(struct lora_struct *lrdata, void __user *arg)
+{
+	struct regmap *rm;
+	int status;
+	uint32_t imax;
+
+	rm = lrdata->lora_device;
+	status = copy_from_user(&imax, arg, sizeof(uint32_t));
+
+	mutex_lock(&(lrdata->buf_lock));
+	sx127X_setLoRaOcpImax(rm, imax);
+	mutex_unlock(&(lrdata->buf_lock));
+
+	return 0;
+}
+
+/**
+ * loraspi_getbandwidth - Get the RF max current of overload current protection (OCP) for PA
+ * @lrdata:	LoRa device
+ * @arg:	the buffer going to hold the RF max current value in user space
+ *
+ * Return:	0 / other values for success / error
+ */
+static long
+loraspi_getocpimax(struct lora_struct *lrdata, void __user *arg)
+{
+	struct regmap *rm;
+	int status;
+	uint32_t imax;
+
+	rm = lrdata->lora_device;
+
+	mutex_lock(&(lrdata->buf_lock));
+	imax = sx127X_getLoRaOcpImax(rm);
+	mutex_unlock(&(lrdata->buf_lock));
+
+	status = copy_to_user(arg, &imax, sizeof(uint32_t));
+
+	return 0;
+}
+
+/**
  * loraspi_setLNA - Set the LNA gain
  * @lrdata:	LoRa device
  * @arg:	the buffer holding the LNA gain value in user space
@@ -1437,6 +1747,32 @@ loraspi_setLNAAGC(struct lora_struct *lrdata, void __user *arg)
 	agc = (agc == 1) ? 1 : 0;
 	mutex_lock(&(lrdata->buf_lock));
 	sx127X_setLoRaLNAAGC(rm, agc);
+	mutex_unlock(&(lrdata->buf_lock));
+
+	return 0;
+}
+
+/**
+ * loraspi_setLnaBoostHf - Set RF low noise amplifier (LNA) boost in High Frequency (RFI_HF) to 150% LNA current
+ * @lrdata:	LoRa device
+ * @arg:	the buffer holding the check or not check in user space
+ *
+ * Return:	0 / other values for success / error
+ */
+static long
+loraspi_setLnaBoostHf(struct lora_struct *lrdata, void __user *arg)
+{
+	struct regmap *rm;
+	int status;
+	uint32_t boost32;
+	uint8_t boost;
+
+	rm = lrdata->lora_device;
+	status = copy_from_user(&boost32, arg, sizeof(uint32_t));
+
+	boost = (boost32 == 1) ? 1 : 0;
+	mutex_lock(&(lrdata->buf_lock));
+	sx127X_setLoRaLnaBoostHf(rm, boost);
 	mutex_unlock(&(lrdata->buf_lock));
 
 	return 0;
@@ -1591,6 +1927,186 @@ loraspi_getsnr(struct lora_struct *lrdata, void __user *arg)
 }
 
 /**
+ * loraspi_setCRC - Enable CRC generation and check on received payload
+ * @lrdata:	LoRa device
+ * @arg:	the buffer holding the check or not check in user space
+ *
+ * Return:	0 / other values for success / error
+ */
+static long
+loraspi_setCRC(struct lora_struct *lrdata, void __user *arg)
+{
+	struct regmap *rm;
+	int status;
+	uint32_t crc32;
+	uint8_t crc;
+
+	rm = lrdata->lora_device;
+	status = copy_from_user(&crc32, arg, sizeof(uint32_t));
+
+	crc = (crc32 == 1) ? 1 : 0;
+	mutex_lock(&(lrdata->buf_lock));
+	sx127X_setLoRaCRC(rm, crc);
+	mutex_unlock(&(lrdata->buf_lock));
+
+	return 0;
+}
+
+/**
+ * loraspi_setcodingrate - Set LoRa package's coding rate
+ * @lrdata:	LoRa device
+ * @arg:	the buffer holding the LoRa package's coding rate value in user space
+ *
+ * Return:	0 / other values for success / error
+ */
+static long
+loraspi_setcodingrate(struct lora_struct *lrdata, void __user *arg)
+{
+	struct regmap *rm;
+	int status;
+	uint32_t codingrate32;
+	uint8_t codingrate;
+
+	rm = lrdata->lora_device;
+	status = copy_from_user(&codingrate32, arg, sizeof(uint32_t));
+
+	codingrate = codingrate32;
+	mutex_lock(&(lrdata->buf_lock));
+	sx127X_setLoRaCR(rm, codingrate);
+	mutex_unlock(&(lrdata->buf_lock));
+
+	return 0;
+}
+
+/**
+ * loraspi_getcodingrate - Get LoRa package's coding rate
+ * @lrdata:	LoRa device
+ * @arg:	the buffer going to hold the LoRa package's coding rate value in user space
+ *
+ * Return:	0 / other values for success / error
+ */
+static long
+loraspi_getcodingrate(struct lora_struct *lrdata, void __user *arg)
+{
+	struct regmap *rm;
+	int status;
+	uint32_t codingrate32;
+	uint8_t codingrate;
+
+	rm = lrdata->lora_device;
+
+	mutex_lock(&(lrdata->buf_lock));
+	codingrate = sx127X_getLoRaCR(rm);
+	mutex_unlock(&(lrdata->buf_lock));
+
+	codingrate32 = codingrate;
+	status = copy_to_user(arg, &codingrate32, sizeof(uint32_t));
+
+	return 0;
+}
+
+/**
+ * loraspi_setImplicit - Set LoRa packages in Explicit / Implicit Header Mode
+ * @lrdata:	LoRa device
+ * @arg:	the buffer holding the check or not check in user space
+ *
+ * Return:	0 / other values for success / error
+ */
+static long
+loraspi_setImplicit(struct lora_struct *lrdata, void __user *arg)
+{
+	struct regmap *rm;
+	int status;
+	uint32_t implicit32;
+	uint8_t implicit;
+
+	rm = lrdata->lora_device;
+	status = copy_from_user(&implicit32, arg, sizeof(uint32_t));
+
+	implicit = (implicit32 == 1) ? 1 : 0;
+	mutex_lock(&(lrdata->buf_lock));
+	sx127X_setLoRaImplicit(rm, implicit);
+	mutex_unlock(&(lrdata->buf_lock));
+
+	return 0;
+}
+
+/**
+ * loraspi_setLDRO - Set RF low data rate optimize
+ * @lrdata:	LoRa device
+ * @arg:	the buffer holding the check or not check in user space
+ *
+ * Return:	0 / other values for success / error
+ */
+static long
+loraspi_setLDRO(struct lora_struct *lrdata, void __user *arg)
+{
+	struct regmap *rm;
+	int status;
+	uint32_t ldro32;
+	uint8_t ldro;
+
+	rm = lrdata->lora_device;
+	status = copy_from_user(&ldro32, arg, sizeof(uint32_t));
+
+	ldro = (ldro32 == 1) ? 1 : 0;
+	mutex_lock(&(lrdata->buf_lock));
+	sx127X_setLoRaLDRO(rm, ldro);
+	mutex_unlock(&(lrdata->buf_lock));
+
+	return 0;
+}
+
+/**
+ * loraspi_setPreambleLen - Set LoRa preamble length
+ * @lrdata:	LoRa device
+ * @arg:	the buffer holding the LoRa preamble length value in user space
+ *
+ * Return:	0 / other values for success / error
+ */
+static long
+loraspi_setPreambleLen(struct lora_struct *lrdata, void __user *arg)
+{
+	struct regmap *rm;
+	int status;
+	uint32_t len;
+
+	rm = lrdata->lora_device;
+	status = copy_from_user(&len, arg, sizeof(uint32_t));
+
+	mutex_lock(&(lrdata->buf_lock));
+	sx127X_setLoRaPreambleLen(rm, len);
+	mutex_unlock(&(lrdata->buf_lock));
+
+	return 0;
+}
+
+/**
+ * loraspi_getPreambleLen - Get LoRa preamble length
+ * @lrdata:	LoRa device
+ * @arg:	the buffer going to hold the LoRa preamble length value in user space
+ *
+ * Return:	0 / other values for success / error
+ */
+static long
+loraspi_getPreambleLen(struct lora_struct *lrdata, void __user *arg)
+{
+	struct regmap *rm;
+	int status;
+	uint32_t len;
+
+	rm = lrdata->lora_device;
+
+	mutex_lock(&(lrdata->buf_lock));
+	len = sx127X_getLoRaCR(rm);
+	mutex_unlock(&(lrdata->buf_lock));
+
+	status = copy_to_user(arg, &len, sizeof(uint32_t));
+
+	return 0;
+}
+
+/**
  * loraspi_ready2write - Is ready to be written
  * @lrdata:	LoRa device
  *
@@ -1648,15 +2164,28 @@ struct lora_operations lrops = {
 	.getFreq = loraspi_getfreq,
 	.setPower = loraspi_setpower,
 	.getPower = loraspi_getpower,
+	.setPmax20dBm = loraspi_setPmax20dBm,
+	.setPaRamp = loraspi_setparamp,
+	.getPaRamp = loraspi_getparamp,
+	.setOcpImax = loraspi_setocpimax,
+	.getOcpImax = loraspi_getocpimax,
 	.setLNA = loraspi_setLNA,
 	.getLNA = loraspi_getLNA,
 	.setLNAAGC = loraspi_setLNAAGC,
+	.setLnaBoostHf = loraspi_setLnaBoostHf,
 	.setSPRFactor = loraspi_setsprfactor,
 	.getSPRFactor = loraspi_getsprfactor,
 	.setBW = loraspi_setbandwidth,
 	.getBW = loraspi_getbandwidth,
 	.getRSSI = loraspi_getrssi,
 	.getSNR = loraspi_getsnr,
+	.setCRC = loraspi_setCRC,
+	.setCodingRate = loraspi_setcodingrate,
+	.getCodingRate = loraspi_getcodingrate,
+	.setImplicit = loraspi_setImplicit,
+	.setPreambleLen = loraspi_setPreambleLen,
+	.getPreambleLen = loraspi_getPreambleLen,
+	.setLDRO = loraspi_setLDRO,
 	.ready2write = loraspi_ready2write,
 	.ready2read = loraspi_ready2read,
 };
