@@ -218,6 +218,11 @@ file_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		if (lrdata->ops->getPower != NULL)
 			ret = lrdata->ops->getPower(lrdata, pval);
 		break;
+	/* Set high power +20 dBm capability on PA_BOOST pin. */
+	case LORA_SET_PMAX20DBM:
+		if (lrdata->ops->setPmax20dBm != NULL)
+			ret = lrdata->ops->setPmax20dBm(lrdata, pval);
+		break;
 	/* Set & get the RF power rise/fall time of ramp up/down. */
 	case LORA_SET_PARAMP:
 		if (lrdata->ops->setPaRamp != NULL)

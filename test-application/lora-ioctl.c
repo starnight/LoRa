@@ -127,6 +127,12 @@ int32_t get_power(int fd)
 	return power;
 }
 
+/* Set high power +20 dBm capability on PA_BOOST pin. */
+void set_pmax20dbm(int fd, uint32_t pmax20dbm)
+{
+	ioctl(fd, LORA_SET_PMAX20DBM, &pmax20dbm);
+}
+
 /* Set & get the RF power rise/fall time of ramp up/down. */
 void set_paramp(int fd, uint32_t us)
 {

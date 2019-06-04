@@ -380,6 +380,20 @@ sx127X_getLoRaPower(struct regmap *rm)
 	return pout;
 }
 
+/**
+ * sx127X_setLoRaPmax20dBm - Set RF high power +20 dBm capability on PA_BOOST pin
+ * @rm:		the device as a regmap to communicate with
+ * @yesno:	1 / 0 for 20dBm / 17dBm
+ */
+void
+sx127X_setLoRaPmax20dBm(struct regmap *rm, uint8_t yesno)
+{
+	uint8_t padac;
+
+	padac = (yesno) ? 0x87 : 0x84;
+	regmap_raw_write(rm, SX127X_REG_PA_DAC, &padac, 1);
+}
+
 const uint32_t ramp_us[] = {
 	3400,
 	2000,
@@ -1534,6 +1548,32 @@ loraspi_getpower(struct lora_struct *lrdata, void __user *arg)
 }
 
 /**
+ * loraspi_setPmax20dBm - Set RF high power +20 dBm capability on PA_BOOST pin
+ * @lrdata:	LoRa device
+ * @arg:	the buffer holding the check or not check in user space
+ *
+ * Return:	0 / other values for success / error
+ */
+static long
+loraspi_setPmax20dBm(struct lora_struct *lrdata, void __user *arg)
+{
+	struct regmap *rm;
+	int status;
+	uint32_t pmax20dBm32;
+	uint8_t pmax20dBm;
+
+	rm = lrdata->lora_device;
+	status = copy_from_user(&pmax20dBm32, arg, sizeof(uint32_t));
+
+	pmax20dBm = (pmax20dBm32 == 1) ? 1 : 0;
+	mutex_lock(&(lrdata->buf_lock));
+	sx127X_setLoRaPmax20dBm(rm, pmax20dBm);
+	mutex_unlock(&(lrdata->buf_lock));
+
+	return 0;
+}
+
+/**
  * loraspi_setparamp - Set the RF power rise/fall time of ramp up/down
  * @lrdata:	LoRa device
  * @arg:	the buffer holding the RF power rise/fall time value in user space
@@ -2124,6 +2164,7 @@ struct lora_operations lrops = {
 	.getFreq = loraspi_getfreq,
 	.setPower = loraspi_setpower,
 	.getPower = loraspi_getpower,
+	.setPmax20dBm = loraspi_setPmax20dBm,
 	.setPaRamp = loraspi_setparamp,
 	.getPaRamp = loraspi_getparamp,
 	.setOcpImax = loraspi_setocpimax,

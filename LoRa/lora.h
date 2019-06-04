@@ -74,6 +74,7 @@
 #define LORA_SET_OCPIMAX	(_IOW(LORA_IOC_MAGIC, 24, int))
 #define LORA_GET_OCPIMAX	(_IOR(LORA_IOC_MAGIC, 25, int))
 #define LORA_SET_LNABOOSTHF	(_IOW(LORA_IOC_MAGIC, 26, int))
+#define LORA_SET_PMAX20DBM	(_IOW(LORA_IOC_MAGIC, 27, int))
 
 /* List the state of the LoRa device. */
 #define LORA_STATE_SLEEP	0
@@ -95,6 +96,8 @@ struct lora_operations {
 	/* Set & get the PA power. */
 	long (*setPower)(struct lora_struct *, void __user *);
 	long (*getPower)(struct lora_struct *, void __user *);
+	/* Set high power +20 dBm capability on PA_BOOST pin. */
+	long (*setPmax20dBm)(struct lora_struct *, void __user *);
 	/* Set & get the RF power rise/fall time of ramp up/down. */
 	long (*setPaRamp)(struct lora_struct *, void __user *);
 	long (*getPaRamp)(struct lora_struct *, void __user *);
